@@ -1,0 +1,1 @@
+Add PNG textures matching the item/model names. See README_DROP_IN.txt for the full list.

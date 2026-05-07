@@ -1,72 +1,55 @@
 package com.amightytank.vanillatweaks;
 
-import com.amightytank.vanillatweaks.client.MediumBoatRenderer;
-import com.amightytank.vanillatweaks.client.SailBoatRenderer;
-import com.amightytank.vanillatweaks.client.model.MediumBoatModel;
-import com.amightytank.vanillatweaks.client.model.SailBoatModel;
-import com.amightytank.vanillatweaks.registry.ModCreativeTabs;
-import com.amightytank.vanillatweaks.registry.ModEntities;
-import com.amightytank.vanillatweaks.registry.ModItems;
-import com.amightytank.vanillatweaks.registry.ModRecipeSerializers;
 import com.mojang.logging.LogUtils;
-import net.minecraft.client.Minecraft;
-import net.neoforged.api.distmarker.Dist;
-import net.neoforged.bus.api.IEventBus;
-import net.neoforged.bus.api.SubscribeEvent;
-import net.neoforged.fml.ModLoadingContext;
-import net.neoforged.fml.common.Mod;
-import net.neoforged.fml.common.Mod.EventBusSubscriber;
-import net.neoforged.fml.config.ModConfig;
-import net.neoforged.fml.event.lifecycle.FMLClientSetupEvent;
-import net.neoforged.neoforge.client.event.EntityRenderersEvent;
+import com.amightytank.vanillatweaks.entity.ModEntities;
+import com.amightytank.vanillatweaks.entity.client.ModBoatRenderer;
+import com.amightytank.vanillatweaks.item.ModCreativeModTabs;
+import com.amightytank.vanillatweaks.item.ModItems;
+import com.amightytank.vanillatweaks.util.ModWoodTypes;
+import net.minecraft.client.renderer.Sheets;
+import net.minecraft.client.renderer.entity.EntityRenderers;
+import net.minecraftforge.api.distmarker.Dist;
+import net.minecraftforge.common.MinecraftForge;
+import net.minecraftforge.event.server.ServerStartingEvent;
+import net.minecraftforge.eventbus.api.IEventBus;
+import net.minecraftforge.eventbus.api.SubscribeEvent;
+import net.minecraftforge.fml.common.Mod;
+import net.minecraftforge.fml.event.lifecycle.FMLClientSetupEvent;
+import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
 import org.slf4j.Logger;
 
-@Mod(VanillaTweaks.MODID)
+// The value here should match an entry in the META-INF/mods.toml file
+@Mod(VanillaTweaks.MOD_ID)
 public class VanillaTweaks {
-    public static final String MODID = "vanillatweaks";
+    public static final String MOD_ID = "vanillatweaks";
     public static final Logger LOGGER = LogUtils.getLogger();
 
-    public VanillaTweaks(IEventBus modEventBus) {
-        ModItems.ITEMS.register(modEventBus);
-        ModEntities.ENTITY_TYPES.register(modEventBus);
-        ModCreativeTabs.CREATIVE_MODE_TABS.register(modEventBus);
-        ModRecipeSerializers.RECIPE_SERIALIZERS.register(modEventBus);
+    public VanillaTweaks() {
+        IEventBus modEventBus = FMLJavaModLoadingContext.get().getModEventBus();
 
-        ModLoadingContext.get().registerConfig(ModConfig.Type.COMMON, Config.SPEC);
+        ModCreativeModTabs.register(modEventBus);
+
+        ModItems.register(modEventBus);
+        ModEntities.register(modEventBus);
+
+        MinecraftForge.EVENT_BUS.register(this);
     }
 
-    @EventBusSubscriber(modid = VanillaTweaks.MODID, bus = EventBusSubscriber.Bus.MOD, value = Dist.CLIENT)
-    static class ClientModEvents {
 
+    // You can use SubscribeEvent and let the Event Bus discover methods to call
+    @SubscribeEvent
+    public void onServerStarting(ServerStartingEvent event) {
+
+    }
+
+    // You can use EventBusSubscriber to automatically register all static methods in the class annotated with @SubscribeEvent
+    @Mod.EventBusSubscriber(modid = MOD_ID, bus = Mod.EventBusSubscriber.Bus.MOD, value = Dist.CLIENT)
+    public static class ClientModEvents {
         @SubscribeEvent
-        static void onClientSetup(FMLClientSetupEvent event) {
-            LOGGER.info("HELLO FROM CLIENT SETUP");
-            LOGGER.info("MINECRAFT NAME >> {}", Minecraft.getInstance().getUser().getName());
-        }
-
-        @SubscribeEvent
-        static void registerEntityRenderers(EntityRenderersEvent.RegisterRenderers event) {
-            event.registerEntityRenderer(
-                    ModEntities.MEDIUM_BOAT.get(),
-                    MediumBoatRenderer::new
-            );
-            event.registerEntityRenderer(
-                    ModEntities.SAIL_BOAT.get(),
-                    SailBoatRenderer::new
-            );
-        }
-
-        @SubscribeEvent
-        static void registerLayer(EntityRenderersEvent.RegisterLayerDefinitions event) {
-            event.registerLayerDefinition(
-                    MediumBoatModel.LAYER_LOCATION,
-                    MediumBoatModel::createBodyLayer
-            );
-
-            event.registerLayerDefinition(
-                    SailBoatModel.LAYER_LOCATION,
-                    SailBoatModel::createBodyLayer
-            );
+        public static void onClientSetup(FMLClientSetupEvent event) {
+            Sheets.addWoodType(ModWoodTypes.PINE);
+            EntityRenderers.register(ModEntities.MOD_BOAT.get(), pContext -> new ModBoatRenderer(pContext, false));
+            EntityRenderers.register(ModEntities.MOD_CHEST_BOAT.get(), pContext -> new ModBoatRenderer(pContext, true));
         }
     }
 }
