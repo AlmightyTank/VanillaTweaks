@@ -1,5 +1,6 @@
 package com.amightytank.vanillatweaks.entity.client.model;
 
+import com.amightytank.vanillatweaks.entity.client.SailboatPaddleAnimator;
 import com.google.common.collect.ImmutableList;
 import net.minecraft.client.model.ListModel;
 import net.minecraft.client.model.WaterPatchModel;
@@ -70,8 +71,8 @@ public class SmallChestSailboatModel extends ListModel<Boat> implements WaterPat
 
     @Override
     public void setupAnim(Boat boat, float limbSwing, float limbSwingAmount, float ageInTicks, float netHeadYaw, float headPitch) {
-        animatePaddle(boat, 0, this.paddleLeft, limbSwing);
-        animatePaddle(boat, 1, this.paddleRight, limbSwing);
+        SailboatPaddleAnimator.animatePaddle(boat, 0, this.paddleLeft, limbSwing);
+        SailboatPaddleAnimator.animatePaddle(boat, 1, this.paddleRight, limbSwing);
     }
 
     @Override
@@ -82,40 +83,5 @@ public class SmallChestSailboatModel extends ListModel<Boat> implements WaterPat
     @Override
     public ModelPart waterPatch() {
         return this.waterPatch;
-    }
-
-    private static void animatePaddle(Boat boat, int side, ModelPart paddle, float limbSwing) {
-        float f = boat.getRowingTime(side, limbSwing);
-
-        float vanillaX = Mth.clampedLerp(
-                -(float)Math.PI / 3F,
-                -0.2617994F,
-                (Mth.sin(-f) + 1.0F) / 2.0F
-        );
-
-        float vanillaY = Mth.clampedLerp(
-                -(float)Math.PI / 4F,
-                (float)Math.PI / 4F,
-                (Mth.sin(-f + 1.0F) + 1.0F) / 2.0F
-        );
-
-        if (side == 1) {
-            vanillaY = (float)Math.PI - vanillaY;
-        }
-
-        // Your Blockbench base rotations
-        float baseXRot = 2.1642F;
-        float baseYRot = side == 1 ? -0.8727F : 0.8727F;
-        float baseZRot = side == 1 ? -2.8798F : 2.8798F;
-
-        // Turn vanilla rotation into an offset instead of replacing the Blockbench pose
-        float centerX = (-(float)Math.PI / 3F + -0.2617994F) / 2.0F;
-        float centerY = side == 1 ? (float)Math.PI : 0.0F;
-
-        float strength = 1.2F;
-
-        paddle.xRot = baseXRot + (vanillaX - centerX) * strength;
-        paddle.yRot = baseYRot + (vanillaY - centerY) * strength;
-        paddle.zRot = baseZRot;
     }
 }
