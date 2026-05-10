@@ -48,11 +48,11 @@ public class ModBoatRenderer extends BoatRenderer {
 
         return switch (type.getBoatSize()) {
             case SAILBOAT -> chestBoat
-                    ? new SailboatChestBoatModel(root)
-                    : new SailboatModel(root);
+                    ? new SmallChestSailboatModel(root)
+                    : new SmallSailboatModel(root);
 
             case MEDIUM_SAILBOAT -> chestBoat
-                    ? new MediumSailboatChestBoatModel(root)
+                    ? new MediumChestSailboatModel(root)
                     : new MediumSailboatModel(root);
 
             case LARGE_SAILBOAT -> chestBoat

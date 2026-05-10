@@ -13,7 +13,7 @@ import net.minecraft.client.model.geom.builders.PartDefinition;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.vehicle.Boat;
 
-public class MediumSailboatModel extends ListModel<Boat> implements WaterPatchModel {
+public class MediumChestSailboatModel extends ListModel<Boat> implements WaterPatchModel {
     private final ModelPart visualRoot;
     private final ModelPart paddleLeft;
     private final ModelPart paddleRight;
@@ -21,7 +21,7 @@ public class MediumSailboatModel extends ListModel<Boat> implements WaterPatchMo
     private final ModelPart paddleRightBack;
     private final ModelPart waterPatch;
 
-    public MediumSailboatModel(ModelPart root) {
+    public MediumChestSailboatModel(ModelPart root) {
         this.visualRoot = root.getChild("visual_root");
 
         this.paddleLeft = this.visualRoot.getChild("left_paddle");
@@ -43,6 +43,12 @@ public class MediumSailboatModel extends ListModel<Boat> implements WaterPatchMo
                 .texOffs(190, 248).addBox(-7.0F, -3.0F, -26.0F, 14.0F, 6.0F, 2.0F, new CubeDeformation(0.0F)), PartPose.offsetAndRotation(0.0F, 1.0F, 0.0F, 0.0F, -1.5708F, 0.0F));
 
         PartDefinition visual_root = partdefinition.addOrReplaceChild("visual_root", CubeListBuilder.create(), PartPose.offsetAndRotation(0.0F, 7.0F, 0.0F, 0.0F, 1.5708F, 0.0F));
+
+        PartDefinition chest_lid = visual_root.addOrReplaceChild("chest_lid", CubeListBuilder.create().texOffs(56, 39).addBox(0.0F, 0.0F, 0.0F, 12.0F, 5.0F, 12.0F, new CubeDeformation(0.0F)), PartPose.offsetAndRotation(6.0F, -15.0F, -13.0F, 0.0F, -3.098F, 0.0F));
+
+        PartDefinition chest_knob = visual_root.addOrReplaceChild("chest_knob", CubeListBuilder.create().texOffs(94, 17).addBox(0.0F, 0.0F, 0.0F, 2.0F, 4.0F, 1.0F, new CubeDeformation(0.0F)), PartPose.offsetAndRotation(1.0F, -12.0F, -12.0F, 0.0F, -3.098F, 0.0F));
+
+        PartDefinition chest_base = visual_root.addOrReplaceChild("chest_base", CubeListBuilder.create().texOffs(8, 39).addBox(0.0F, 0.0F, 0.0F, 12.0F, 8.0F, 12.0F, new CubeDeformation(0.0F)), PartPose.offsetAndRotation(6.0F, -11.0F, -13.0F, 0.0F, -3.098F, 0.0F));
 
         PartDefinition front = visual_root.addOrReplaceChild("front", CubeListBuilder.create().texOffs(48, 59).addBox(6.0F, -7.0F, 7.0F, 2.0F, 6.0F, 2.0F, new CubeDeformation(0.0F))
                 .texOffs(48, 67).addBox(4.0F, -7.0F, 9.0F, 2.0F, 6.0F, 2.0F, new CubeDeformation(0.0F))
