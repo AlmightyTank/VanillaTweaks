@@ -1,6 +1,5 @@
 package com.amightytank.vanillatweaks.entity.client.model;
 
-import com.amightytank.vanillatweaks.entity.client.SailboatPaddleAnimator;
 import com.google.common.collect.ImmutableList;
 import net.minecraft.client.model.ListModel;
 import net.minecraft.client.model.WaterPatchModel;
@@ -18,8 +17,6 @@ public class SmallSailboatModel extends ListModel<Boat> implements WaterPatchMod
     private final ModelPart visualRoot;
     private final ModelPart paddleLeft;
     private final ModelPart paddleRight;
-    private final SailboatPaddleAnimator.PaddlePose leftPaddlePose;
-    private final SailboatPaddleAnimator.PaddlePose rightPaddlePose;
     private final ModelPart bannerSail;
     private final ModelPart bannerPanel;
     private final ModelPart waterPatch;
@@ -30,9 +27,6 @@ public class SmallSailboatModel extends ListModel<Boat> implements WaterPatchMod
 
         this.paddleLeft = root.getChild("left_paddle");
         this.paddleRight = root.getChild("right_paddle");
-
-        this.leftPaddlePose = SailboatPaddleAnimator.PaddlePose.from(this.paddleLeft);
-        this.rightPaddlePose = SailboatPaddleAnimator.PaddlePose.from(this.paddleRight);
 
         this.bannerSail = root.getChild("banner_sail");
         this.bannerPanel = root.getChild("banner_panel");
@@ -75,8 +69,8 @@ public class SmallSailboatModel extends ListModel<Boat> implements WaterPatchMod
 
     @Override
     public void setupAnim(Boat boat, float limbSwing, float limbSwingAmount, float ageInTicks, float netHeadYaw, float headPitch) {
-        SailboatPaddleAnimator.animatePaddle(boat, 0, this.paddleLeft, limbSwing, this.leftPaddlePose);
-        SailboatPaddleAnimator.animatePaddle(boat, 1, this.paddleRight, limbSwing, this.rightPaddlePose);
+        animateSmallPaddle(boat, 0, this.paddleLeft, limbSwing);
+        animateSmallPaddle(boat, 1, this.paddleRight, limbSwing);
     }
 
     @Override
@@ -87,5 +81,42 @@ public class SmallSailboatModel extends ListModel<Boat> implements WaterPatchMod
     @Override
     public ModelPart waterPatch() {
         return this.waterPatch;
+    }
+
+    private static void animateSmallPaddle(Boat boat, int side, ModelPart paddle, float limbSwing) {
+        float f = boat.getRowingTime(side, limbSwing);
+
+        boolean rightSide = side == 1;
+
+        float yFix = rightSide ? -(float)Math.PI / 2F : (float)Math.PI / 2F;
+
+        float baseX = rightSide ? -0.6409F : 2.5007F;
+        float baseY = -0.6699F + yFix;
+        float baseZ = rightSide ? -0.2139F : 2.9277F;
+
+        float xAmount = 0.55F;
+        float yAmount = 0.45F;
+
+        paddle.xRot = Mth.clampedLerp(
+                baseX - xAmount,
+                baseX + xAmount,
+                (Mth.sin(-f) + 1.0F) / 2.0F
+        );
+
+        if (rightSide) {
+            paddle.yRot = Mth.clampedLerp(
+                    baseY + yAmount,
+                    baseY - yAmount,
+                    (Mth.sin(-f + 1.0F) + 1.0F) / 2.0F
+            );
+        } else {
+            paddle.yRot = Mth.clampedLerp(
+                    baseY - yAmount,
+                    baseY + yAmount,
+                    (Mth.sin(-f + 1.0F) + 1.0F) / 2.0F
+            );
+        }
+
+        paddle.zRot = baseZ;
     }
 }
