@@ -22,17 +22,39 @@ public class LargeChestSailboatModel extends ListModel<Boat> implements WaterPat
 	private final ModelPart paddleRightMiddle;
 	private final ModelPart paddleRightBack;
 	private final ModelPart paddleLeftBack;
+	private final SailboatPaddleAnimator.PaddlePose leftPaddlePose;
+	private final SailboatPaddleAnimator.PaddlePose rightPaddlePose;
+	private final SailboatPaddleAnimator.PaddlePose leftMiddlePaddlePose;
+	private final SailboatPaddleAnimator.PaddlePose rightMiddlePaddlePose;
+	private final SailboatPaddleAnimator.PaddlePose leftBackPaddlePose;
+	private final SailboatPaddleAnimator.PaddlePose rightBackPaddlePose;
+	private final ModelPart bannerSailFront;
+	private final ModelPart bannerPanelFront;
+	private final ModelPart bannerSailRear;
+	private final ModelPart bannerPanelRear;
 	private final ModelPart waterPatch;
 
 	public LargeChestSailboatModel(ModelPart root) {
 		this.visualRoot = root.getChild("visual_root");
 
-		this.paddleLeft = this.visualRoot.getChild("left_paddle_front");
-		this.paddleRight = this.visualRoot.getChild("right_paddle_front");
-		this.paddleLeftMiddle = this.visualRoot.getChild("left_paddle_middle");
-		this.paddleRightMiddle = this.visualRoot.getChild("right_paddle_middle");
-		this.paddleRightBack = this.visualRoot.getChild("right_paddle_back");
-		this.paddleLeftBack = this.visualRoot.getChild("left_paddle_back");
+		this.paddleLeft = root.getChild("left_paddle_front");
+		this.paddleRight = root.getChild("right_paddle_front");
+		this.paddleLeftMiddle = root.getChild("left_paddle_middle");
+		this.paddleRightMiddle = root.getChild("right_paddle_middle");
+		this.paddleRightBack = root.getChild("right_paddle_back");
+		this.paddleLeftBack = root.getChild("left_paddle_back");
+
+		this.leftPaddlePose = SailboatPaddleAnimator.PaddlePose.from(this.paddleLeft);
+		this.rightPaddlePose = SailboatPaddleAnimator.PaddlePose.from(this.paddleRight);
+		this.leftMiddlePaddlePose = SailboatPaddleAnimator.PaddlePose.from(this.paddleLeftMiddle);
+		this.rightMiddlePaddlePose = SailboatPaddleAnimator.PaddlePose.from(this.paddleRightMiddle);
+		this.leftBackPaddlePose = SailboatPaddleAnimator.PaddlePose.from(this.paddleLeftBack);
+		this.rightBackPaddlePose = SailboatPaddleAnimator.PaddlePose.from(this.paddleRightBack);
+
+		this.bannerSailFront = root.getChild("banner_sail_front");
+		this.bannerPanelFront = root.getChild("banner_panel_front");
+		this.bannerSailRear = root.getChild("banner_sail_rear");
+		this.bannerPanelRear = root.getChild("banner_panel_rear");
 
 		this.waterPatch = root.getChild("water_patch");
 	}
@@ -101,58 +123,95 @@ public class LargeChestSailboatModel extends ListModel<Boat> implements WaterPat
 				.texOffs(83, 103).addBox(-56.0F, -8.0F, -3.0F, 2.0F, 14.0F, 3.0F, new CubeDeformation(0.0F))
 				.texOffs(83, 103).addBox(-58.0F, -6.0F, -3.0F, 2.0F, 10.0F, 3.0F, new CubeDeformation(0.0F)), PartPose.offsetAndRotation(1.0F, -3.0F, -13.0F, 0.0F, 1.5708F, -1.5708F));
 
-		PartDefinition left_paddle_front = visual_root.addOrReplaceChild("left_paddle_front", CubeListBuilder.create().texOffs(48, 76).addBox(-1.0F, 0.0F, -5.0F, 2.0F, 2.0F, 18.0F, new CubeDeformation(0.0F))
-				.texOffs(8, 99).addBox(-1.001F, -3.0F, 8.0F, 1.0F, 6.0F, 7.0F, new CubeDeformation(0.0F)), PartPose.offsetAndRotation(12.0F, -11.0F, 24.0F, 2.1642F, 0.8727F, 2.8798F));
+		PartDefinition left_paddle_front = partdefinition.addOrReplaceChild("left_paddle_front", CubeListBuilder.create().texOffs(48, 76).addBox(-1.0F, 0.0F, -5.0F, 2.0F, 2.0F, 18.0F, new CubeDeformation(0.0F))
+				.texOffs(8, 99).addBox(-1.001F, -3.0F, 8.0F, 1.0F, 6.0F, 7.0F, new CubeDeformation(0.0F)), PartPose.offsetAndRotation(24.0F, -8.0F, -12.0F, 2.5007F, -0.6699F, 2.9277F));
 
-		PartDefinition right_paddle_front = visual_root.addOrReplaceChild("right_paddle_front", CubeListBuilder.create().texOffs(8, 79).addBox(-1.0F, 0.0F, -5.0F, 2.0F, 2.0F, 18.0F, new CubeDeformation(0.0F))
-				.texOffs(24, 99).addBox(0.001F, -3.0F, 8.0F, 1.0F, 6.0F, 7.0F, new CubeDeformation(0.0F)), PartPose.offsetAndRotation(-12.0F, -11.0F, 24.0F, 2.1642F, -0.8727F, -2.8798F));
+		PartDefinition right_paddle_front = partdefinition.addOrReplaceChild("right_paddle_front", CubeListBuilder.create().texOffs(8, 79).addBox(-1.0F, 0.0F, -5.0F, 2.0F, 2.0F, 18.0F, new CubeDeformation(0.0F))
+				.texOffs(24, 99).addBox(0.001F, -3.0F, 8.0F, 1.0F, 6.0F, 7.0F, new CubeDeformation(0.0F)), PartPose.offsetAndRotation(24.0F, -8.0F, 12.0F, -0.6409F, -0.6699F, -0.2139F));
 
-		PartDefinition left_paddle_middle = visual_root.addOrReplaceChild("left_paddle_middle", CubeListBuilder.create().texOffs(48, 76).addBox(-1.0F, 0.0F, -5.0F, 2.0F, 2.0F, 18.0F, new CubeDeformation(0.0F))
-				.texOffs(8, 99).addBox(-1.001F, -3.0F, 8.0F, 1.0F, 6.0F, 7.0F, new CubeDeformation(0.0F)), PartPose.offsetAndRotation(12.0F, -11.0F, -1.0F, 2.1642F, 0.8727F, 2.8798F));
+		PartDefinition left_paddle_middle = partdefinition.addOrReplaceChild("left_paddle_middle", CubeListBuilder.create().texOffs(48, 76).addBox(-1.0F, 0.0F, -5.0F, 2.0F, 2.0F, 18.0F, new CubeDeformation(0.0F))
+				.texOffs(8, 99).addBox(-1.001F, -3.0F, 8.0F, 1.0F, 6.0F, 7.0F, new CubeDeformation(0.0F)), PartPose.offsetAndRotation(-1.0F, -8.0F, -12.0F, 2.5007F, -0.6699F, 2.9277F));
 
-		PartDefinition right_paddle_middle = visual_root.addOrReplaceChild("right_paddle_middle", CubeListBuilder.create().texOffs(8, 79).addBox(-1.0F, 0.0F, -5.0F, 2.0F, 2.0F, 18.0F, new CubeDeformation(0.0F))
-				.texOffs(24, 99).addBox(0.001F, -3.0F, 8.0F, 1.0F, 6.0F, 7.0F, new CubeDeformation(0.0F)), PartPose.offsetAndRotation(-12.0F, -11.0F, -1.0F, 2.1642F, -0.8727F, -2.8798F));
+		PartDefinition right_paddle_middle = partdefinition.addOrReplaceChild("right_paddle_middle", CubeListBuilder.create().texOffs(8, 79).addBox(-1.0F, 0.0F, -5.0F, 2.0F, 2.0F, 18.0F, new CubeDeformation(0.0F))
+				.texOffs(24, 99).addBox(0.001F, -3.0F, 8.0F, 1.0F, 6.0F, 7.0F, new CubeDeformation(0.0F)), PartPose.offsetAndRotation(-1.0F, -8.0F, 12.0F, -0.6409F, -0.6699F, -0.2139F));
 
-		PartDefinition right_paddle_back = visual_root.addOrReplaceChild("right_paddle_back", CubeListBuilder.create().texOffs(8, 59).addBox(-1.0F, 0.0F, -5.0F, 2.0F, 2.0F, 18.0F, new CubeDeformation(0.0F))
-				.texOffs(48, 96).addBox(0.001F, -3.0F, 8.0F, 1.0F, 6.0F, 7.0F, new CubeDeformation(0.0F)), PartPose.offsetAndRotation(-12.0F, -11.0F, -26.0F, 2.1642F, -0.8727F, -2.8798F));
+		PartDefinition right_paddle_back = partdefinition.addOrReplaceChild("right_paddle_back", CubeListBuilder.create().texOffs(8, 59).addBox(-1.0F, 0.0F, -5.0F, 2.0F, 2.0F, 18.0F, new CubeDeformation(0.0F))
+				.texOffs(48, 96).addBox(0.001F, -3.0F, 8.0F, 1.0F, 6.0F, 7.0F, new CubeDeformation(0.0F)), PartPose.offsetAndRotation(-26.0F, -8.0F, 12.0F, -0.6409F, -0.6699F, -0.2139F));
 
-		PartDefinition left_paddle_back = visual_root.addOrReplaceChild("left_paddle_back", CubeListBuilder.create().texOffs(56, 56).addBox(-1.0F, 0.0F, -5.0F, 2.0F, 2.0F, 18.0F, new CubeDeformation(0.0F))
-				.texOffs(94, 4).addBox(-1.001F, -3.0F, 8.0F, 1.0F, 6.0F, 7.0F, new CubeDeformation(0.0F)), PartPose.offsetAndRotation(12.0F, -11.0F, -26.0F, 2.1642F, 0.8727F, 2.8798F));
+		PartDefinition left_paddle_back = partdefinition.addOrReplaceChild("left_paddle_back", CubeListBuilder.create().texOffs(56, 56).addBox(-1.0F, 0.0F, -5.0F, 2.0F, 2.0F, 18.0F, new CubeDeformation(0.0F))
+				.texOffs(94, 4).addBox(-1.001F, -3.0F, 8.0F, 1.0F, 6.0F, 7.0F, new CubeDeformation(0.0F)), PartPose.offsetAndRotation(-26.0F, -8.0F, -12.0F, 2.5007F, -0.6699F, 2.9277F));
 
-		PartDefinition banner_sail_front = visual_root.addOrReplaceChild("banner_sail_front", CubeListBuilder.create().texOffs(0, 39).addBox(-1.0F, -61.0F, -5.0F, 2.0F, 60.0F, 2.0F, new CubeDeformation(0.0F))
+		PartDefinition banner_sail_front = partdefinition.addOrReplaceChild("banner_sail_front", CubeListBuilder.create().texOffs(0, 39).addBox(-1.0F, -61.0F, -5.0F, 2.0F, 60.0F, 2.0F, new CubeDeformation(0.0F))
 				.texOffs(94, 0).addBox(-7.0F, -61.0F, -5.0F, 14.0F, 1.0F, 1.0F, new CubeDeformation(0.0F))
-				.texOffs(94, 2).addBox(-7.0F, -36.0F, -5.0F, 14.0F, 1.0F, 1.0F, new CubeDeformation(0.0F)), PartPose.offsetAndRotation(0.0F, 0.0F, 8.0F, 0.0F, 3.1416F, 0.0F));
+				.texOffs(94, 2).addBox(-7.0F, -36.0F, -5.0F, 14.0F, 1.0F, 1.0F, new CubeDeformation(0.0F)), PartPose.offsetAndRotation(8.0F, 3.0F, 0.0F, 0.0F, -1.5708F, 0.0F));
 
-		PartDefinition banner_panel_front = visual_root.addOrReplaceChild("banner_panel_front", CubeListBuilder.create().texOffs(88, 76).addBox(-13.0F, -26.0F, -1.0F, 14.0F, 26.0F, 1.0F, new CubeDeformation(0.0F)), PartPose.offset(6.0F, -35.0F, 14.0F));
+		PartDefinition banner_panel_front = partdefinition.addOrReplaceChild("banner_panel_front", CubeListBuilder.create().texOffs(88, 76).addBox(-13.0F, -26.0F, -1.0F, 14.0F, 26.0F, 1.0F, new CubeDeformation(0.0F)), PartPose.offsetAndRotation(14.0F, -32.0F, -6.0F, 0.0F, 1.5708F, 0.0F));
 
-		PartDefinition banner_sail_rear = visual_root.addOrReplaceChild("banner_sail_rear", CubeListBuilder.create().texOffs(0, 39).addBox(-1.0F, -79.0F, -5.0F, 2.0F, 78.0F, 2.0F, new CubeDeformation(0.0F))
+		PartDefinition banner_sail_rear = partdefinition.addOrReplaceChild("banner_sail_rear", CubeListBuilder.create().texOffs(0, 39).addBox(-1.0F, -79.0F, -5.0F, 2.0F, 78.0F, 2.0F, new CubeDeformation(0.0F))
 				.texOffs(94, 0).addBox(-7.0F, -79.0F, -5.0F, 14.0F, 1.0F, 1.0F, new CubeDeformation(0.0F))
-				.texOffs(94, 2).addBox(-7.0F, -54.0F, -5.0F, 14.0F, 1.0F, 1.0F, new CubeDeformation(0.0F)), PartPose.offsetAndRotation(0.0F, 0.0F, -17.0F, 0.0F, 3.1416F, 0.0F));
+				.texOffs(94, 2).addBox(-7.0F, -54.0F, -5.0F, 14.0F, 1.0F, 1.0F, new CubeDeformation(0.0F)), PartPose.offsetAndRotation(-17.0F, 3.0F, 0.0F, 0.0F, -1.5708F, 0.0F));
 
-		PartDefinition banner_panel_rear = visual_root.addOrReplaceChild("banner_panel_rear", CubeListBuilder.create().texOffs(88, 76).addBox(-13.0F, -44.0F, -1.0F, 14.0F, 26.0F, 1.0F, new CubeDeformation(0.0F)), PartPose.offset(6.0F, -35.0F, -11.0F));
+		PartDefinition banner_panel_rear = partdefinition.addOrReplaceChild("banner_panel_rear", CubeListBuilder.create().texOffs(88, 76).addBox(-13.0F, -44.0F, -1.0F, 14.0F, 26.0F, 1.0F, new CubeDeformation(0.0F)), PartPose.offsetAndRotation(-11.0F, -32.0F, -6.0F, 0.0F, 1.5708F, 0.0F));
 
 		return LayerDefinition.create(meshdefinition, 176, 176);
 	}
 
 	@Override
 	public void setupAnim(Boat boat, float limbSwing, float limbSwingAmount, float ageInTicks, float netHeadYaw, float headPitch) {
-		SailboatPaddleAnimator.animatePaddle(boat, 0, this.paddleLeft, limbSwing);
-		SailboatPaddleAnimator.animatePaddle(boat, 1, this.paddleRight, limbSwing);
+		SailboatPaddleAnimator.animatePaddle(boat, 0, this.paddleLeft, limbSwing, this.leftPaddlePose);
+		SailboatPaddleAnimator.animatePaddle(boat, 1, this.paddleRight, limbSwing, this.rightPaddlePose);
 
-		SailboatPaddleAnimator.animatePaddle(boat, 0, this.paddleLeftMiddle, limbSwing);
-		SailboatPaddleAnimator.animatePaddle(boat, 1, this.paddleRightMiddle, limbSwing);
+		SailboatPaddleAnimator.animatePaddle(boat, 0, this.paddleLeftMiddle, limbSwing, this.leftMiddlePaddlePose);
+		SailboatPaddleAnimator.animatePaddle(boat, 1, this.paddleRightMiddle, limbSwing, this.rightMiddlePaddlePose);
 
-		SailboatPaddleAnimator.animatePaddle(boat, 0, this.paddleLeftBack, limbSwing);
-		SailboatPaddleAnimator.animatePaddle(boat, 1, this.paddleRightBack, limbSwing);
+		SailboatPaddleAnimator.animatePaddle(boat, 0, this.paddleLeftBack, limbSwing, this.leftBackPaddlePose);
+		SailboatPaddleAnimator.animatePaddle(boat, 1, this.paddleRightBack, limbSwing, this.rightBackPaddlePose);
 	}
 
 	@Override
 	public Iterable<ModelPart> parts() {
-		return ImmutableList.of(visualRoot);
+		return ImmutableList.of(visualRoot, paddleLeft, paddleRight, paddleLeftMiddle, paddleRightMiddle, paddleLeftBack, paddleRightBack, bannerPanelFront, bannerSailFront, bannerPanelRear, bannerSailRear);
 	}
 
 	@Override
 	public ModelPart waterPatch() {
 		return this.waterPatch;
+	}
+
+	private static void animatePaddle(Boat boat, int side, ModelPart paddle, float limbSwing) {
+		float f = boat.getRowingTime(side, limbSwing);
+
+		boolean rightSide = side == 1;
+
+		// Blockbench rest pose
+		float baseX = rightSide ? -0.6409F : 2.5007F;
+		float baseY = -0.6699F;
+		float baseZ = rightSide ? -0.2139F : 2.9277F;
+
+		// How far the oar moves from the Blockbench pose
+		float xAmount = 0.55F;
+		float yAmount = 0.45F;
+
+		paddle.xRot = Mth.clampedLerp(
+				baseX - xAmount,
+				baseX + xAmount,
+				(Mth.sin(-f) + 1.0F) / 2.0F
+		);
+
+		paddle.yRot = Mth.clampedLerp(
+				baseY - yAmount,
+				baseY + yAmount,
+				(Mth.sin(-f + 1.0F) + 1.0F) / 2.0F
+		);
+
+		if (rightSide) {
+			paddle.yRot = Mth.clampedLerp(
+					baseY + yAmount,
+					baseY - yAmount,
+					(Mth.sin(-f + 1.0F) + 1.0F) / 2.0F
+			);
+		}
+
+		paddle.zRot = baseZ;
 	}
 }
