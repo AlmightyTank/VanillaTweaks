@@ -7,6 +7,7 @@ import net.minecraft.network.syncher.EntityDataAccessor;
 import net.minecraft.network.syncher.EntityDataSerializers;
 import net.minecraft.network.syncher.SynchedEntityData;
 import net.minecraft.util.Mth;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityDimensions;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.Pose;
@@ -16,11 +17,18 @@ import net.minecraft.world.entity.vehicle.ChestBoat;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.Vec3;
-import net.minecraft.world.entity.Entity;
 
 public class ModChestBoatEntity extends ChestBoat {
     private static final EntityDataAccessor<Integer> DATA_ID_TYPE =
             SynchedEntityData.defineId(ModChestBoatEntity.class, EntityDataSerializers.INT);
+
+    private static final EntityDataAccessor<Integer> DATA_BANNER_COUNT =
+            SynchedEntityData.defineId(ModChestBoatEntity.class, EntityDataSerializers.INT);
+
+    private boolean sailInputLeft;
+    private boolean sailInputRight;
+    private boolean sailInputForward;
+    private boolean sailInputBack;
 
     public ModChestBoatEntity(EntityType<? extends Boat> entityType, Level level) {
         super(entityType, level);
@@ -33,11 +41,6 @@ public class ModChestBoatEntity extends ChestBoat {
         this.yo = y;
         this.zo = z;
     }
-
-    private boolean sailInputLeft;
-    private boolean sailInputRight;
-    private boolean sailInputForward;
-    private boolean sailInputBack;
 
     @Override
     public void setInput(boolean left, boolean right, boolean forward, boolean back) {
@@ -65,30 +68,17 @@ public class ModChestBoatEntity extends ChestBoat {
 
         ModBoatEntity.BoatSize size = this.getModVariant().getBoatSize();
 
-        // Scale vanilla turning.
-        // Vanilla already turned the boat during super.tick(), so we reduce/boost that turn here.
         float vanillaTurn = Mth.wrapDegrees(this.getYRot() - oldYRot);
+        this.setYRot(oldYRot + vanillaTurn * size.getTurnScale());
 
-        float turnScale = switch (size) {
-            case SAILBOAT -> 1.35F;        // fast turn
-            case MEDIUM_SAILBOAT -> 0.75F; // slower
-            case LARGE_SAILBOAT -> 0.35F;  // heavy turn
-        };
-
-        this.setYRot(oldYRot + vanillaTurn * turnScale);
-
-        // Forward speed tuning.
         if (this.sailInputForward) {
-            int rowers = getRowingPassengerCount();
-            int banners = getBannerCount();
+            int rowers = this.getRowingPassengerCount();
+            int banners = this.getBannerCount();
 
-            float acceleration = getBaseAcceleration(size);
             float rowerBonus = 1.0F + Math.max(0, rowers - 1) * 0.25F;
             float bannerBonus = 1.0F + banners * 0.18F;
 
-            acceleration *= rowerBonus;
-            acceleration *= bannerBonus;
-
+            float acceleration = size.getBaseAcceleration() * rowerBonus * bannerBonus;
             float yaw = this.getYRot() * Mth.DEG_TO_RAD;
 
             this.setDeltaMovement(this.getDeltaMovement().add(
@@ -101,22 +91,6 @@ public class ModChestBoatEntity extends ChestBoat {
         this.limitTopSpeed(size);
     }
 
-    private float getBaseAcceleration(ModBoatEntity.BoatSize size) {
-        return switch (size) {
-            case SAILBOAT -> 0.038F;
-            case MEDIUM_SAILBOAT -> 0.027F;
-            case LARGE_SAILBOAT -> 0.018F;
-        };
-    }
-
-    private double getBaseTopSpeed(ModBoatEntity.BoatSize size) {
-        return switch (size) {
-            case SAILBOAT -> 0.30D;
-            case MEDIUM_SAILBOAT -> 0.38D;
-            case LARGE_SAILBOAT -> 0.47D;
-        };
-    }
-
     private void limitTopSpeed(ModBoatEntity.BoatSize size) {
         Vec3 motion = this.getDeltaMovement();
 
@@ -125,13 +99,13 @@ public class ModChestBoatEntity extends ChestBoat {
             return;
         }
 
-        int rowers = getRowingPassengerCount();
-        int banners = getBannerCount();
+        int rowers = this.getRowingPassengerCount();
+        int banners = this.getBannerCount();
 
         double rowerBonus = 1.0D + Math.max(0, rowers - 1) * 0.15D;
         double bannerBonus = 1.0D + banners * 0.12D;
 
-        double maxSpeed = getBaseTopSpeed(size) * rowerBonus * bannerBonus;
+        double maxSpeed = size.getBaseTopSpeed() * rowerBonus * bannerBonus;
 
         if (horizontalSpeed > maxSpeed) {
             double scale = maxSpeed / horizontalSpeed;
@@ -156,30 +130,24 @@ public class ModChestBoatEntity extends ChestBoat {
         return Math.max(1, count);
     }
 
-    private int getBannerCount() {
-        return switch (this.getModVariant().getBoatSize()) {
-            case SAILBOAT -> 1;
-            case MEDIUM_SAILBOAT -> 1;
-            case LARGE_SAILBOAT -> 2; // temporary test value
-        };
+    public int getBannerCount() {
+        return this.entityData.get(DATA_BANNER_COUNT);
+    }
+
+    public void setBannerCount(int count) {
+        ModBoatEntity.BoatSize size = this.getModVariant().getBoatSize();
+        int clamped = Math.max(0, Math.min(count, size.getMaxBanners()));
+        this.entityData.set(DATA_BANNER_COUNT, clamped);
     }
 
     @Override
     public EntityDimensions getDimensions(Pose pose) {
-        return switch (this.getModVariant().getBoatSize()) {
-            case SAILBOAT -> EntityDimensions.scalable(1.375F, 0.5625F);
-            case MEDIUM_SAILBOAT -> EntityDimensions.scalable(1.8F, 0.65F);
-            case LARGE_SAILBOAT -> EntityDimensions.scalable(2.35F, 0.75F);
-        };
+        return this.getModVariant().getBoatSize().getDimensions(true);
     }
 
     @Override
     protected int getMaxPassengers() {
-        return switch (this.getModVariant().getBoatSize()) {
-            case SAILBOAT -> 1;
-            case MEDIUM_SAILBOAT -> 1;
-            case LARGE_SAILBOAT -> 2;
-        };
+        return this.getModVariant().getBoatSize().getMaxPassengers(true);
     }
 
     @Override
@@ -189,10 +157,9 @@ public class ModChestBoatEntity extends ChestBoat {
         }
 
         int index = this.getPassengers().indexOf(passenger);
-        Vec3 seat = getSeatOffset(index);
+        Vec3 seat = this.getModVariant().getBoatSize().getSeatOffset(index, true);
 
         double riderY = this.getY() + this.getPassengersRidingOffset() + passenger.getMyRidingOffset();
-
         Vec3 rotatedSeat = seat.yRot(-this.getYRot() * Mth.DEG_TO_RAD);
 
         callback.accept(
@@ -203,25 +170,6 @@ public class ModChestBoatEntity extends ChestBoat {
         );
     }
 
-    private Vec3 getSeatOffset(int index) {
-        return switch (this.getModVariant().getBoatSize()) {
-            case SAILBOAT -> new Vec3(0.0D, 0.0D, 0.0D);
-
-            case MEDIUM_SAILBOAT -> switch (index) {
-                case 0 -> new Vec3(0.0D, 0.0D, 0.45D);
-                case 1 -> new Vec3(0.0D, 0.0D, -1.15D);
-                default -> Vec3.ZERO;
-            };
-
-            case LARGE_SAILBOAT -> switch (index) {
-                case 0 -> new Vec3(0.0D, 0.25D, 1.15D);
-                case 1 -> new Vec3(0.0D, 0.25D, -0.15D);
-                case 2 -> new Vec3(0.0D, 0.25D, -1.85D);
-                default -> Vec3.ZERO;
-            };
-        };
-    }
-
     @Override
     public Item getDropItem() {
         return ModItems.getChestBoatItem(this.getModVariant()).get();
@@ -229,6 +177,7 @@ public class ModChestBoatEntity extends ChestBoat {
 
     public void setVariant(ModBoatEntity.Type variant) {
         this.entityData.set(DATA_ID_TYPE, variant.ordinal());
+        this.setBannerCount(this.getBannerCount());
         this.refreshDimensions();
     }
 
@@ -239,21 +188,30 @@ public class ModChestBoatEntity extends ChestBoat {
     @Override
     protected void defineSynchedData() {
         super.defineSynchedData();
-        this.entityData.define(DATA_ID_TYPE, ModBoatEntity.Type.SAILBOAT.ordinal());
+        this.entityData.define(DATA_ID_TYPE, ModBoatEntity.Type.OAK_SAILBOAT.ordinal());
+        this.entityData.define(DATA_BANNER_COUNT, 0);
     }
 
     @Override
     protected void addAdditionalSaveData(CompoundTag tag) {
         super.addAdditionalSaveData(tag);
-        tag.putString("Type", this.getModVariant().getSerializedName());
+
+        tag.putString("ModBoatType", this.getModVariant().getSerializedName());
+        tag.putInt("BannerCount", this.getBannerCount());
     }
 
     @Override
     protected void readAdditionalSaveData(CompoundTag tag) {
         super.readAdditionalSaveData(tag);
 
-        if (tag.contains("Type", 8)) {
+        if (tag.contains("ModBoatType", 8)) {
+            this.setVariant(ModBoatEntity.Type.byName(tag.getString("ModBoatType")));
+        } else if (tag.contains("Type", 8)) {
             this.setVariant(ModBoatEntity.Type.byName(tag.getString("Type")));
+        }
+
+        if (tag.contains("BannerCount", 3)) {
+            this.setBannerCount(tag.getInt("BannerCount"));
         }
     }
 }
