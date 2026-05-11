@@ -16,7 +16,7 @@ public class ModCreativeModTabs {
 
     public static final RegistryObject<CreativeModeTab> TUTORIAL_TAB = CREATIVE_MODE_TABS.register("tutorial_tab",
             () -> CreativeModeTab.builder()
-                    .icon(() -> new ItemStack(ModItems.getBoatItem(ModBoatEntity.Type.SAILBOAT).get()))
+                    .icon(() -> new ItemStack(ModItems.getBoatItem(ModBoatEntity.Type.OAK_SAILBOAT).get()))
                     .title(Component.translatable("creativetab.tutorial_tab"))
                     .displayItems((parameters, output) -> {
                         for (ModBoatEntity.Type type : ModBoatEntity.Type.values()) {
