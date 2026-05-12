@@ -7,6 +7,7 @@ import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResultHolder;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntitySelector;
+import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.entity.vehicle.Boat;
 import net.minecraft.world.item.Item;
@@ -20,17 +21,24 @@ import net.minecraft.world.phys.Vec3;
 
 import java.util.List;
 import java.util.function.Predicate;
+import java.util.function.Supplier;
 
 public class ModBoatItem extends Item {
-    private static final Predicate<Entity> ENTITY_PREDICATE = EntitySelector.NO_SPECTATORS.and(Entity::isPickable);
+    private static final Predicate<Entity> ENTITY_PREDICATE =
+            EntitySelector.NO_SPECTATORS.and(Entity::isPickable);
 
     private final ModBoatEntity.Type type;
     private final boolean hasChest;
+    private final Supplier<? extends EntityType<? extends Boat>> boatEntity;
 
-    public ModBoatItem(boolean hasChest, ModBoatEntity.Type type, Item.Properties properties) {
+    public ModBoatItem(boolean hasChest,
+                       ModBoatEntity.Type type,
+                       Supplier<? extends EntityType<? extends Boat>> boatEntity,
+                       Properties properties) {
         super(properties);
         this.hasChest = hasChest;
         this.type = type;
+        this.boatEntity = boatEntity;
     }
 
     @Override
@@ -64,15 +72,16 @@ public class ModBoatItem extends Item {
             return InteractionResultHolder.pass(itemStack);
         }
 
-        Boat boat = this.getBoat(level, hitResult);
+        Boat boat = this.getBoat(level, hitResult, player.getYRot());
+
+        // Set rotation before variant so the custom rectangular hitbox builds in the right direction
+        boat.setYRot(player.getYRot());
 
         if (boat instanceof ModChestBoatEntity chestBoat) {
             chestBoat.setVariant(this.type);
         } else if (boat instanceof ModBoatEntity modBoat) {
             modBoat.setVariant(this.type);
         }
-
-        boat.setYRot(player.getYRot());
 
         if (!level.noCollision(boat, boat.getBoundingBox())) {
             return InteractionResultHolder.fail(itemStack);
@@ -91,13 +100,20 @@ public class ModBoatItem extends Item {
         return InteractionResultHolder.sidedSuccess(itemStack, level.isClientSide());
     }
 
-    private Boat getBoat(Level level, HitResult hitResult) {
+    private Boat getBoat(Level level, HitResult hitResult, float yaw) {
         double x = hitResult.getLocation().x;
         double y = hitResult.getLocation().y;
         double z = hitResult.getLocation().z;
 
-        return this.hasChest
-                ? new ModChestBoatEntity(level, x, y, z)
-                : new ModBoatEntity(level, x, y, z);
+        Boat boat = this.boatEntity.get().create(level);
+
+        if (boat == null) {
+            boat = this.hasChest
+                    ? new ModChestBoatEntity(level, x, y, z)
+                    : new ModBoatEntity(level, x, y, z);
+        }
+
+        boat.moveTo(x, y, z, yaw, 0.0F);
+        return boat;
     }
 }

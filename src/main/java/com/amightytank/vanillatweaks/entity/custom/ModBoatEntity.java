@@ -19,6 +19,7 @@ import net.minecraft.world.item.Item;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 
 import java.util.function.IntFunction;
@@ -64,6 +65,38 @@ public class ModBoatEntity extends Boat {
         super.tick();
 
         this.applySailboatMovement(oldYRot);
+
+        // Keeps the custom rectangular hitbox updated as the boat turns
+        this.setBoundingBox(this.makeBoundingBox());
+    }
+
+    @Override
+    protected AABB makeBoundingBox() {
+        BoatSize size = this.getModVariant().getBoatSize();
+
+        float width = size.getHitboxWidth();      // left / right
+        float length = size.getHitboxLength();    // front / back
+        float height = size.getHitboxHeight();
+
+        float yaw = this.getYRot() * Mth.DEG_TO_RAD;
+
+        double sin = Math.abs(Mth.sin(yaw));
+        double cos = Math.abs(Mth.cos(yaw));
+
+        double halfWidth = width / 2.0D;
+        double halfLength = length / 2.0D;
+
+        double halfX = halfWidth * cos + halfLength * sin;
+        double halfZ = halfWidth * sin + halfLength * cos;
+
+        return new AABB(
+                this.getX() - halfX,
+                this.getY(),
+                this.getZ() - halfZ,
+                this.getX() + halfX,
+                this.getY() + height,
+                this.getZ() + halfZ
+        );
     }
 
     private void applySailboatMovement(float oldYRot) {
@@ -184,6 +217,7 @@ public class ModBoatEntity extends Boat {
         this.entityData.set(DATA_ID_TYPE, variant.ordinal());
         this.setBannerCount(this.getBannerCount());
         this.refreshDimensions();
+        this.setBoundingBox(this.makeBoundingBox());
     }
 
     public Type getModVariant() {
@@ -221,12 +255,13 @@ public class ModBoatEntity extends Boat {
     }
 
     public enum BoatSize implements StringRepresentable {
-        SAILBOAT("sailboat", 1.60F, 0.35F, 1, 1, 1.35F, 0.020F, 0.36D, 0),
-        MEDIUM_SAILBOAT("medium_sailboat", 2.85F, 0.40F, 2, 1, 0.75F, 0.014F, 0.42D, 0),
-        LARGE_SAILBOAT("large_sailboat", 4.35F, 0.45F, 3, 2, 0.35F, 0.009F, 0.48D, 2);
+        SAILBOAT("sailboat", 1.375F, 1.60F, 0.35F, 1, 1, 1.35F, 0.020F, 0.36D, 0),
+        MEDIUM_SAILBOAT("medium_sailboat", 1.55F, 2.85F, 0.40F, 2, 1, 0.75F, 0.014F, 0.42D, 0),
+        LARGE_SAILBOAT("large_sailboat", 1.85F, 4.35F, 0.45F, 3, 2, 0.35F, 0.009F, 0.48D, 2);
 
         private final String name;
         private final float hitboxWidth;
+        private final float hitboxLength;
         private final float hitboxHeight;
         private final int maxPassengers;
         private final int maxChestPassengers;
@@ -235,10 +270,12 @@ public class ModBoatEntity extends Boat {
         private final double baseTopSpeed;
         private final int maxBanners;
 
-        BoatSize(String name, float hitboxWidth, float hitboxHeight, int maxPassengers, int maxChestPassengers,
+        BoatSize(String name, float hitboxWidth, float hitboxLength, float hitboxHeight,
+                 int maxPassengers, int maxChestPassengers,
                  float turnScale, float baseAcceleration, double baseTopSpeed, int maxBanners) {
             this.name = name;
             this.hitboxWidth = hitboxWidth;
+            this.hitboxLength = hitboxLength;
             this.hitboxHeight = hitboxHeight;
             this.maxPassengers = maxPassengers;
             this.maxChestPassengers = maxChestPassengers;
@@ -255,6 +292,18 @@ public class ModBoatEntity extends Boat {
 
         public String getName() {
             return this.name;
+        }
+
+        public float getHitboxWidth() {
+            return this.hitboxWidth;
+        }
+
+        public float getHitboxLength() {
+            return this.hitboxLength;
+        }
+
+        public float getHitboxHeight() {
+            return this.hitboxHeight;
         }
 
         public EntityDimensions getDimensions(boolean chestBoat) {

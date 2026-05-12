@@ -16,6 +16,7 @@ import net.minecraft.world.entity.vehicle.Boat;
 import net.minecraft.world.entity.vehicle.ChestBoat;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 
 public class ModChestBoatEntity extends ChestBoat {
@@ -59,6 +60,38 @@ public class ModChestBoatEntity extends ChestBoat {
         super.tick();
 
         this.applySailboatMovement(oldYRot);
+
+        // Keeps the custom rectangular hitbox updated as the chest boat turns
+        this.setBoundingBox(this.makeBoundingBox());
+    }
+
+    @Override
+    protected AABB makeBoundingBox() {
+        ModBoatEntity.BoatSize size = this.getModVariant().getBoatSize();
+
+        float width = size.getHitboxWidth();      // left / right
+        float length = size.getHitboxLength();    // front / back
+        float height = size.getHitboxHeight();
+
+        float yaw = this.getYRot() * Mth.DEG_TO_RAD;
+
+        double sin = Math.abs(Mth.sin(yaw));
+        double cos = Math.abs(Mth.cos(yaw));
+
+        double halfWidth = width / 2.0D;
+        double halfLength = length / 2.0D;
+
+        double halfX = halfWidth * cos + halfLength * sin;
+        double halfZ = halfWidth * sin + halfLength * cos;
+
+        return new AABB(
+                this.getX() - halfX,
+                this.getY(),
+                this.getZ() - halfZ,
+                this.getX() + halfX,
+                this.getY() + height,
+                this.getZ() + halfZ
+        );
     }
 
     private void applySailboatMovement(float oldYRot) {
@@ -179,6 +212,7 @@ public class ModChestBoatEntity extends ChestBoat {
         this.entityData.set(DATA_ID_TYPE, variant.ordinal());
         this.setBannerCount(this.getBannerCount());
         this.refreshDimensions();
+        this.setBoundingBox(this.makeBoundingBox());
     }
 
     public ModBoatEntity.Type getModVariant() {

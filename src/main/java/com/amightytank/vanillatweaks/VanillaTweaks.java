@@ -1,11 +1,10 @@
 package com.amightytank.vanillatweaks;
 
-import com.mojang.logging.LogUtils;
 import com.amightytank.vanillatweaks.entity.ModEntities;
 import com.amightytank.vanillatweaks.entity.client.ModBoatRenderer;
 import com.amightytank.vanillatweaks.item.ModCreativeModTabs;
 import com.amightytank.vanillatweaks.item.ModItems;
-import net.minecraft.client.renderer.Sheets;
+import com.mojang.logging.LogUtils;
 import net.minecraft.client.renderer.entity.EntityRenderers;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.common.MinecraftForge;
@@ -17,7 +16,6 @@ import net.minecraftforge.fml.event.lifecycle.FMLClientSetupEvent;
 import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
 import org.slf4j.Logger;
 
-// The value here should match an entry in the META-INF/mods.toml file
 @Mod(VanillaTweaks.MOD_ID)
 public class VanillaTweaks {
     public static final String MOD_ID = "vanillatweaks";
@@ -27,27 +25,42 @@ public class VanillaTweaks {
         IEventBus modEventBus = FMLJavaModLoadingContext.get().getModEventBus();
 
         ModCreativeModTabs.register(modEventBus);
-
         ModItems.register(modEventBus);
         ModEntities.register(modEventBus);
 
         MinecraftForge.EVENT_BUS.register(this);
     }
 
-
-    // You can use SubscribeEvent and let the Event Bus discover methods to call
     @SubscribeEvent
     public void onServerStarting(ServerStartingEvent event) {
 
     }
 
-    // You can use EventBusSubscriber to automatically register all static methods in the class annotated with @SubscribeEvent
     @Mod.EventBusSubscriber(modid = MOD_ID, bus = Mod.EventBusSubscriber.Bus.MOD, value = Dist.CLIENT)
     public static class ClientModEvents {
         @SubscribeEvent
         public static void onClientSetup(FMLClientSetupEvent event) {
-            EntityRenderers.register(ModEntities.MOD_BOAT.get(), pContext -> new ModBoatRenderer(pContext, false));
-            EntityRenderers.register(ModEntities.MOD_CHEST_BOAT.get(), pContext -> new ModBoatRenderer(pContext, true));
+            registerBoatRenderers();
+        }
+
+        private static void registerBoatRenderers() {
+            EntityRenderers.register(ModEntities.MOD_BOAT.get(),
+                    context -> new ModBoatRenderer(context, false));
+
+            EntityRenderers.register(ModEntities.MOD_CHEST_BOAT.get(),
+                    context -> new ModBoatRenderer(context, true));
+
+            EntityRenderers.register(ModEntities.MEDIUM_MOD_BOAT.get(),
+                    context -> new ModBoatRenderer(context, false));
+
+            EntityRenderers.register(ModEntities.MEDIUM_MOD_CHEST_BOAT.get(),
+                    context -> new ModBoatRenderer(context, true));
+
+            EntityRenderers.register(ModEntities.LARGE_MOD_BOAT.get(),
+                    context -> new ModBoatRenderer(context, false));
+
+            EntityRenderers.register(ModEntities.LARGE_MOD_CHEST_BOAT.get(),
+                    context -> new ModBoatRenderer(context, true));
         }
     }
 }
