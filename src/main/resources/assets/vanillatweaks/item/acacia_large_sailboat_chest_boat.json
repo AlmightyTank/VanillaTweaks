@@ -1,0 +1,6 @@
+{
+  "parent": "item/generated",
+  "textures": {
+    "layer0": "vanillatweaks:item/acacia_large_sailboat_chest_boat"
+  }
+}
