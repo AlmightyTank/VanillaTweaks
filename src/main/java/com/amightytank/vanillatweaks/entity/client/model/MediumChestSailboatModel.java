@@ -122,7 +122,7 @@ public class MediumChestSailboatModel extends ListModel<Boat> implements WaterPa
 
         boolean rightSide = side == 1;
 
-        float yFix = rightSide ? -(float)Math.PI / 2F : (float)Math.PI / 2F;
+        float yFix = rightSide ? (float)Math.PI / 2F : -(float)Math.PI / 2F;
 
         float baseX = rightSide ? -0.6409F : 2.5007F;
         float baseY = -0.6699F + yFix;

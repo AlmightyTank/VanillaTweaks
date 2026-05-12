@@ -27,6 +27,14 @@ public class LargeSailboatModel extends ListModel<Boat> implements WaterPatchMod
 	private final ModelPart bannerPanelRear;
 	private final ModelPart waterPatch;
 
+	private final float leftLargePaddleBaseX;
+	private final float leftLargePaddleBaseY;
+	private final float leftLargePaddleBaseZ;
+
+	private final float rightLargePaddleBaseX;
+	private final float rightLargePaddleBaseY;
+	private final float rightLargePaddleBaseZ;
+
 	public LargeSailboatModel(ModelPart root) {
 		this.visualRoot = root.getChild("visual_root");
 
@@ -36,6 +44,14 @@ public class LargeSailboatModel extends ListModel<Boat> implements WaterPatchMod
 		this.paddleRightMiddle = root.getChild("right_paddle_middle");
 		this.paddleRightBack = root.getChild("right_paddle_back");
 		this.paddleLeftBack = root.getChild("left_paddle_back");
+
+		this.leftLargePaddleBaseX = this.paddleLeft.xRot;
+		this.leftLargePaddleBaseY = this.paddleLeft.yRot;
+		this.leftLargePaddleBaseZ = this.paddleLeft.zRot;
+
+		this.rightLargePaddleBaseX = this.paddleRight.xRot;
+		this.rightLargePaddleBaseY = this.paddleRight.yRot;
+		this.rightLargePaddleBaseZ = this.paddleRight.zRot;
 
 		this.bannerSailFront = root.getChild("banner_sail_front");
 		this.bannerPanelFront = root.getChild("banner_panel_front");
@@ -59,9 +75,9 @@ public class LargeSailboatModel extends ListModel<Boat> implements WaterPatchMod
 				.texOffs(80, 100).addBox(-53.0F, -11.0F, -6.0F, 3.0F, 20.0F, 6.0F, new CubeDeformation(0.0F))
 				.texOffs(80, 100).addBox(-55.0F, -10.0F, -6.0F, 2.0F, 18.0F, 6.0F, new CubeDeformation(0.0F))
 				.texOffs(80, 100).addBox(-57.0F, -8.0F, -6.0F, 2.0F, 14.0F, 6.0F, new CubeDeformation(0.0F))
-				.texOffs(80, 100).addBox(-59.0F, -6.0F, -6.0F, 2.0F, 10.0F, 6.0F, new CubeDeformation(0.0F)), PartPose.offsetAndRotation(12.0F, 0.0F, -1.0F, -1.5708F, 0.0F, 0.0F));
+				.texOffs(80, 100).addBox(-59.0F, -6.0F, -6.0F, 2.0F, 10.0F, 6.0F, new CubeDeformation(0.0F)), PartPose.offsetAndRotation(-12.0F, -6.0F, -1.0F, -1.5708F, 0.0F, 3.1416F));
 
-		PartDefinition visual_root = partdefinition.addOrReplaceChild("visual_root", CubeListBuilder.create(), PartPose.offsetAndRotation(0.0F, 3.0F, 0.0F, 0.0F, 1.5708F, 0.0F));
+		PartDefinition visual_root = partdefinition.addOrReplaceChild("visual_root", CubeListBuilder.create(), PartPose.offsetAndRotation(0.0F, 3.0F, 0.0F, 0.0F, -1.5708F, 0.0F));
 
 		PartDefinition left = visual_root.addOrReplaceChild("left", CubeListBuilder.create().texOffs(-24, 23).addBox(-46.0F, -7.0F, -1.0F, 68.0F, 6.0F, 2.0F, new CubeDeformation(0.0F)), PartPose.offsetAndRotation(13.0F, -2.0F, -13.0F, 0.0F, 1.5708F, 0.0F));
 
@@ -104,48 +120,99 @@ public class LargeSailboatModel extends ListModel<Boat> implements WaterPatchMod
 				.texOffs(83, 103).addBox(-58.0F, -6.0F, -3.0F, 2.0F, 10.0F, 3.0F, new CubeDeformation(0.0F)), PartPose.offsetAndRotation(1.0F, -3.0F, -13.0F, 0.0F, 1.5708F, -1.5708F));
 
 		PartDefinition left_paddle_front = partdefinition.addOrReplaceChild("left_paddle_front", CubeListBuilder.create().texOffs(48, 76).addBox(-1.0F, 0.0F, -5.0F, 2.0F, 2.0F, 18.0F, new CubeDeformation(0.0F))
-				.texOffs(8, 99).addBox(-1.001F, -3.0F, 8.0F, 1.0F, 6.0F, 7.0F, new CubeDeformation(0.0F)), PartPose.offsetAndRotation(24.0F, -8.0F, -12.0F, 2.5007F, -0.6699F, 2.9277F));
+				.texOffs(8, 99).addBox(-1.001F, -3.0F, 8.0F, 1.0F, 6.0F, 7.0F, new CubeDeformation(0.0F)), PartPose.offsetAndRotation(-24.0F, -8.0F, 12.0F, -0.6409F, 0.6699F, 0.2139F));
 
 		PartDefinition right_paddle_front = partdefinition.addOrReplaceChild("right_paddle_front", CubeListBuilder.create().texOffs(8, 79).addBox(-1.0F, 0.0F, -5.0F, 2.0F, 2.0F, 18.0F, new CubeDeformation(0.0F))
-				.texOffs(24, 99).addBox(0.001F, -3.0F, 8.0F, 1.0F, 6.0F, 7.0F, new CubeDeformation(0.0F)), PartPose.offsetAndRotation(24.0F, -8.0F, 12.0F, -0.6409F, -0.6699F, -0.2139F));
+				.texOffs(24, 99).addBox(0.001F, -3.0F, 8.0F, 1.0F, 6.0F, 7.0F, new CubeDeformation(0.0F)), PartPose.offsetAndRotation(-24.0F, -8.0F, -12.0F, 2.5007F, 0.6699F, -2.9277F));
 
 		PartDefinition left_paddle_middle = partdefinition.addOrReplaceChild("left_paddle_middle", CubeListBuilder.create().texOffs(48, 76).addBox(-1.0F, 0.0F, -5.0F, 2.0F, 2.0F, 18.0F, new CubeDeformation(0.0F))
-				.texOffs(8, 99).addBox(-1.001F, -3.0F, 8.0F, 1.0F, 6.0F, 7.0F, new CubeDeformation(0.0F)), PartPose.offsetAndRotation(-1.0F, -8.0F, -12.0F, 2.5007F, -0.6699F, 2.9277F));
+				.texOffs(8, 99).addBox(-1.001F, -3.0F, 8.0F, 1.0F, 6.0F, 7.0F, new CubeDeformation(0.0F)), PartPose.offsetAndRotation(1.0F, -8.0F, 12.0F, -0.6409F, 0.6699F, 0.2139F));
 
 		PartDefinition right_paddle_middle = partdefinition.addOrReplaceChild("right_paddle_middle", CubeListBuilder.create().texOffs(8, 79).addBox(-1.0F, 0.0F, -5.0F, 2.0F, 2.0F, 18.0F, new CubeDeformation(0.0F))
-				.texOffs(24, 99).addBox(0.001F, -3.0F, 8.0F, 1.0F, 6.0F, 7.0F, new CubeDeformation(0.0F)), PartPose.offsetAndRotation(-1.0F, -8.0F, 12.0F, -0.6409F, -0.6699F, -0.2139F));
+				.texOffs(24, 99).addBox(0.001F, -3.0F, 8.0F, 1.0F, 6.0F, 7.0F, new CubeDeformation(0.0F)), PartPose.offsetAndRotation(1.0F, -8.0F, -12.0F, 2.5007F, 0.6699F, -2.9277F));
 
 		PartDefinition right_paddle_back = partdefinition.addOrReplaceChild("right_paddle_back", CubeListBuilder.create().texOffs(8, 59).addBox(-1.0F, 0.0F, -5.0F, 2.0F, 2.0F, 18.0F, new CubeDeformation(0.0F))
-				.texOffs(48, 96).addBox(0.001F, -3.0F, 8.0F, 1.0F, 6.0F, 7.0F, new CubeDeformation(0.0F)), PartPose.offsetAndRotation(-26.0F, -8.0F, 12.0F, -0.6409F, -0.6699F, -0.2139F));
+				.texOffs(48, 96).addBox(0.001F, -3.0F, 8.0F, 1.0F, 6.0F, 7.0F, new CubeDeformation(0.0F)), PartPose.offsetAndRotation(26.0F, -8.0F, -12.0F, 2.5007F, 0.6699F, -2.9277F));
 
 		PartDefinition left_paddle_back = partdefinition.addOrReplaceChild("left_paddle_back", CubeListBuilder.create().texOffs(56, 56).addBox(-1.0F, 0.0F, -5.0F, 2.0F, 2.0F, 18.0F, new CubeDeformation(0.0F))
-				.texOffs(94, 4).addBox(-1.001F, -3.0F, 8.0F, 1.0F, 6.0F, 7.0F, new CubeDeformation(0.0F)), PartPose.offsetAndRotation(-26.0F, -8.0F, -12.0F, 2.5007F, -0.6699F, 2.9277F));
+				.texOffs(94, 4).addBox(-1.001F, -3.0F, 8.0F, 1.0F, 6.0F, 7.0F, new CubeDeformation(0.0F)), PartPose.offsetAndRotation(26.0F, -8.0F, 12.0F, -0.6409F, 0.6699F, 0.2139F));
 
 		PartDefinition banner_sail_front = partdefinition.addOrReplaceChild("banner_sail_front", CubeListBuilder.create().texOffs(0, 39).addBox(-1.0F, -61.0F, -5.0F, 2.0F, 60.0F, 2.0F, new CubeDeformation(0.0F))
-				.texOffs(94, 0).addBox(-7.0F, -61.0F, -5.0F, 14.0F, 1.0F, 1.0F, new CubeDeformation(0.0F))
-				.texOffs(94, 2).addBox(-7.0F, -36.0F, -5.0F, 14.0F, 1.0F, 1.0F, new CubeDeformation(0.0F)), PartPose.offsetAndRotation(8.0F, 3.0F, 0.0F, 0.0F, -1.5708F, 0.0F));
+				.texOffs(94, 0).addBox(-7.0F, -61.0F, -4.0F, 14.0F, 1.0F, 1.0F, new CubeDeformation(0.0F))
+				.texOffs(94, 2).addBox(-7.0F, -36.0F, -4.0F, 14.0F, 1.0F, 1.0F, new CubeDeformation(0.0F)), PartPose.offsetAndRotation(-8.0F, 3.0F, 0.0F, 0.0F, 1.5708F, 0.0F));
 
-		PartDefinition banner_panel_front = partdefinition.addOrReplaceChild("banner_panel_front", CubeListBuilder.create().texOffs(88, 76).addBox(-13.0F, -26.0F, -1.0F, 14.0F, 26.0F, 1.0F, new CubeDeformation(0.0F)), PartPose.offsetAndRotation(14.0F, -32.0F, -6.0F, 0.0F, 1.5708F, 0.0F));
+		PartDefinition banner_panel_front = partdefinition.addOrReplaceChild("banner_panel_front", CubeListBuilder.create().texOffs(88, 76).addBox(-13.0F, -26.0F, -1.0F, 14.0F, 26.0F, 1.0F, new CubeDeformation(0.0F)), PartPose.offsetAndRotation(-11.0F, -32.0F, 6.0F, 0.0F, -1.5708F, 0.0F));
 
 		PartDefinition banner_sail_rear = partdefinition.addOrReplaceChild("banner_sail_rear", CubeListBuilder.create().texOffs(0, 39).addBox(-1.0F, -79.0F, -5.0F, 2.0F, 78.0F, 2.0F, new CubeDeformation(0.0F))
-				.texOffs(94, 0).addBox(-7.0F, -79.0F, -5.0F, 14.0F, 1.0F, 1.0F, new CubeDeformation(0.0F))
-				.texOffs(94, 2).addBox(-7.0F, -54.0F, -5.0F, 14.0F, 1.0F, 1.0F, new CubeDeformation(0.0F)), PartPose.offsetAndRotation(-17.0F, 3.0F, 0.0F, 0.0F, -1.5708F, 0.0F));
+				.texOffs(94, 0).addBox(-7.0F, -79.0F, -4.0F, 14.0F, 1.0F, 1.0F, new CubeDeformation(0.0F))
+				.texOffs(94, 2).addBox(-7.0F, -54.0F, -4.0F, 14.0F, 1.0F, 1.0F, new CubeDeformation(0.0F)), PartPose.offsetAndRotation(17.0F, 3.0F, 0.0F, 0.0F, 1.5708F, 0.0F));
 
-		PartDefinition banner_panel_rear = partdefinition.addOrReplaceChild("banner_panel_rear", CubeListBuilder.create().texOffs(88, 76).addBox(-13.0F, -44.0F, -1.0F, 14.0F, 26.0F, 1.0F, new CubeDeformation(0.0F)), PartPose.offsetAndRotation(-11.0F, -32.0F, -6.0F, 0.0F, 1.5708F, 0.0F));
+		PartDefinition banner_panel_rear = partdefinition.addOrReplaceChild("banner_panel_rear", CubeListBuilder.create().texOffs(88, 76).addBox(-13.0F, -44.0F, -1.0F, 14.0F, 26.0F, 1.0F, new CubeDeformation(0.0F)), PartPose.offsetAndRotation(14.0F, -32.0F, 6.0F, 0.0F, -1.5708F, 0.0F));
 
 		return LayerDefinition.create(meshdefinition, 176, 176);
 	}
 
 	@Override
 	public void setupAnim(Boat boat, float limbSwing, float limbSwingAmount, float ageInTicks, float netHeadYaw, float headPitch) {
-		animateLargePaddle(boat, 0, this.paddleLeft, limbSwing);
-		animateLargePaddle(boat, 1, this.paddleRight, limbSwing);
+		animateLargePaddle(
+				boat,
+				0,
+				this.paddleLeft,
+				limbSwing,
+				this.leftLargePaddleBaseX,
+				this.leftLargePaddleBaseY,
+				this.leftLargePaddleBaseZ
+		);
 
-		animateLargePaddle(boat, 0, this.paddleLeftMiddle, limbSwing);
-		animateLargePaddle(boat, 1, this.paddleRightMiddle, limbSwing);
+		animateLargePaddle(
+				boat,
+				1,
+				this.paddleRight,
+				limbSwing,
+				this.rightLargePaddleBaseX,
+				this.rightLargePaddleBaseY,
+				this.rightLargePaddleBaseZ
+		);
 
-		animateLargePaddle(boat, 0, this.paddleLeftBack, limbSwing);
-		animateLargePaddle(boat, 1, this.paddleRightBack, limbSwing);
+		animateLargePaddle(
+				boat,
+				0,
+				this.paddleLeftMiddle,
+				limbSwing,
+				this.leftLargePaddleBaseX,
+				this.leftLargePaddleBaseY,
+				this.leftLargePaddleBaseZ
+		);
+
+		animateLargePaddle(
+				boat,
+				1,
+				this.paddleRightMiddle,
+				limbSwing,
+				this.rightLargePaddleBaseX,
+				this.rightLargePaddleBaseY,
+				this.rightLargePaddleBaseZ
+		);
+
+		animateLargePaddle(
+				boat,
+				0,
+				this.paddleLeftBack,
+				limbSwing,
+				this.leftLargePaddleBaseX,
+				this.leftLargePaddleBaseY,
+				this.leftLargePaddleBaseZ
+		);
+
+		animateLargePaddle(
+				boat,
+				1,
+				this.paddleRightBack,
+				limbSwing,
+				this.rightLargePaddleBaseX,
+				this.rightLargePaddleBaseY,
+				this.rightLargePaddleBaseZ
+		);
 	}
 
 	@Override
@@ -158,39 +225,27 @@ public class LargeSailboatModel extends ListModel<Boat> implements WaterPatchMod
 		return this.waterPatch;
 	}
 
-	private static void animateLargePaddle(Boat boat, int side, ModelPart paddle, float limbSwing) {
+	private static void animateLargePaddle(
+			Boat boat,
+			int side,
+			ModelPart paddle,
+			float limbSwing,
+			float baseX,
+			float baseY,
+			float baseZ
+	) {
 		float f = boat.getRowingTime(side, limbSwing);
-
-		boolean rightSide = side == 1;
-
-		float yFix = rightSide ? -(float)Math.PI / 2F : (float)Math.PI / 2F;
-
-		float baseX = rightSide ? -0.6409F : 2.5007F;
-		float baseY = (rightSide ? -0.8727F : 0.8727F) + yFix;
-		float baseZ = rightSide ? -0.2139F : 2.9277F;
 
 		float xAmount = 0.55F;
 		float yAmount = 0.45F;
 
-		paddle.xRot = Mth.clampedLerp(
-				baseX - xAmount,
-				baseX + xAmount,
-				(Mth.sin(-f) + 1.0F) / 2.0F
-		);
+		float xDelta = Mth.sin(-f) * xAmount;
+		float yDelta = (Mth.sin(-f + 1.0F) - Mth.sin(1.0F)) * yAmount;
 
-		if (rightSide) {
-			paddle.yRot = Mth.clampedLerp(
-					baseY + yAmount,
-					baseY - yAmount,
-					(Mth.sin(-f + 1.0F) + 1.0F) / 2.0F
-			);
-		} else {
-			paddle.yRot = Mth.clampedLerp(
-					baseY - yAmount,
-					baseY + yAmount,
-					(Mth.sin(-f + 1.0F) + 1.0F) / 2.0F
-			);
-		}
+		paddle.xRot = baseX + xDelta;
+
+		// Left side was good, so use the same yRot direction for right too.
+		paddle.yRot = baseY + yDelta;
 
 		paddle.zRot = baseZ;
 	}
