@@ -14,10 +14,10 @@ public class ModCreativeModTabs {
     public static final DeferredRegister<CreativeModeTab> CREATIVE_MODE_TABS =
             DeferredRegister.create(Registries.CREATIVE_MODE_TAB, VanillaTweaks.MOD_ID);
 
-    public static final RegistryObject<CreativeModeTab> TUTORIAL_TAB = CREATIVE_MODE_TABS.register("tutorial_tab",
+    public static final RegistryObject<CreativeModeTab> TUTORIAL_TAB = CREATIVE_MODE_TABS.register("vanilla_tweaks_tab",
             () -> CreativeModeTab.builder()
                     .icon(() -> new ItemStack(ModItems.getBoatItem(ModBoatEntity.Type.OAK_SAILBOAT).get()))
-                    .title(Component.translatable("creativetab.tutorial_tab"))
+                    .title(Component.translatable("creativetab.vanillatweaks.vanilla_tweaks_tab"))
                     .displayItems((parameters, output) -> {
                         for (ModBoatEntity.Type type : ModBoatEntity.Type.values()) {
                             output.accept(ModItems.getBoatItem(type).get());
