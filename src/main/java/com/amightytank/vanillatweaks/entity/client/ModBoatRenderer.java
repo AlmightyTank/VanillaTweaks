@@ -35,7 +35,7 @@ public class ModBoatRenderer extends BoatRenderer {
 
     private static String getTextureLocation(ModBoatEntity.Type type, boolean chestBoat) {
         return chestBoat
-                ? "textures/entity/chest_boat/" + type.getTextureName() + ".png"
+                ? "textures/entity/boat/" + type.getTextureName() + "_chest_boat.png"
                 : "textures/entity/boat/" + type.getTextureName() + ".png";
     }
 
