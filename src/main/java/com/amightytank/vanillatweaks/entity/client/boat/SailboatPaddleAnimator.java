@@ -1,4 +1,4 @@
-package com.amightytank.vanillatweaks.entity.client;
+package com.amightytank.vanillatweaks.entity.client.boat;
 
 import net.minecraft.client.model.geom.ModelPart;
 import net.minecraft.util.Mth;

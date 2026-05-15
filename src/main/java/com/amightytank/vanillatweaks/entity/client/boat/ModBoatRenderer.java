@@ -1,11 +1,11 @@
-package com.amightytank.vanillatweaks.entity.client;
+package com.amightytank.vanillatweaks.entity.client.boat;
 
 import com.amightytank.vanillatweaks.VanillaTweaks;
-import com.amightytank.vanillatweaks.entity.client.model.*;
+import com.amightytank.vanillatweaks.entity.client.boat.model.*;
 import com.google.common.collect.ImmutableMap;
 import com.mojang.datafixers.util.Pair;
-import com.amightytank.vanillatweaks.entity.custom.ModBoatEntity;
-import com.amightytank.vanillatweaks.entity.custom.ModChestBoatEntity;
+import com.amightytank.vanillatweaks.entity.custom.boat.ModBoatEntity;
+import com.amightytank.vanillatweaks.entity.custom.boat.ModChestBoatEntity;
 import net.minecraft.client.model.ListModel;
 import net.minecraft.client.model.geom.ModelLayerLocation;
 import net.minecraft.client.model.geom.ModelPart;

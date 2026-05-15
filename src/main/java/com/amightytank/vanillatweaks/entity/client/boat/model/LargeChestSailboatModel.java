@@ -1,6 +1,6 @@
-package com.amightytank.vanillatweaks.entity.client.model;
+package com.amightytank.vanillatweaks.entity.client.boat.model;
 
-import com.amightytank.vanillatweaks.entity.client.SailboatPaddleAnimator;
+import com.amightytank.vanillatweaks.entity.client.boat.SailboatPaddleAnimator;
 import com.google.common.collect.ImmutableList;
 import net.minecraft.client.model.ListModel;
 import net.minecraft.client.model.WaterPatchModel;
@@ -11,10 +11,9 @@ import net.minecraft.client.model.geom.builders.CubeListBuilder;
 import net.minecraft.client.model.geom.builders.LayerDefinition;
 import net.minecraft.client.model.geom.builders.MeshDefinition;
 import net.minecraft.client.model.geom.builders.PartDefinition;
-import net.minecraft.util.Mth;
 import net.minecraft.world.entity.vehicle.Boat;
 
-public class LargeSailboatModel extends ListModel<Boat> implements WaterPatchModel {
+public class LargeChestSailboatModel extends ListModel<Boat> implements WaterPatchModel {
 	private final ModelPart visualRoot;
 	private final ModelPart paddleLeft;
 	private final ModelPart paddleRight;
@@ -37,7 +36,7 @@ public class LargeSailboatModel extends ListModel<Boat> implements WaterPatchMod
 	private final SailboatPaddleAnimator.PaddleBase leftBackPaddleBase;
 	private final SailboatPaddleAnimator.PaddleBase rightBackPaddleBase;
 
-	public LargeSailboatModel(ModelPart root) {
+	public LargeChestSailboatModel(ModelPart root) {
 		this.visualRoot = root.getChild("visual_root");
 
 		this.paddleLeft = root.getChild("left_paddle_front");
@@ -81,6 +80,12 @@ public class LargeSailboatModel extends ListModel<Boat> implements WaterPatchMod
 				.texOffs(215, 225).addBox(-59.0F, -6.0F, -6.0F, 2.0F, 10.0F, 6.0F, new CubeDeformation(0.0F)), PartPose.offsetAndRotation(-12.0F, -6.0F, -1.0F, -1.5708F, 0.0F, 3.1416F));
 
 		PartDefinition visual_root = partdefinition.addOrReplaceChild("visual_root", CubeListBuilder.create(), PartPose.offsetAndRotation(0.0F, 3.0F, 0.0F, 0.0F, -1.5708F, 0.0F));
+
+		PartDefinition chest_lid = visual_root.addOrReplaceChild("chest_lid", CubeListBuilder.create().texOffs(16, 63).addBox(0.0F, 0.0F, 0.0F, 12.0F, 5.0F, 12.0F, new CubeDeformation(0.0F)), PartPose.offset(-6.0F, -15.0F, 22.0F));
+
+		PartDefinition chest_knob = visual_root.addOrReplaceChild("chest_knob", CubeListBuilder.create().texOffs(92, 108).addBox(0.0F, 0.0F, 0.0F, 2.0F, 4.0F, 1.0F, new CubeDeformation(0.0F)), PartPose.offset(-1.0F, -12.0F, 21.0F));
+
+		PartDefinition chest_base = visual_root.addOrReplaceChild("chest_base", CubeListBuilder.create().texOffs(16, 43).addBox(0.0F, 0.0F, 0.0F, 12.0F, 8.0F, 12.0F, new CubeDeformation(0.0F)), PartPose.offset(-6.0F, -11.0F, 22.0F));
 
 		PartDefinition left = visual_root.addOrReplaceChild("left", CubeListBuilder.create().texOffs(0, 27).mirror().addBox(-46.0F, -7.0F, -1.0F, 68.0F, 6.0F, 2.0F, new CubeDeformation(0.0F)).mirror(false), PartPose.offsetAndRotation(13.0F, -2.0F, -13.0F, 0.0F, 1.5708F, 0.0F));
 

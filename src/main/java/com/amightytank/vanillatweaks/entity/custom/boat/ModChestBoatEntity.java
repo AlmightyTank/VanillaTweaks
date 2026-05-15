@@ -1,4 +1,4 @@
-package com.amightytank.vanillatweaks.entity.custom;
+package com.amightytank.vanillatweaks.entity.custom.boat;
 
 import com.amightytank.vanillatweaks.entity.ModEntities;
 import com.amightytank.vanillatweaks.item.ModItems;

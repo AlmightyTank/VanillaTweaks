@@ -1,6 +1,6 @@
-package com.amightytank.vanillatweaks.entity.client.model;
+package com.amightytank.vanillatweaks.entity.client.boat.model;
 
-import com.amightytank.vanillatweaks.entity.client.SailboatPaddleAnimator;
+import com.amightytank.vanillatweaks.entity.client.boat.SailboatPaddleAnimator;
 import com.google.common.collect.ImmutableList;
 import net.minecraft.client.model.ListModel;
 import net.minecraft.client.model.WaterPatchModel;
@@ -11,7 +11,6 @@ import net.minecraft.client.model.geom.builders.CubeListBuilder;
 import net.minecraft.client.model.geom.builders.LayerDefinition;
 import net.minecraft.client.model.geom.builders.MeshDefinition;
 import net.minecraft.client.model.geom.builders.PartDefinition;
-import net.minecraft.util.Mth;
 import net.minecraft.world.entity.vehicle.Boat;
 
 public class MediumChestSailboatModel extends ListModel<Boat> implements WaterPatchModel {

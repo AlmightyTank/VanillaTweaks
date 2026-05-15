@@ -1,4 +1,4 @@
-package com.amightytank.vanillatweaks.entity.client;
+package com.amightytank.vanillatweaks.entity.client.boat;
 
 import com.amightytank.vanillatweaks.VanillaTweaks;
 import net.minecraft.client.model.geom.ModelLayerLocation;
