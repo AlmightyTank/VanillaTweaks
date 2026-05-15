@@ -1,7 +1,7 @@
 package com.amightytank.vanillatweaks;
 
 import com.amightytank.vanillatweaks.entity.ModEntities;
-import com.amightytank.vanillatweaks.entity.client.ModBoatRenderer;
+import com.amightytank.vanillatweaks.entity.client.boat.ModBoatRenderer;
 import com.amightytank.vanillatweaks.item.ModCreativeModTabs;
 import com.amightytank.vanillatweaks.item.ModItems;
 import com.mojang.logging.LogUtils;

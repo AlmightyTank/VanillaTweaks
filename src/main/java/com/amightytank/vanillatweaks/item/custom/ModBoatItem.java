@@ -1,7 +1,7 @@
 package com.amightytank.vanillatweaks.item.custom;
 
-import com.amightytank.vanillatweaks.entity.custom.ModBoatEntity;
-import com.amightytank.vanillatweaks.entity.custom.ModChestBoatEntity;
+import com.amightytank.vanillatweaks.entity.custom.boat.ModBoatEntity;
+import com.amightytank.vanillatweaks.entity.custom.boat.ModChestBoatEntity;
 import net.minecraft.stats.Stats;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResultHolder;

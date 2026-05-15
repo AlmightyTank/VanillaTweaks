@@ -2,11 +2,12 @@ package com.amightytank.vanillatweaks.item;
 
 import com.amightytank.vanillatweaks.VanillaTweaks;
 import com.amightytank.vanillatweaks.entity.ModEntities;
-import com.amightytank.vanillatweaks.entity.custom.ModBoatEntity;
+import com.amightytank.vanillatweaks.entity.custom.boat.ModBoatEntity;
 import com.amightytank.vanillatweaks.item.custom.ModBoatItem;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.vehicle.Boat;
 import net.minecraft.world.item.Item;
+import net.minecraftforge.common.ForgeSpawnEggItem;
 import net.minecraftforge.eventbus.api.IEventBus;
 import net.minecraftforge.registries.DeferredRegister;
 import net.minecraftforge.registries.ForgeRegistries;
@@ -36,6 +37,30 @@ public class ModItems {
                     () -> new ModBoatItem(true, type, getBoatEntity(type, true), new Item.Properties())));
         }
     }
+
+    public static final RegistryObject<Item> PIRATE_CAPTAIN_SPAWN_EGG = ITEMS.register("pirate_captain_spawn_egg",
+            () -> new ForgeSpawnEggItem(
+                    ModEntities.PIRATE_CAPTAIN,
+                    0x1F1F1F,
+                    0xD4AF37,
+                    new Item.Properties()
+            ));
+
+    public static final RegistryObject<Item> PIRATE_PARROT_SPAWN_EGG = ITEMS.register("pirate_parrot_spawn_egg",
+            () -> new ForgeSpawnEggItem(
+                    ModEntities.PIRATE_PARROT,
+                    0x2E7D32,
+                    0xFFCC33,
+                    new Item.Properties()
+            ));
+
+    public static final RegistryObject<Item> KRAKEN_TENTACLE_SPAWN_EGG = ITEMS.register("kraken_tentacle_spawn_egg",
+            () -> new ForgeSpawnEggItem(
+                    ModEntities.KRAKEN_TENTACLE,
+                    0x1B263B,
+                    0x6A0DAD,
+                    new Item.Properties()
+            ));
 
     private static Supplier<? extends EntityType<? extends Boat>> getBoatEntity(ModBoatEntity.Type type, boolean chest) {
         return switch (type.getBoatSize()) {

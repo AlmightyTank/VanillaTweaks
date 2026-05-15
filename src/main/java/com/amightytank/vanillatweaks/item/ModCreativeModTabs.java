@@ -1,7 +1,7 @@
 package com.amightytank.vanillatweaks.item;
 
 import com.amightytank.vanillatweaks.VanillaTweaks;
-import com.amightytank.vanillatweaks.entity.custom.ModBoatEntity;
+import com.amightytank.vanillatweaks.entity.custom.boat.ModBoatEntity;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.CreativeModeTab;
@@ -23,6 +23,9 @@ public class ModCreativeModTabs {
                             output.accept(ModItems.getBoatItem(type).get());
                             output.accept(ModItems.getChestBoatItem(type).get());
                         }
+                        output.accept(ModItems.PIRATE_CAPTAIN_SPAWN_EGG.get());
+                        output.accept(ModItems.PIRATE_PARROT_SPAWN_EGG.get());
+                        output.accept(ModItems.KRAKEN_TENTACLE_SPAWN_EGG.get());
                     })
                     .build());
 

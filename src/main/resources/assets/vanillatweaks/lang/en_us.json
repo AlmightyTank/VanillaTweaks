@@ -3,6 +3,14 @@
   "creativetab.vanillatweaks.vanilla_tweaks_tab": "Vanilla Tweaks",
   "creativetab.vanilla_tweaks_tab": "Vanilla Tweaks",
 
+  "entity.vanillatweaks.pirate_captain": "Pirate Captain",
+  "entity.vanillatweaks.pirate_parrot": "Pirate Parrot",
+  "entity.vanillatweaks.kraken_tentacle": "Kraken Tentacle",
+
+  "item.vanillatweaks.pirate_captain_spawn_egg": "Pirate Captain Spawn Egg",
+  "item.vanillatweaks.pirate_parrot_spawn_egg": "Pirate Parrot Spawn Egg",
+  "item.vanillatweaks.kraken_tentacle_spawn_egg": "Kraken Tentacle Spawn Egg",
+
   "item.vanillatweaks.oak_sailboat": "Oak Sailboat",
   "item.vanillatweaks.oak_sailboat_chest_boat": "Oak Chest Sailboat",
   "item.vanillatweaks.oak_medium_sailboat": "Oak Medium Sailboat",
