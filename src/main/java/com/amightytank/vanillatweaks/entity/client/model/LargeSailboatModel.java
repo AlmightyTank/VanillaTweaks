@@ -1,5 +1,6 @@
 package com.amightytank.vanillatweaks.entity.client.model;
 
+import com.amightytank.vanillatweaks.entity.client.SailboatPaddleAnimator;
 import com.google.common.collect.ImmutableList;
 import net.minecraft.client.model.ListModel;
 import net.minecraft.client.model.WaterPatchModel;
@@ -27,13 +28,14 @@ public class LargeSailboatModel extends ListModel<Boat> implements WaterPatchMod
 	private final ModelPart bannerPanelRear;
 	private final ModelPart waterPatch;
 
-	private final float leftLargePaddleBaseX;
-	private final float leftLargePaddleBaseY;
-	private final float leftLargePaddleBaseZ;
+	private final SailboatPaddleAnimator.PaddleBase leftFrontPaddleBase;
+	private final SailboatPaddleAnimator.PaddleBase rightFrontPaddleBase;
 
-	private final float rightLargePaddleBaseX;
-	private final float rightLargePaddleBaseY;
-	private final float rightLargePaddleBaseZ;
+	private final SailboatPaddleAnimator.PaddleBase leftMiddlePaddleBase;
+	private final SailboatPaddleAnimator.PaddleBase rightMiddlePaddleBase;
+
+	private final SailboatPaddleAnimator.PaddleBase leftBackPaddleBase;
+	private final SailboatPaddleAnimator.PaddleBase rightBackPaddleBase;
 
 	public LargeSailboatModel(ModelPart root) {
 		this.visualRoot = root.getChild("visual_root");
@@ -42,16 +44,17 @@ public class LargeSailboatModel extends ListModel<Boat> implements WaterPatchMod
 		this.paddleRight = root.getChild("right_paddle_front");
 		this.paddleLeftMiddle = root.getChild("left_paddle_middle");
 		this.paddleRightMiddle = root.getChild("right_paddle_middle");
-		this.paddleRightBack = root.getChild("right_paddle_back");
 		this.paddleLeftBack = root.getChild("left_paddle_back");
+		this.paddleRightBack = root.getChild("right_paddle_back");
 
-		this.leftLargePaddleBaseX = this.paddleLeft.xRot;
-		this.leftLargePaddleBaseY = this.paddleLeft.yRot;
-		this.leftLargePaddleBaseZ = this.paddleLeft.zRot;
+		this.leftFrontPaddleBase = new SailboatPaddleAnimator.PaddleBase(this.paddleLeft);
+		this.rightFrontPaddleBase = new SailboatPaddleAnimator.PaddleBase(this.paddleRight);
 
-		this.rightLargePaddleBaseX = this.paddleRight.xRot;
-		this.rightLargePaddleBaseY = this.paddleRight.yRot;
-		this.rightLargePaddleBaseZ = this.paddleRight.zRot;
+		this.leftMiddlePaddleBase = new SailboatPaddleAnimator.PaddleBase(this.paddleLeftMiddle);
+		this.rightMiddlePaddleBase = new SailboatPaddleAnimator.PaddleBase(this.paddleRightMiddle);
+
+		this.leftBackPaddleBase = new SailboatPaddleAnimator.PaddleBase(this.paddleLeftBack);
+		this.rightBackPaddleBase = new SailboatPaddleAnimator.PaddleBase(this.paddleRightBack);
 
 		this.bannerSailFront = root.getChild("banner_sail_front");
 		this.bannerPanelFront = root.getChild("banner_panel_front");
@@ -154,65 +157,14 @@ public class LargeSailboatModel extends ListModel<Boat> implements WaterPatchMod
 
 	@Override
 	public void setupAnim(Boat boat, float limbSwing, float limbSwingAmount, float ageInTicks, float netHeadYaw, float headPitch) {
-		animateLargePaddle(
-				boat,
-				0,
-				this.paddleLeft,
-				limbSwing,
-				this.leftLargePaddleBaseX,
-				this.leftLargePaddleBaseY,
-				this.leftLargePaddleBaseZ
-		);
+		SailboatPaddleAnimator.animatePaddleFromBase(boat, 0, this.paddleLeft, limbSwing, this.leftFrontPaddleBase, 0.55F, 0.45F);
+		SailboatPaddleAnimator.animatePaddleFromBase(boat, 1, this.paddleRight, limbSwing, this.rightFrontPaddleBase, 0.55F, 0.45F);
 
-		animateLargePaddle(
-				boat,
-				1,
-				this.paddleRight,
-				limbSwing,
-				this.rightLargePaddleBaseX,
-				this.rightLargePaddleBaseY,
-				this.rightLargePaddleBaseZ
-		);
+		SailboatPaddleAnimator.animatePaddleFromBase(boat, 0, this.paddleLeftMiddle, limbSwing, this.leftMiddlePaddleBase, 0.55F, 0.45F);
+		SailboatPaddleAnimator.animatePaddleFromBase(boat, 1, this.paddleRightMiddle, limbSwing, this.rightMiddlePaddleBase, 0.55F, 0.45F);
 
-		animateLargePaddle(
-				boat,
-				0,
-				this.paddleLeftMiddle,
-				limbSwing,
-				this.leftLargePaddleBaseX,
-				this.leftLargePaddleBaseY,
-				this.leftLargePaddleBaseZ
-		);
-
-		animateLargePaddle(
-				boat,
-				1,
-				this.paddleRightMiddle,
-				limbSwing,
-				this.rightLargePaddleBaseX,
-				this.rightLargePaddleBaseY,
-				this.rightLargePaddleBaseZ
-		);
-
-		animateLargePaddle(
-				boat,
-				0,
-				this.paddleLeftBack,
-				limbSwing,
-				this.leftLargePaddleBaseX,
-				this.leftLargePaddleBaseY,
-				this.leftLargePaddleBaseZ
-		);
-
-		animateLargePaddle(
-				boat,
-				1,
-				this.paddleRightBack,
-				limbSwing,
-				this.rightLargePaddleBaseX,
-				this.rightLargePaddleBaseY,
-				this.rightLargePaddleBaseZ
-		);
+		SailboatPaddleAnimator.animatePaddleFromBase(boat, 0, this.paddleLeftBack, limbSwing, this.leftBackPaddleBase, 0.55F, 0.45F);
+		SailboatPaddleAnimator.animatePaddleFromBase(boat, 1, this.paddleRightBack, limbSwing, this.rightBackPaddleBase, 0.55F, 0.45F);
 	}
 
 	@Override
@@ -223,30 +175,5 @@ public class LargeSailboatModel extends ListModel<Boat> implements WaterPatchMod
 	@Override
 	public ModelPart waterPatch() {
 		return this.waterPatch;
-	}
-
-	private static void animateLargePaddle(
-			Boat boat,
-			int side,
-			ModelPart paddle,
-			float limbSwing,
-			float baseX,
-			float baseY,
-			float baseZ
-	) {
-		float f = boat.getRowingTime(side, limbSwing);
-
-		float xAmount = 0.55F;
-		float yAmount = 0.45F;
-
-		float xDelta = Mth.sin(-f) * xAmount;
-		float yDelta = (Mth.sin(-f + 1.0F) - Mth.sin(1.0F)) * yAmount;
-
-		paddle.xRot = baseX + xDelta;
-
-		// Left side was good, so use the same yRot direction for right too.
-		paddle.yRot = baseY + yDelta;
-
-		paddle.zRot = baseZ;
 	}
 }
