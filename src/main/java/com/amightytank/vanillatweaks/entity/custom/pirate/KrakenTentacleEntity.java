@@ -17,6 +17,12 @@ public class KrakenTentacleEntity extends Monster {
     private static final EntityDataAccessor<Integer> WARMUP_DELAY =
             SynchedEntityData.defineId(KrakenTentacleEntity.class, EntityDataSerializers.INT);
 
+    private static final EntityDataAccessor<Integer> ATTACK_TYPE =
+            SynchedEntityData.defineId(KrakenTentacleEntity.class, EntityDataSerializers.INT);
+
+    public static final int TYPE_SMALL_CHASE = 0;
+    public static final int TYPE_BIG_STRIKE = 1;
+
     private static final int MAX_LIFE_TICKS = 40;
 
     private LivingEntity owner;
@@ -33,6 +39,7 @@ public class KrakenTentacleEntity extends Monster {
     protected void defineSynchedData() {
         super.defineSynchedData();
         this.entityData.define(WARMUP_DELAY, 0);
+        this.entityData.define(ATTACK_TYPE, TYPE_BIG_STRIKE);
     }
 
     public void setOwner(LivingEntity owner) {
@@ -49,6 +56,22 @@ public class KrakenTentacleEntity extends Monster {
 
     public int getWarmupDelay() {
         return this.entityData.get(WARMUP_DELAY);
+    }
+
+    public void setAttackType(int type) {
+        this.entityData.set(ATTACK_TYPE, type);
+    }
+
+    public int getAttackType() {
+        return this.entityData.get(ATTACK_TYPE);
+    }
+
+    public boolean isSmallChaseTentacle() {
+        return this.getAttackType() == TYPE_SMALL_CHASE;
+    }
+
+    public boolean isBigStrikeTentacle() {
+        return this.getAttackType() == TYPE_BIG_STRIKE;
     }
 
     public boolean isActivated() {
@@ -78,13 +101,12 @@ public class KrakenTentacleEntity extends Monster {
 
         this.activated = true;
 
-        // IMPORTANT:
-        // This must happen on BOTH client and server so the model animation progresses.
+        // Must run on client too so the model animation moves.
         this.lifeTicks--;
 
         if (!this.level().isClientSide) {
-            // Hit shortly after it pops up.
-            if (!this.hasHit && this.lifeTicks <= 32) {
+            // Small chase tentacles are mostly visual. Big strike tentacles hurt.
+            if (this.isBigStrikeTentacle() && !this.hasHit && this.lifeTicks <= 30) {
                 this.hitNearbyTargets();
                 this.hasHit = true;
             }
@@ -96,7 +118,7 @@ public class KrakenTentacleEntity extends Monster {
     }
 
     private void hitNearbyTargets() {
-        AABB hitBox = this.getBoundingBox().inflate(1.0D, 1.4D, 1.0D);
+        AABB hitBox = this.getBoundingBox().inflate(1.25D, 1.6D, 1.25D);
 
         List<LivingEntity> targets = this.level().getEntitiesOfClass(
                 LivingEntity.class,
@@ -110,13 +132,13 @@ public class KrakenTentacleEntity extends Monster {
         );
 
         for (LivingEntity target : targets) {
-            target.hurt(this.damageSources().mobAttack(this), 6.0F);
+            target.hurt(this.damageSources().mobAttack(this), 7.0F);
 
             double xKnock = this.getX() - target.getX();
             double zKnock = this.getZ() - target.getZ();
 
-            target.knockback(0.65D, xKnock, zKnock);
-            target.setDeltaMovement(target.getDeltaMovement().add(0.0D, 0.35D, 0.0D));
+            target.knockback(0.8D, xKnock, zKnock);
+            target.setDeltaMovement(target.getDeltaMovement().add(0.0D, 0.45D, 0.0D));
             target.hasImpulse = true;
         }
     }
@@ -128,12 +150,10 @@ public class KrakenTentacleEntity extends Monster {
 
     @Override
     protected void doPush(net.minecraft.world.entity.Entity entity) {
-        // No pushing.
     }
 
     @Override
     protected void pushEntities() {
-        // No pushing.
     }
 
     @Override

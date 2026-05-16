@@ -82,43 +82,92 @@ public class CaptainSummonKrakenGoal extends Goal {
         double targetX = target.getX();
         double targetZ = target.getZ();
 
-        double angle = Math.atan2(targetZ - captainZ, targetX - captainX);
+        double pathAngle = Math.atan2(targetZ - captainZ, targetX - captainX);
 
         /*
-         * Main line of tentacles toward target.
+         * Small chase tentacles.
+         * These pop up one after another toward the player.
+         * They ALSO face the player.
          */
-        for (int i = 1; i <= 8; i++) {
-            double distance = 1.25D * i;
+        for (int i = 1; i <= 7; i++) {
+            double distance = 1.15D * i;
 
-            double x = captainX + Math.cos(angle) * distance;
-            double z = captainZ + Math.sin(angle) * distance;
-
-            int delay = i * 2;
-
-            this.spawnTentacleAt(x, z, angle, delay);
-        }
-
-        /*
-         * Small side spread near the target, like Evoker's wider fang burst.
-         */
-        for (int i = 0; i < 5; i++) {
-            double sideAngle = angle + Mth.PI / 2.0F;
-            double sideOffset = (i - 2) * 1.2D;
-
-            double forwardDistance = 8.5D;
+            double sideNoise = (this.captain.getRandom().nextDouble() - 0.5D) * 0.9D;
+            double sideAngle = pathAngle + Mth.PI / 2.0F;
 
             double x = captainX
-                    + Math.cos(angle) * forwardDistance
-                    + Math.cos(sideAngle) * sideOffset;
+                    + Math.cos(pathAngle) * distance
+                    + Math.cos(sideAngle) * sideNoise;
 
             double z = captainZ
-                    + Math.sin(angle) * forwardDistance
-                    + Math.sin(sideAngle) * sideOffset;
+                    + Math.sin(pathAngle) * distance
+                    + Math.sin(sideAngle) * sideNoise;
 
-            int delay = 18 + i;
+            int delay = i * 3;
 
-            this.spawnTentacleAt(x, z, angle, delay);
+            // Always face the target.
+            double faceTargetAngle = Math.atan2(targetZ - z, targetX - x);
+
+            this.spawnTentacleAt(
+                    x,
+                    z,
+                    faceTargetAngle,
+                    delay,
+                    KrakenTentacleEntity.TYPE_SMALL_CHASE
+            );
         }
+
+        /*
+         * Big strike tentacles.
+         * These spawn around the target and face the target directly.
+         */
+        int bigCount = 1 + this.captain.getRandom().nextInt(3);
+
+        for (int i = 0; i < bigCount; i++) {
+            double radius = 0.8D + this.captain.getRandom().nextDouble() * 1.4D;
+            double randomAngle = this.captain.getRandom().nextDouble() * Math.PI * 2.0D;
+
+            double x = targetX + Math.cos(randomAngle) * radius;
+            double z = targetZ + Math.sin(randomAngle) * radius;
+
+            int delay = 24 + i * 3;
+
+            // Always face the target.
+            double faceTargetAngle = Math.atan2(targetZ - z, targetX - x);
+
+            this.spawnTentacleAt(
+                    x,
+                    z,
+                    faceTargetAngle,
+                    delay,
+                    KrakenTentacleEntity.TYPE_BIG_STRIKE
+            );
+        }
+    }
+
+    private void spawnTentacleAt(double x, double z, double angle, int delay, int attackType) {
+        Level level = this.captain.level();
+
+        double y = this.findGroundY(level, x, z);
+
+        KrakenTentacleEntity tentacle = ModEntities.KRAKEN_TENTACLE.get().create(level);
+
+        if (tentacle == null) {
+            return;
+        }
+
+        /*
+         * This controls which side of the model faces the target.
+         * If you still see the back, switch +90F to -90F.
+         */
+        float yaw = (float) (angle * 180.0D / Math.PI) - 90.0F;
+
+        tentacle.moveTo(x, y, z, yaw, 0.0F);
+        tentacle.setOwner(this.captain);
+        tentacle.setWarmupDelay(delay);
+        tentacle.setAttackType(attackType);
+
+        level.addFreshEntity(tentacle);
     }
 
     private void spawnTentacleAt(double x, double z, double angle, int delay) {
