@@ -1,0 +1,14 @@
+{
+  "parent": "item/generated",
+  "textures": {
+    "layer0": "vanillatweaks:item/pirate_spear"
+  },
+  "overrides": [
+    {
+      "predicate": {
+        "throwing": 1.0
+      },
+      "model": "vanillatweaks:item/pirate_spear_in_hand"
+    }
+  ]
+}

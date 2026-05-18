@@ -7,9 +7,29 @@
   "entity.vanillatweaks.pirate_parrot": "Pirate Parrot",
   "entity.vanillatweaks.kraken_tentacle": "Kraken Tentacle",
 
+  "item.vanillatweaks.pirate_spear": "Pirate Spear",
+  "tooltip.vanillatweaks.pirate_spear": "A heavy boarding spear used by pirate brutes.",
+
+  "entity.vanillatweaks.pirate_gunner": "Pirate Gunner",
+  "entity.vanillatweaks.pirate_dynamite_arrow": "Dynamite Arrow",
+  "item.vanillatweaks.pirate_gunner_spawn_egg": "Pirate Gunner Spawn Egg",
+
+  "entity.vanillatweaks.pirate_deckhand": "Pirate Deckhand",
+  "item.vanillatweaks.pirate_deckhand_spawn_egg": "Pirate Deckhand Spawn Egg",
+
   "item.vanillatweaks.pirate_captain_spawn_egg": "Pirate Captain Spawn Egg",
   "item.vanillatweaks.pirate_parrot_spawn_egg": "Pirate Parrot Spawn Egg",
   "item.vanillatweaks.kraken_tentacle_spawn_egg": "Kraken Tentacle Spawn Egg",
+
+  "item.vanillatweaks.pirate_patrol_spawn_egg": "Pirate Patrol Spawn Egg",
+
+  "item.vanillatweaks.boat_upgrade_template": "Boat Upgrade Template",
+
+  "item.vanillatweaks.smithing_template.boat_upgrade.title": "Boat Upgrade",
+  "item.vanillatweaks.smithing_template.boat_upgrade.applies_to": "Sailboats",
+  "item.vanillatweaks.smithing_template.boat_upgrade.ingredients": "Matching Planks",
+  "item.vanillatweaks.smithing_template.boat_upgrade.base_slot_description": "Add a sailboat",
+  "item.vanillatweaks.smithing_template.boat_upgrade.additions_slot_description": "Add matching planks",
 
   "item.vanillatweaks.oak_sailboat": "Oak Sailboat",
   "item.vanillatweaks.oak_sailboat_chest_boat": "Oak Chest Sailboat",

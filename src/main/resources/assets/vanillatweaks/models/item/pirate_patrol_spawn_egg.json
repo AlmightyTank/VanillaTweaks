@@ -1,0 +1,6 @@
+{
+  "parent": "minecraft:item/generated",
+  "textures": {
+    "layer0": "vanillatweaks:item/pirate_patrol_spawn_egg"
+  }
+}

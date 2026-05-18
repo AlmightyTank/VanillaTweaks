@@ -3,6 +3,7 @@ package com.amightytank.vanillatweaks.entity.custom.pirate;
 import net.minecraft.network.syncher.EntityDataAccessor;
 import net.minecraft.network.syncher.EntityDataSerializers;
 import net.minecraft.network.syncher.SynchedEntityData;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.ai.attributes.AttributeSupplier;
@@ -25,6 +26,16 @@ public class KrakenTentacleEntity extends Monster {
 
     private static final int MAX_LIFE_TICKS = 40;
 
+    /*
+     * The big strike should hit when the model is visually slamming forward.
+     * lifeTicks starts at 40 and counts down.
+     *
+     * lifeTicks 40 = progress 0.0
+     * lifeTicks 26 = progress about 0.35
+     * lifeTicks 0  = progress 1.0
+     */
+    private static final int BIG_STRIKE_HIT_TICK = 26;
+
     private LivingEntity owner;
     private int lifeTicks = MAX_LIFE_TICKS;
     private boolean hasHit = false;
@@ -33,6 +44,7 @@ public class KrakenTentacleEntity extends Monster {
     public KrakenTentacleEntity(EntityType<? extends Monster> entityType, Level level) {
         super(entityType, level);
         this.noPhysics = true;
+        this.setNoGravity(true);
     }
 
     @Override
@@ -78,6 +90,10 @@ public class KrakenTentacleEntity extends Monster {
         return this.activated;
     }
 
+    public int getLifeTicks() {
+        return this.lifeTicks;
+    }
+
     public float getLifeProgress() {
         if (!this.activated) {
             return 0.0F;
@@ -86,10 +102,22 @@ public class KrakenTentacleEntity extends Monster {
         return 1.0F - ((float) this.lifeTicks / (float) MAX_LIFE_TICKS);
     }
 
+    public float getLifeProgress(float partialTick) {
+        if (!this.activated) {
+            return 0.0F;
+        }
+
+        float adjustedLife = this.lifeTicks - partialTick;
+        adjustedLife = Math.max(0.0F, adjustedLife);
+
+        return 1.0F - adjustedLife / (float) MAX_LIFE_TICKS;
+    }
+
     @Override
     public void tick() {
         super.tick();
 
+        this.setNoGravity(true);
         this.setDeltaMovement(0.0D, 0.0D, 0.0D);
 
         int warmup = this.getWarmupDelay();
@@ -101,12 +129,17 @@ public class KrakenTentacleEntity extends Monster {
 
         this.activated = true;
 
-        // Must run on client too so the model animation moves.
-        this.lifeTicks--;
+        /*
+         * Run this on client and server.
+         * Client needs it so the model animation moves.
+         * Server needs it so damage/discard timing works.
+         */
+        if (this.lifeTicks > 0) {
+            this.lifeTicks--;
+        }
 
         if (!this.level().isClientSide) {
-            // Small chase tentacles are mostly visual. Big strike tentacles hurt.
-            if (this.isBigStrikeTentacle() && !this.hasHit && this.lifeTicks <= 30) {
+            if (this.isBigStrikeTentacle() && !this.hasHit && this.lifeTicks <= BIG_STRIKE_HIT_TICK) {
                 this.hitNearbyTargets();
                 this.hasHit = true;
             }
@@ -118,7 +151,11 @@ public class KrakenTentacleEntity extends Monster {
     }
 
     private void hitNearbyTargets() {
-        AABB hitBox = this.getBoundingBox().inflate(1.25D, 1.6D, 1.25D);
+        /*
+         * Larger hitbox because the tentacle model is tall.
+         * This makes the slam feel like it actually hits around the tentacle.
+         */
+        AABB hitBox = this.getBoundingBox().inflate(2.25D, 4.0D, 2.25D);
 
         List<LivingEntity> targets = this.level().getEntitiesOfClass(
                 LivingEntity.class,
@@ -134,12 +171,13 @@ public class KrakenTentacleEntity extends Monster {
         for (LivingEntity target : targets) {
             target.hurt(this.damageSources().mobAttack(this), 7.0F);
 
-            double xKnock = this.getX() - target.getX();
-            double zKnock = this.getZ() - target.getZ();
+            double xKnock = target.getX() - this.getX();
+            double zKnock = target.getZ() - this.getZ();
 
-            target.knockback(0.8D, xKnock, zKnock);
+            target.knockback(0.8D, -xKnock, -zKnock);
             target.setDeltaMovement(target.getDeltaMovement().add(0.0D, 0.45D, 0.0D));
             target.hasImpulse = true;
+            target.hurtMarked = true;
         }
     }
 
@@ -149,7 +187,7 @@ public class KrakenTentacleEntity extends Monster {
     }
 
     @Override
-    protected void doPush(net.minecraft.world.entity.Entity entity) {
+    protected void doPush(Entity entity) {
     }
 
     @Override
@@ -158,6 +196,11 @@ public class KrakenTentacleEntity extends Monster {
 
     @Override
     public boolean canBeCollidedWith() {
+        return false;
+    }
+
+    @Override
+    public boolean canCollideWith(Entity entity) {
         return false;
     }
 

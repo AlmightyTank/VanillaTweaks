@@ -3,10 +3,9 @@ package com.amightytank.vanillatweaks.event;
 import com.amightytank.vanillatweaks.VanillaTweaks;
 import com.amightytank.vanillatweaks.entity.ModEntities;
 import com.amightytank.vanillatweaks.entity.client.ModModelLayers;
+import com.amightytank.vanillatweaks.entity.client.pirate.PirateDeckhandRenderer;
 import com.amightytank.vanillatweaks.entity.client.boat.model.*;
-import com.amightytank.vanillatweaks.entity.client.pirate.KrakenTentacleRenderer;
-import com.amightytank.vanillatweaks.entity.client.pirate.PirateCaptainRenderer;
-import com.amightytank.vanillatweaks.entity.client.pirate.PirateParrotRenderer;
+import com.amightytank.vanillatweaks.entity.client.pirate.*;
 import com.amightytank.vanillatweaks.entity.client.pirate.model.KrakenTentacleModel;
 import com.amightytank.vanillatweaks.entity.client.pirate.model.PirateCaptainModel;
 import net.minecraftforge.api.distmarker.Dist;
@@ -37,5 +36,9 @@ public class ModEventBusClientEvents {
         event.registerEntityRenderer(ModEntities.PIRATE_CAPTAIN.get(), PirateCaptainRenderer::new);
         event.registerEntityRenderer(ModEntities.PIRATE_PARROT.get(), PirateParrotRenderer::new);
         event.registerEntityRenderer(ModEntities.KRAKEN_TENTACLE.get(), KrakenTentacleRenderer::new);
+        event.registerEntityRenderer(ModEntities.PIRATE_BRUTE.get(), PirateBruteRenderer::new);
+        event.registerEntityRenderer(ModEntities.PIRATE_GUNNER.get(), PirateGunnerRenderer::new);
+        event.registerEntityRenderer(ModEntities.PIRATE_DYNAMITE_ARROW.get(), PirateDynamiteArrowRenderer::new);
+        event.registerEntityRenderer(ModEntities.PIRATE_DECKHAND.get(), PirateDeckhandRenderer::new);
     }
 }

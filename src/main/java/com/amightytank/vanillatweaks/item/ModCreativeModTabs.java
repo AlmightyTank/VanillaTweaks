@@ -26,6 +26,12 @@ public class ModCreativeModTabs {
                         output.accept(ModItems.PIRATE_CAPTAIN_SPAWN_EGG.get());
                         output.accept(ModItems.PIRATE_PARROT_SPAWN_EGG.get());
                         output.accept(ModItems.KRAKEN_TENTACLE_SPAWN_EGG.get());
+                        output.accept(ModItems.PIRATE_BRUTE_SPAWN_EGG.get());
+                        output.accept(ModItems.PIRATE_GUNNER_SPAWN_EGG.get());
+                        output.accept(ModItems.PIRATE_DECKHAND_SPAWN_EGG.get());
+                        output.accept(ModItems.PIRATE_SPEAR.get());
+                        output.accept(ModItems.PIRATE_PATROL_SPAWN_EGG.get());
+                        output.accept(ModItems.BOAT_UPGRADE_TEMPLATE.get());
                     })
                     .build());
 

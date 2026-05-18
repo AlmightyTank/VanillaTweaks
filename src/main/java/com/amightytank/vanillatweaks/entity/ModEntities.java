@@ -3,9 +3,7 @@ package com.amightytank.vanillatweaks.entity;
 import com.amightytank.vanillatweaks.VanillaTweaks;
 import com.amightytank.vanillatweaks.entity.custom.boat.ModBoatEntity;
 import com.amightytank.vanillatweaks.entity.custom.boat.ModChestBoatEntity;
-import com.amightytank.vanillatweaks.entity.custom.pirate.KrakenTentacleEntity;
-import com.amightytank.vanillatweaks.entity.custom.pirate.PirateCaptainEntity;
-import com.amightytank.vanillatweaks.entity.custom.pirate.PirateParrotEntity;
+import com.amightytank.vanillatweaks.entity.custom.pirate.*;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.MobCategory;
 import net.minecraftforge.eventbus.api.IEventBus;
@@ -82,6 +80,34 @@ public class ModEntities {
                             .sized(1.0F, 2.0F)
                             .clientTrackingRange(8)
                             .build("kraken_tentacle"));
+
+    public static final RegistryObject<EntityType<PirateBruteEntity>> PIRATE_BRUTE =
+            ENTITY_TYPES.register("pirate_brute",
+                    () -> EntityType.Builder.of(PirateBruteEntity::new, MobCategory.MONSTER)
+                            .sized(0.7F, 2.0F)
+                            .build("pirate_brute"));
+
+    public static final RegistryObject<EntityType<PirateGunnerEntity>> PIRATE_GUNNER =
+            ENTITY_TYPES.register("pirate_gunner",
+                    () -> EntityType.Builder.of(PirateGunnerEntity::new, MobCategory.MONSTER)
+                            .sized(0.6F, 1.95F)
+                            .clientTrackingRange(8)
+                            .build("pirate_gunner"));
+
+    public static final RegistryObject<EntityType<PirateDynamiteArrowEntity>> PIRATE_DYNAMITE_ARROW =
+            ENTITY_TYPES.register("pirate_dynamite_arrow",
+                    () -> EntityType.Builder.<PirateDynamiteArrowEntity>of(PirateDynamiteArrowEntity::new, MobCategory.MISC)
+                            .sized(0.5F, 0.5F)
+                            .clientTrackingRange(4)
+                            .updateInterval(20)
+                            .build("pirate_dynamite_arrow"));
+
+    public static final RegistryObject<EntityType<PirateDeckhandEntity>> PIRATE_DECKHAND =
+            ENTITY_TYPES.register("pirate_deckhand",
+                    () -> EntityType.Builder.of(PirateDeckhandEntity::new, MobCategory.MONSTER)
+                            .sized(0.6F, 1.95F)
+                            .clientTrackingRange(8)
+                            .build("pirate_deckhand"));
 
     public static void register(IEventBus eventBus) {
         ENTITY_TYPES.register(eventBus);

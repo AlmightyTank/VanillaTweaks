@@ -4,8 +4,11 @@ import com.amightytank.vanillatweaks.entity.ModEntities;
 import com.amightytank.vanillatweaks.entity.client.boat.ModBoatRenderer;
 import com.amightytank.vanillatweaks.item.ModCreativeModTabs;
 import com.amightytank.vanillatweaks.item.ModItems;
+import com.amightytank.vanillatweaks.world.PiratePatrolSpawner;
 import com.mojang.logging.LogUtils;
 import net.minecraft.client.renderer.entity.EntityRenderers;
+import net.minecraft.client.renderer.item.ItemProperties;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.event.server.ServerStartingEvent;
@@ -29,6 +32,7 @@ public class VanillaTweaks {
         ModEntities.register(modEventBus);
 
         MinecraftForge.EVENT_BUS.register(this);
+        MinecraftForge.EVENT_BUS.register(PiratePatrolSpawner.class);
     }
 
     @SubscribeEvent
@@ -41,6 +45,14 @@ public class VanillaTweaks {
         @SubscribeEvent
         public static void onClientSetup(FMLClientSetupEvent event) {
             registerBoatRenderers();
+            event.enqueueWork(() -> {
+                ItemProperties.register(
+                        ModItems.PIRATE_SPEAR.get(),
+                        new ResourceLocation("throwing"),
+                        (stack, level, entity, seed) ->
+                                entity != null && entity.isUsingItem() && entity.getUseItem() == stack ? 1.0F : 0.0F
+                );
+            });
         }
 
         private static void registerBoatRenderers() {

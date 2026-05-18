@@ -2,9 +2,7 @@ package com.amightytank.vanillatweaks.event;
 
 import com.amightytank.vanillatweaks.VanillaTweaks;
 import com.amightytank.vanillatweaks.entity.ModEntities;
-import com.amightytank.vanillatweaks.entity.custom.pirate.KrakenTentacleEntity;
-import com.amightytank.vanillatweaks.entity.custom.pirate.PirateCaptainEntity;
-import com.amightytank.vanillatweaks.entity.custom.pirate.PirateParrotEntity;
+import com.amightytank.vanillatweaks.entity.custom.pirate.*;
 import net.minecraftforge.event.entity.EntityAttributeCreationEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
@@ -17,5 +15,8 @@ public class ModEventBusEvents {
         event.put(ModEntities.PIRATE_CAPTAIN.get(), PirateCaptainEntity.createAttributes().build());
         event.put(ModEntities.PIRATE_PARROT.get(), PirateParrotEntity.createAttributes().build());
         event.put(ModEntities.KRAKEN_TENTACLE.get(), KrakenTentacleEntity.createAttributes().build());
+        event.put(ModEntities.PIRATE_BRUTE.get(), PirateBruteEntity.createAttributes().build());
+        event.put(ModEntities.PIRATE_GUNNER.get(), PirateGunnerEntity.createAttributes().build());
+        event.put(ModEntities.PIRATE_DECKHAND.get(), PirateDeckhandEntity.createAttributes().build());
     }
 }

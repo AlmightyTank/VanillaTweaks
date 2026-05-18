@@ -1,0 +1,16 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "category": "transportation",
+  "ingredients": [
+    {
+      "item": "minecraft:oak_boat"
+    },
+    {
+      "tag": "minecraft:banners"
+    }
+  ],
+  "result": {
+    "item": "vanillatweaks:oak_sailboat",
+    "count": 1
+  }
+}

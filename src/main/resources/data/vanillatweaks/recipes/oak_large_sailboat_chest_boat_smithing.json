@@ -1,0 +1,15 @@
+{
+  "type": "minecraft:smithing_transform",
+  "template": {
+    "item": "vanillatweaks:boat_upgrade_template"
+  },
+  "base": {
+    "item": "vanillatweaks:oak_medium_sailboat_chest_boat"
+  },
+  "addition": {
+    "item": "minecraft:oak_planks"
+  },
+  "result": {
+    "item": "vanillatweaks:oak_large_sailboat_chest_boat"
+  }
+}
