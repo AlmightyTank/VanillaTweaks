@@ -16,6 +16,7 @@ public class ModModelLayers {
 
     public static final ModelLayerLocation KRAKEN_TENTACLE_LAYER = create("entity/pirate/kraken_tentacle");
     public static final ModelLayerLocation PIRATE_CAPTAIN_LAYER = create("entity/pirate/pirate_captain");
+    public static final ModelLayerLocation PIRATE_BRUTE_LAYER = create("entity/pirate/pirate_brute");
 
     private static ModelLayerLocation create(String path) {
         return new ModelLayerLocation(new ResourceLocation(VanillaTweaks.MOD_ID, path), "main");

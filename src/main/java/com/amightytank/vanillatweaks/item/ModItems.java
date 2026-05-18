@@ -67,9 +67,17 @@ public class ModItems {
                     new Item.Properties()
             ));
 
-    public static final RegistryObject<Item> PIRATE_BRUTE_SPAWN_EGG = ITEMS.register("pirate_brute_spawn_egg",
+    public static final RegistryObject<Item> PIRATE_AXE_BRUTE_SPAWN_EGG = ITEMS.register("pirate_axe_brute_spawn_egg",
             () -> new ForgeSpawnEggItem(
-                    ModEntities.PIRATE_BRUTE,
+                    ModEntities.PIRATE_AXE_BRUTE,
+                    0x1F1F1F,
+                    0xD4AF37,
+                    new Item.Properties()
+            ));
+
+    public static final RegistryObject<Item> PIRATE_SPEAR_BRUTE_SPAWN_EGG = ITEMS.register("pirate_spear_brute_spawn_egg",
+            () -> new ForgeSpawnEggItem(
+                    ModEntities.PIRATE_SPEAR_BRUTE,
                     0x1F1F1F,
                     0xD4AF37,
                     new Item.Properties()

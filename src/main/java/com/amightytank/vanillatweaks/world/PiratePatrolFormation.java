@@ -274,7 +274,12 @@ public class PiratePatrolFormation {
         } else if (roll < 85) {
             pirate = ModEntities.PIRATE_GUNNER.get().create(level);
         } else {
-            pirate = ModEntities.PIRATE_BRUTE.get().create(level);
+            int roll2 = level.random.nextInt(100);
+            if (roll2 < 50) {
+                pirate = ModEntities.PIRATE_SPEAR_BRUTE.get().create(level);
+            } {
+                pirate = ModEntities.PIRATE_AXE_BRUTE.get().create(level);
+            }
         }
 
         if (pirate == null) return null;

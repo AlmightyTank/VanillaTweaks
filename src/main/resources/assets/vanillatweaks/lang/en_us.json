@@ -10,6 +10,9 @@
   "item.vanillatweaks.pirate_spear": "Pirate Spear",
   "tooltip.vanillatweaks.pirate_spear": "A heavy boarding spear used by pirate brutes.",
 
+  "entity.vanillatweaks.pirate_spear_brute": "Pirate Spear Brute",
+  "entity.vanillatweaks.pirate_axe_brute": "Pirate Axe Brute",
+
   "entity.vanillatweaks.pirate_gunner": "Pirate Gunner",
   "entity.vanillatweaks.pirate_dynamite_arrow": "Dynamite Arrow",
   "item.vanillatweaks.pirate_gunner_spawn_egg": "Pirate Gunner Spawn Egg",

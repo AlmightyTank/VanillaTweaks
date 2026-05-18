@@ -19,12 +19,20 @@ public class PirateParrotPeckGoal extends Goal {
 
     @Override
     public boolean canUse() {
+        if (this.parrot.shouldReturnToOwner()) {
+            return false;
+        }
+
         LivingEntity target = this.parrot.getTarget();
         return target != null && target.isAlive();
     }
 
     @Override
     public boolean canContinueToUse() {
+        if (this.parrot.shouldReturnToOwner()) {
+            return false;
+        }
+
         LivingEntity target = this.parrot.getTarget();
         return target != null && target.isAlive();
     }
@@ -38,6 +46,7 @@ public class PirateParrotPeckGoal extends Goal {
         }
 
         this.parrot.getLookControl().setLookAt(target, 30.0F, 30.0F);
+
         this.parrot.getMoveControl().setWantedPosition(
                 target.getX(),
                 target.getEyeY(),

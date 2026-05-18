@@ -18,6 +18,21 @@ public class CaptainSummonKrakenGoal extends Goal {
     private int castTime;
     private int cooldown;
 
+    private static final int SMALL_CHASE_COUNT = 7;
+    private static final int CIRCLE_STRIKE_COUNT = 3;
+
+    /*
+     * Distance from the player for the 3 big strike tentacles.
+     * 1.75D - 2.25D usually looks good.
+     */
+    private static final double CIRCLE_RADIUS = 2.0D;
+
+    /*
+     * If your tentacles point the wrong way in game:
+     * try 90.0F, -90.0F, or 180.0F.
+     */
+    private static final float TENTACLE_YAW_OFFSET = 0.0F;
+
     public CaptainSummonKrakenGoal(PirateCaptainEntity captain) {
         this.captain = captain;
         this.setFlags(EnumSet.of(Goal.Flag.MOVE, Goal.Flag.LOOK));
@@ -71,81 +86,75 @@ public class CaptainSummonKrakenGoal extends Goal {
         this.castTime--;
 
         if (this.castTime == 18 && !this.captain.level().isClientSide) {
-            this.summonEvokerStyleTentacles(target);
+            this.summonChaseThenCircleStrike(target);
         }
     }
 
-    private void summonEvokerStyleTentacles(LivingEntity target) {
+    private void summonChaseThenCircleStrike(LivingEntity target) {
         double captainX = this.captain.getX();
         double captainZ = this.captain.getZ();
 
         double targetX = target.getX();
         double targetZ = target.getZ();
 
-        double pathAngle = Math.atan2(targetZ - captainZ, targetX - captainX);
+        double dx = targetX - captainX;
+        double dz = targetZ - captainZ;
+
+        double pathAngle = Math.atan2(dz, dx);
+        double sideAngle = pathAngle + Math.PI / 2.0D;
 
         /*
          * Small chase tentacles.
-         * These pop up one after another toward the player.
-         * They ALSO face the player.
+         * These are spaced from the captain toward the player.
          */
-        for (int i = 1; i <= 7; i++) {
-            double distance = 1.15D * i;
+        for (int i = 1; i <= SMALL_CHASE_COUNT; i++) {
+            double progress = (double) i / (double) (SMALL_CHASE_COUNT + 1);
 
-            double sideNoise = (this.captain.getRandom().nextDouble() - 0.5D) * 0.9D;
-            double sideAngle = pathAngle + Mth.PI / 2.0F;
+            double sideNoise = (this.captain.getRandom().nextDouble() - 0.5D) * 0.75D;
 
-            double x = captainX
-                    + Math.cos(pathAngle) * distance
-                    + Math.cos(sideAngle) * sideNoise;
-
-            double z = captainZ
-                    + Math.sin(pathAngle) * distance
-                    + Math.sin(sideAngle) * sideNoise;
+            double x = captainX + dx * progress + Math.cos(sideAngle) * sideNoise;
+            double z = captainZ + dz * progress + Math.sin(sideAngle) * sideNoise;
 
             int delay = i * 3;
 
-            // Always face the target.
-            double faceTargetAngle = Math.atan2(targetZ - z, targetX - x);
+            float yaw = this.getYawFacing(x, z, targetX, targetZ);
 
             this.spawnTentacleAt(
                     x,
                     z,
-                    faceTargetAngle,
                     delay,
-                    KrakenTentacleEntity.TYPE_SMALL_CHASE
+                    KrakenTentacleEntity.TYPE_SMALL_CHASE,
+                    yaw
             );
         }
 
         /*
-         * Big strike tentacles.
-         * These spawn around the target and face the target directly.
+         * 3 big strike tentacles.
+         * These circle the player and face inward toward the player.
          */
-        int bigCount = 1 + this.captain.getRandom().nextInt(3);
+        double startAngle = this.captain.getRandom().nextDouble() * Math.PI * 2.0D;
 
-        for (int i = 0; i < bigCount; i++) {
-            double radius = 0.8D + this.captain.getRandom().nextDouble() * 1.4D;
-            double randomAngle = this.captain.getRandom().nextDouble() * Math.PI * 2.0D;
+        for (int i = 0; i < CIRCLE_STRIKE_COUNT; i++) {
+            double angle = startAngle + i * ((Math.PI * 2.0D) / CIRCLE_STRIKE_COUNT);
 
-            double x = targetX + Math.cos(randomAngle) * radius;
-            double z = targetZ + Math.sin(randomAngle) * radius;
+            double x = targetX + Math.cos(angle) * CIRCLE_RADIUS;
+            double z = targetZ + Math.sin(angle) * CIRCLE_RADIUS;
 
-            int delay = 24 + i * 3;
+            int delay = 26;
 
-            // Always face the target.
-            double faceTargetAngle = Math.atan2(targetZ - z, targetX - x);
+            float yaw = this.getYawFacing(x, z, targetX, targetZ);
 
             this.spawnTentacleAt(
                     x,
                     z,
-                    faceTargetAngle,
                     delay,
-                    KrakenTentacleEntity.TYPE_BIG_STRIKE
+                    KrakenTentacleEntity.TYPE_BIG_STRIKE,
+                    yaw
             );
         }
     }
 
-    private void spawnTentacleAt(double x, double z, double angle, int delay, int attackType) {
+    private void spawnTentacleAt(double x, double z, int delay, int attackType, float yaw) {
         Level level = this.captain.level();
 
         double y = this.findGroundY(level, x, z);
@@ -156,13 +165,8 @@ public class CaptainSummonKrakenGoal extends Goal {
             return;
         }
 
-        /*
-         * This controls which side of the model faces the target.
-         * If you still see the back, switch +90F to -90F.
-         */
-        float yaw = (float) (angle * 180.0D / Math.PI) - 90.0F;
-
         tentacle.moveTo(x, y, z, yaw, 0.0F);
+
         tentacle.setOwner(this.captain);
         tentacle.setWarmupDelay(delay);
         tentacle.setAttackType(attackType);
@@ -170,24 +174,13 @@ public class CaptainSummonKrakenGoal extends Goal {
         level.addFreshEntity(tentacle);
     }
 
-    private void spawnTentacleAt(double x, double z, double angle, int delay) {
-        Level level = this.captain.level();
+    private float getYawFacing(double fromX, double fromZ, double toX, double toZ) {
+        double dx = toX - fromX;
+        double dz = toZ - fromZ;
 
-        double y = this.findGroundY(level, x, z);
-
-        KrakenTentacleEntity tentacle = ModEntities.KRAKEN_TENTACLE.get().create(level);
-
-        if (tentacle == null) {
-            return;
-        }
-
-        float yaw = (float) (angle * 180.0D / Math.PI) - 90.0F;
-
-        tentacle.moveTo(x, y, z, yaw, 0.0F);
-        tentacle.setOwner(this.captain);
-        tentacle.setWarmupDelay(delay);
-
-        level.addFreshEntity(tentacle);
+        return Mth.wrapDegrees(
+                (float) (Math.atan2(dz, dx) * (180.0D / Math.PI)) - 90.0F + TENTACLE_YAW_OFFSET
+        );
     }
 
     private double findGroundY(Level level, double x, double z) {
@@ -197,9 +190,6 @@ public class CaptainSummonKrakenGoal extends Goal {
                 Mth.floor(z)
         );
 
-        /*
-         * Search downward until we find a solid block or water surface area.
-         */
         for (int i = 0; i < 8; i++) {
             BlockState stateBelow = level.getBlockState(pos.below());
 

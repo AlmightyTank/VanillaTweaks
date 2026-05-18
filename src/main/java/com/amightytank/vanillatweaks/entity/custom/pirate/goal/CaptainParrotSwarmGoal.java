@@ -75,7 +75,14 @@ public class CaptainParrotSwarmGoal extends Goal {
     private void summonParrots(LivingEntity target) {
         Level level = this.captain.level();
 
-        for (int i = 0; i < 5; i++) {
+        // Hide shoulder parrot model while swarm is active.
+        if (this.captain.hasShoulderParrot()) {
+            this.captain.setShoulderParrot(false);
+            this.spawnShoulderParrot(level, target);
+        }
+
+        // Normal swarm parrots.
+        for (int i = 0; i < 4; i++) {
             PirateParrotEntity parrot = ModEntities.PIRATE_PARROT.get().create(level);
 
             if (parrot == null) {
@@ -89,8 +96,30 @@ public class CaptainParrotSwarmGoal extends Goal {
             parrot.moveTo(x, y, z, this.captain.getRandom().nextFloat() * 360.0F, 0.0F);
             parrot.setOwner(this.captain);
             parrot.setTarget(target);
+            parrot.setFromShoulder(false);
 
             level.addFreshEntity(parrot);
         }
+    }
+
+    private void spawnShoulderParrot(Level level, LivingEntity target) {
+        PirateParrotEntity parrot = ModEntities.PIRATE_PARROT.get().create(level);
+
+        if (parrot == null) {
+            return;
+        }
+
+        double yawRad = Math.toRadians(this.captain.getYRot());
+
+        double shoulderX = this.captain.getX() - Math.sin(yawRad) * 0.45D;
+        double shoulderY = this.captain.getY() + 1.75D;
+        double shoulderZ = this.captain.getZ() + Math.cos(yawRad) * 0.45D;
+
+        parrot.moveTo(shoulderX, shoulderY, shoulderZ, this.captain.getYRot(), 0.0F);
+        parrot.setOwner(this.captain);
+        parrot.setTarget(target);
+        parrot.setFromShoulder(true);
+
+        level.addFreshEntity(parrot);
     }
 }

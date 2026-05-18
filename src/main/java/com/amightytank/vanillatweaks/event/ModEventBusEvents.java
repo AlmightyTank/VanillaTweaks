@@ -15,7 +15,8 @@ public class ModEventBusEvents {
         event.put(ModEntities.PIRATE_CAPTAIN.get(), PirateCaptainEntity.createAttributes().build());
         event.put(ModEntities.PIRATE_PARROT.get(), PirateParrotEntity.createAttributes().build());
         event.put(ModEntities.KRAKEN_TENTACLE.get(), KrakenTentacleEntity.createAttributes().build());
-        event.put(ModEntities.PIRATE_BRUTE.get(), PirateBruteEntity.createAttributes().build());
+        event.put(ModEntities.PIRATE_SPEAR_BRUTE.get(), PirateSpearBruteEntity.createAttributes().build());
+        event.put(ModEntities.PIRATE_AXE_BRUTE.get(), PirateAxeBruteEntity.createAttributes().build());
         event.put(ModEntities.PIRATE_GUNNER.get(), PirateGunnerEntity.createAttributes().build());
         event.put(ModEntities.PIRATE_DECKHAND.get(), PirateDeckhandEntity.createAttributes().build());
     }
