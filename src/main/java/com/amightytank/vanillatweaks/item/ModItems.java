@@ -59,14 +59,6 @@ public class ModItems {
                     new Item.Properties()
             ));
 
-    public static final RegistryObject<Item> KRAKEN_TENTACLE_SPAWN_EGG = ITEMS.register("kraken_tentacle_spawn_egg",
-            () -> new ForgeSpawnEggItem(
-                    ModEntities.KRAKEN_TENTACLE,
-                    0x1B263B,
-                    0x6A0DAD,
-                    new Item.Properties()
-            ));
-
     public static final RegistryObject<Item> PIRATE_AXE_BRUTE_SPAWN_EGG = ITEMS.register("pirate_axe_brute_spawn_egg",
             () -> new ForgeSpawnEggItem(
                     ModEntities.PIRATE_AXE_BRUTE,

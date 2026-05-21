@@ -3,6 +3,7 @@ package com.amightytank.vanillatweaks.entity.client.pirate;
 import com.amightytank.vanillatweaks.VanillaTweaks;
 import com.amightytank.vanillatweaks.entity.client.ModModelLayers;
 import com.amightytank.vanillatweaks.entity.client.pirate.model.PirateCaptainModel;
+import com.amightytank.vanillatweaks.entity.client.pirate.model.ShoulderPirateParrotModel;
 import com.amightytank.vanillatweaks.entity.custom.pirate.PirateCaptainEntity;
 import net.minecraft.client.renderer.entity.EntityRendererProvider;
 import net.minecraft.client.renderer.entity.MobRenderer;
@@ -13,7 +14,16 @@ public class PirateCaptainRenderer extends MobRenderer<PirateCaptainEntity, Pira
             new ResourceLocation(VanillaTweaks.MOD_ID, "textures/entity/pirate/pirate_captain.png");
 
     public PirateCaptainRenderer(EntityRendererProvider.Context context) {
-        super(context, new PirateCaptainModel<>(context.bakeLayer(ModModelLayers.PIRATE_CAPTAIN_LAYER)), 0.5F);
+        super(
+                context,
+                new PirateCaptainModel<>(context.bakeLayer(ModModelLayers.PIRATE_CAPTAIN_LAYER)),
+                0.5F
+        );
+
+        this.addLayer(new ShoulderPirateParrotLayer(
+                this,
+                new ShoulderPirateParrotModel<>(context.bakeLayer(ModModelLayers.SHOULDER_PIRATE_PARROT_LAYER))
+        ));
     }
 
     @Override

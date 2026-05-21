@@ -9,6 +9,7 @@ import com.amightytank.vanillatweaks.entity.client.pirate.*;
 import com.amightytank.vanillatweaks.entity.client.pirate.model.KrakenTentacleModel;
 import com.amightytank.vanillatweaks.entity.client.pirate.model.PirateBruteModel;
 import com.amightytank.vanillatweaks.entity.client.pirate.model.PirateCaptainModel;
+import com.amightytank.vanillatweaks.entity.client.pirate.model.ShoulderPirateParrotModel;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.client.event.EntityRenderersEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
@@ -31,6 +32,7 @@ public class ModEventBusClientEvents {
         event.registerLayerDefinition(ModModelLayers.KRAKEN_TENTACLE_LAYER, KrakenTentacleModel::createBodyLayer);
         event.registerLayerDefinition(ModModelLayers.PIRATE_CAPTAIN_LAYER, PirateCaptainModel::createBodyLayer);
         event.registerLayerDefinition(ModModelLayers.PIRATE_BRUTE_LAYER, PirateBruteModel::createBodyLayer);
+        event.registerLayerDefinition(ModModelLayers.SHOULDER_PIRATE_PARROT_LAYER, ShoulderPirateParrotModel::createBodyLayer);
     }
 
     @SubscribeEvent

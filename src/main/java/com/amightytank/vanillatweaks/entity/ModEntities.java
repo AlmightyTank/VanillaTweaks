@@ -76,9 +76,9 @@ public class ModEntities {
 
     public static final RegistryObject<EntityType<KrakenTentacleEntity>> KRAKEN_TENTACLE =
             ENTITY_TYPES.register("kraken_tentacle",
-                    () -> EntityType.Builder.of(KrakenTentacleEntity::new, MobCategory.MONSTER)
+                    () -> EntityType.Builder.of(KrakenTentacleEntity::new, MobCategory.MISC)
                             .sized(1.0F, 2.0F)
-                            .clientTrackingRange(8)
+                            .clientTrackingRange(10)
                             .build("kraken_tentacle"));
 
     public static final RegistryObject<EntityType<PirateSpearBruteEntity>> PIRATE_SPEAR_BRUTE =

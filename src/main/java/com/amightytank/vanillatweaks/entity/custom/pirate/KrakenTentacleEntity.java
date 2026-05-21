@@ -1,48 +1,52 @@
 package com.amightytank.vanillatweaks.entity.custom.pirate;
 
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.network.protocol.game.ClientGamePacketListener;
 import net.minecraft.network.syncher.EntityDataAccessor;
 import net.minecraft.network.syncher.EntityDataSerializers;
 import net.minecraft.network.syncher.SynchedEntityData;
-import net.minecraft.util.Mth;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.AnimationState;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LivingEntity;
-import net.minecraft.world.entity.ai.attributes.AttributeSupplier;
-import net.minecraft.world.entity.ai.attributes.Attributes;
-import net.minecraft.world.entity.monster.Monster;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.AABB;
+import net.minecraftforge.network.NetworkHooks;
 
-import java.util.List;
+import javax.annotation.Nullable;
+import java.util.UUID;
 
-public class KrakenTentacleEntity extends Monster {
-    private static final EntityDataAccessor<Integer> WARMUP_DELAY =
-            SynchedEntityData.defineId(KrakenTentacleEntity.class, EntityDataSerializers.INT);
-
-    private static final EntityDataAccessor<Integer> ATTACK_TYPE =
-            SynchedEntityData.defineId(KrakenTentacleEntity.class, EntityDataSerializers.INT);
-
+public class KrakenTentacleEntity extends Entity {
     public static final int TYPE_SMALL_CHASE = 0;
     public static final int TYPE_BIG_STRIKE = 1;
 
-    private static final int BIG_STRIKE_LIFE_TICKS = 70;
-    private static final int SMALL_CHASE_LIFE_TICKS = 80;
+    private static final EntityDataAccessor<Integer> DATA_ATTACK_TYPE =
+            SynchedEntityData.defineId(KrakenTentacleEntity.class, EntityDataSerializers.INT);
 
-    private static final int BIG_STRIKE_HIT_ACTIVE_TICK = 40;
+    private static final EntityDataAccessor<Integer> DATA_WARMUP_DELAY =
+            SynchedEntityData.defineId(KrakenTentacleEntity.class, EntityDataSerializers.INT);
 
-    public final AnimationState bigStrikeAnimationState = new AnimationState();
+    private static final EntityDataAccessor<Boolean> DATA_ACTIVE =
+            SynchedEntityData.defineId(KrakenTentacleEntity.class, EntityDataSerializers.BOOLEAN);
+
     public final AnimationState smallChaseAnimationState = new AnimationState();
+    public final AnimationState bigStrikeAnimationState = new AnimationState();
 
-    private LivingEntity owner;
+    @Nullable
+    private Entity owner;
 
-    private int lifeTicks = BIG_STRIKE_LIFE_TICKS;
-    private int activeTicks = 0;
+    @Nullable
+    private UUID ownerUUID;
 
-    private boolean hasHit = false;
-    private int lastAnimatedAttackType = -1;
+    private boolean animationStarted;
+    private boolean smallChaseDamageDone;
+    private boolean bigStrikeDamageDone;
+    private int lifeTicks;
 
-    public KrakenTentacleEntity(EntityType<? extends Monster> entityType, Level level) {
+    public KrakenTentacleEntity(EntityType<? extends KrakenTentacleEntity> entityType, Level level) {
         super(entityType, level);
         this.noPhysics = true;
         this.setNoGravity(true);
@@ -50,215 +54,217 @@ public class KrakenTentacleEntity extends Monster {
 
     @Override
     protected void defineSynchedData() {
-        super.defineSynchedData();
-        this.entityData.define(WARMUP_DELAY, 0);
-        this.entityData.define(ATTACK_TYPE, TYPE_BIG_STRIKE);
+        this.entityData.define(DATA_ATTACK_TYPE, TYPE_BIG_STRIKE);
+        this.entityData.define(DATA_WARMUP_DELAY, 0);
+        this.entityData.define(DATA_ACTIVE, false);
     }
 
-    public void setOwner(LivingEntity owner) {
-        this.owner = owner;
+    public void setAttackActive(boolean active) {
+        this.entityData.set(DATA_ACTIVE, active);
     }
 
-    public LivingEntity getOwner() {
-        return this.owner;
+    public boolean isAttackActive() {
+        return this.entityData.get(DATA_ACTIVE);
     }
 
-    public void setWarmupDelay(int delay) {
-        this.entityData.set(WARMUP_DELAY, Math.max(0, delay));
-    }
-
-    public int getWarmupDelay() {
-        return this.entityData.get(WARMUP_DELAY);
-    }
-
-    public void setAttackType(int type) {
-        this.entityData.set(ATTACK_TYPE, type);
-
-        if (this.activeTicks == 0) {
-            this.lifeTicks = getMaxLifeTicksForType(type);
-        }
-    }
-
-    public int getAttackType() {
-        return this.entityData.get(ATTACK_TYPE);
-    }
-
-    public boolean isSmallChaseTentacle() {
-        return this.getAttackType() == TYPE_SMALL_CHASE;
-    }
-
-    public boolean isBigStrikeTentacle() {
-        return this.getAttackType() == TYPE_BIG_STRIKE;
-    }
-
-    public boolean isActivated() {
-        return this.activeTicks > 0;
-    }
-
-    public int getLifeTicks() {
-        return this.lifeTicks;
-    }
-
-    public int getActiveTicks() {
-        return this.activeTicks;
-    }
-
-    public int getMaxLifeTicks() {
-        return getMaxLifeTicksForType(this.getAttackType());
-    }
-
-    private static int getMaxLifeTicksForType(int type) {
-        if (type == TYPE_SMALL_CHASE) {
-            return SMALL_CHASE_LIFE_TICKS;
-        }
-
-        return BIG_STRIKE_LIFE_TICKS;
-    }
-
-    public float getLifeProgress() {
-        return Mth.clamp((float) this.activeTicks / (float) this.getMaxLifeTicks(), 0.0F, 1.0F);
-    }
-
-    public float getLifeProgress(float partialTick) {
-        return Mth.clamp(((float) this.activeTicks + partialTick) / (float) this.getMaxLifeTicks(), 0.0F, 1.0F);
-    }
-
-    /*
-     * Turning is disabled for now.
-     * Keep this method so old spawn code can still call tentacle.faceTarget(player)
-     * without causing compile errors or rotating the model.
-     */
-    public void faceTarget(LivingEntity target) {
-        // Disabled for now.
-    }
-
-    private void lockRotation() {
-        this.setYRot(0.0F);
-        this.yRotO = 0.0F;
-
-        this.yBodyRot = 0.0F;
-        this.yBodyRotO = 0.0F;
-
-        this.yHeadRot = 0.0F;
-        this.yHeadRotO = 0.0F;
-    }
-
-    private void startCorrectAnimationImmediately() {
-        int currentAttackType = this.getAttackType();
-
-        if (this.lastAnimatedAttackType == currentAttackType) {
-            return;
-        }
-
-        this.lastAnimatedAttackType = currentAttackType;
-
-        this.bigStrikeAnimationState.stop();
-        this.smallChaseAnimationState.stop();
-
-        if (currentAttackType == TYPE_SMALL_CHASE) {
-            this.smallChaseAnimationState.start(this.tickCount);
-        } else {
-            this.bigStrikeAnimationState.start(this.tickCount);
-        }
+    public boolean hasAnimationStarted() {
+        return this.animationStarted;
     }
 
     @Override
     public void tick() {
         super.tick();
 
-        this.setNoGravity(true);
-        this.setDeltaMovement(0.0D, 0.0D, 0.0D);
-
         /*
-         * Turning disabled.
-         * This keeps the rendered tentacle facing its default Blockbench direction.
+         * Server controls when the tentacle is allowed to appear.
          */
-        this.lockRotation();
+        if (!this.level().isClientSide && !this.isAttackActive()) {
+            if (this.getWarmupDelay() > 0) {
+                this.setWarmupDelay(this.getWarmupDelay() - 1);
+                return;
+            }
 
-        /*
-         * Animation starts immediately so it does not spawn big and then shrink.
-         */
-        this.startCorrectAnimationImmediately();
-
-        this.activeTicks++;
-
-        if (this.lifeTicks > 0) {
-            this.lifeTicks--;
+            this.setAttackActive(true);
         }
 
-        int warmup = this.getWarmupDelay();
-
-        if (warmup > 0) {
-            this.setWarmupDelay(warmup - 1);
+        /*
+         * Client and server both wait until active.
+         * This prevents the model from showing before the animation starts.
+         */
+        if (!this.isAttackActive()) {
+            return;
         }
+
+        if (!this.animationStarted) {
+            this.startCorrectAnimation();
+            this.animationStarted = true;
+        }
+
+        this.lifeTicks++;
 
         if (!this.level().isClientSide) {
-            if (warmup <= 0 && this.isBigStrikeTentacle() && !this.hasHit && this.activeTicks >= BIG_STRIKE_HIT_ACTIVE_TICK) {
-                this.hitNearbyTargets();
-                this.hasHit = true;
-            }
+            this.handleDamageTicks();
+        }
 
-            if (this.lifeTicks <= 0) {
-                this.discard();
-            }
+        if (!this.level().isClientSide && this.lifeTicks > this.getMaxLifeTicks()) {
+            this.discard();
         }
     }
 
-    private void hitNearbyTargets() {
-        AABB hitBox = this.getBoundingBox().inflate(2.25D, 4.0D, 2.25D);
+    private void handleDamageTicks() {
+        if (this.getAttackType() == TYPE_SMALL_CHASE) {
+            if (!this.smallChaseDamageDone && this.lifeTicks >= 16) {
+                this.dealAttackDamage(this.getSmallChaseDamageAmount());
+                this.smallChaseDamageDone = true;
+            }
 
-        List<LivingEntity> targets = this.level().getEntitiesOfClass(
-                LivingEntity.class,
-                hitBox,
-                entity -> entity.isAlive()
-                        && entity != this
-                        && entity != this.owner
-                        && !(entity instanceof AbstractPirateEntity)
-                        && !(entity instanceof PirateParrotEntity)
-                        && !(entity instanceof KrakenTentacleEntity)
-        );
+            return;
+        }
 
-        for (LivingEntity target : targets) {
-            target.hurt(this.damageSources().mobAttack(this), 7.0F);
+        /*
+         * Big strike hits once as one heavy slam.
+         */
+        if (!this.bigStrikeDamageDone && this.lifeTicks >= 43) {
+            this.dealAttackDamage(this.getBigStrikeDamageAmount());
+            this.bigStrikeDamageDone = true;
+        }
+    }
 
-            double xKnock = target.getX() - this.getX();
-            double zKnock = target.getZ() - this.getZ();
+    private float getSmallChaseDamageAmount() {
+        return 1.0F;
+    }
 
-            target.knockback(0.8D, -xKnock, -zKnock);
-            target.setDeltaMovement(target.getDeltaMovement().add(0.0D, 0.45D, 0.0D));
-            target.hasImpulse = true;
-            target.hurtMarked = true;
+    private float getBigStrikeDamageAmount() {
+        /*
+         * 3 hits x 4 damage = 12 total if all swings connect.
+         */
+        return 6.0F;
+    }
+
+    private void startCorrectAnimation() {
+        if (this.getAttackType() == TYPE_SMALL_CHASE) {
+            this.smallChaseAnimationState.start(this.tickCount);
+        } else {
+            this.bigStrikeAnimationState.start(this.tickCount);
+        }
+    }
+
+    private int getMaxLifeTicks() {
+        if (this.getAttackType() == TYPE_SMALL_CHASE) {
+            return 45;
+        }
+
+        return 75;
+    }
+
+    private double getHitRange() {
+        if (this.getAttackType() == TYPE_SMALL_CHASE) {
+            return 0.9D;
+        }
+
+        return 1.75D;
+    }
+
+    private void dealAttackDamage(float damageAmount) {
+        AABB hitBox = this.getBoundingBox().inflate(this.getHitRange(), 1.0D, this.getHitRange());
+
+        for (LivingEntity livingEntity : this.level().getEntitiesOfClass(LivingEntity.class, hitBox)) {
+            if (!this.canDamageEntity(livingEntity)) {
+                continue;
+            }
+            livingEntity.hurt(this.getTentacleDamageSource(), damageAmount);
+        }
+    }
+
+    private boolean canDamageEntity(LivingEntity livingEntity) {
+        if (!livingEntity.isAlive()) {
+            return false;
+        }
+
+        Entity ownerEntity = this.getOwner();
+
+        if (ownerEntity != null && livingEntity.is(ownerEntity)) {
+            return false;
+        }
+
+        return true;
+    }
+
+    private DamageSource getTentacleDamageSource() {
+        Entity ownerEntity = this.getOwner();
+
+        if (ownerEntity instanceof LivingEntity livingOwner) {
+            return this.damageSources().mobAttack(livingOwner);
+        }
+
+        return this.damageSources().magic();
+    }
+
+    public void setAttackType(int attackType) {
+        this.entityData.set(DATA_ATTACK_TYPE, attackType);
+    }
+
+    public int getAttackType() {
+        return this.entityData.get(DATA_ATTACK_TYPE);
+    }
+
+    public void setWarmupDelay(int warmupDelay) {
+        this.entityData.set(DATA_WARMUP_DELAY, warmupDelay);
+    }
+
+    public int getWarmupDelay() {
+        return this.entityData.get(DATA_WARMUP_DELAY);
+    }
+
+    public void setOwner(@Nullable Entity owner) {
+        this.owner = owner;
+        this.ownerUUID = owner == null ? null : owner.getUUID();
+    }
+
+    @Nullable
+    public Entity getOwner() {
+        if (this.owner == null && this.ownerUUID != null && this.level() instanceof ServerLevel serverLevel) {
+            this.owner = serverLevel.getEntity(this.ownerUUID);
+        }
+
+        return this.owner;
+    }
+
+    @Override
+    protected void readAdditionalSaveData(CompoundTag tag) {
+        this.setAttackType(tag.getInt("AttackType"));
+        this.setWarmupDelay(tag.getInt("WarmupDelay"));
+        this.lifeTicks = tag.getInt("LifeTicks");
+        this.smallChaseDamageDone = tag.getBoolean("SmallChaseDamageDone");
+        this.bigStrikeDamageDone = tag.getBoolean("BigStrikeDamageDone");
+        this.setAttackActive(tag.getBoolean("AttackActive"));
+
+        if (tag.hasUUID("Owner")) {
+            this.ownerUUID = tag.getUUID("Owner");
         }
     }
 
     @Override
-    public boolean isPushable() {
+    protected void addAdditionalSaveData(CompoundTag tag) {
+        tag.putInt("AttackType", this.getAttackType());
+        tag.putInt("WarmupDelay", this.getWarmupDelay());
+        tag.putInt("LifeTicks", this.lifeTicks);
+        tag.putBoolean("SmallChaseDamageDone", this.smallChaseDamageDone);
+        tag.putBoolean("BigStrikeDamageDone", this.bigStrikeDamageDone);
+        tag.putBoolean("AttackActive", this.isAttackActive());
+
+        if (this.ownerUUID != null) {
+            tag.putUUID("Owner", this.ownerUUID);
+        }
+    }
+
+    @Override
+    public boolean isPickable() {
         return false;
     }
 
     @Override
-    protected void doPush(Entity entity) {
-    }
-
-    @Override
-    protected void pushEntities() {
-    }
-
-    @Override
-    public boolean canBeCollidedWith() {
-        return false;
-    }
-
-    @Override
-    public boolean canCollideWith(Entity entity) {
-        return false;
-    }
-
-    public static AttributeSupplier.Builder createAttributes() {
-        return Monster.createMonsterAttributes()
-                .add(Attributes.MAX_HEALTH, 20.0D)
-                .add(Attributes.MOVEMENT_SPEED, 0.0D)
-                .add(Attributes.KNOCKBACK_RESISTANCE, 1.0D)
-                .add(Attributes.FOLLOW_RANGE, 0.0D);
+    public Packet<ClientGamePacketListener> getAddEntityPacket() {
+        return NetworkHooks.getEntitySpawningPacket(this);
     }
 }

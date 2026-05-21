@@ -25,7 +25,6 @@ public class ModCreativeModTabs {
                         }
                         output.accept(ModItems.PIRATE_CAPTAIN_SPAWN_EGG.get());
                         output.accept(ModItems.PIRATE_PARROT_SPAWN_EGG.get());
-                        output.accept(ModItems.KRAKEN_TENTACLE_SPAWN_EGG.get());
                         output.accept(ModItems.PIRATE_AXE_BRUTE_SPAWN_EGG.get());
                         output.accept(ModItems.PIRATE_SPEAR_BRUTE_SPAWN_EGG.get());
                         output.accept(ModItems.PIRATE_GUNNER_SPAWN_EGG.get());

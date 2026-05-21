@@ -22,8 +22,8 @@ public class PirateParrotEntity extends Parrot {
 
     private LivingEntity owner;
 
-    private int lifeTicks = 260;
-    private int attackTicks = 170;
+    // 420 ticks = 21 seconds
+    private int lifeTicks = 420;
 
     public PirateParrotEntity(EntityType<? extends Parrot> entityType, Level level) {
         super(entityType, level);
@@ -53,16 +53,25 @@ public class PirateParrotEntity extends Parrot {
     }
 
     public boolean shouldReturnToOwner() {
-        return this.isFromShoulder() && this.attackTicks <= 0;
+        // Shoulder parrot is now permanent on the captain model/layer.
+        // Swarm parrots never return.
+        return false;
     }
 
     @Override
     protected void registerGoals() {
         this.goalSelector.addGoal(0, new FloatGoal(this));
-        this.goalSelector.addGoal(1, new PirateParrotPeckGoal(this, 1.65D));
+
+        // Faster pecking movement.
+        this.goalSelector.addGoal(1, new PirateParrotPeckGoal(this, 2.15D));
+
         this.goalSelector.addGoal(3, new RandomLookAroundGoal(this));
 
-        this.targetSelector.addGoal(1, new NearestAttackableTargetGoal<>(this, Player.class, true));
+        this.targetSelector.addGoal(1, new NearestAttackableTargetGoal<>(
+                this,
+                Player.class,
+                true
+        ));
     }
 
     @Override
@@ -75,51 +84,7 @@ public class PirateParrotEntity extends Parrot {
 
         this.lifeTicks--;
 
-        if (this.isFromShoulder()) {
-            this.tickShoulderParrot();
-        } else {
-            this.tickNormalSwarmParrot();
-        }
-    }
-
-    private void tickNormalSwarmParrot() {
         if (this.lifeTicks <= 0) {
-            this.discard();
-        }
-    }
-
-    private void tickShoulderParrot() {
-        if (!(this.owner instanceof PirateCaptainEntity captain) || !captain.isAlive()) {
-            this.discard();
-            return;
-        }
-
-        this.attackTicks--;
-
-        if (this.attackTicks > 0 && this.getTarget() != null && this.getTarget().isAlive()) {
-            return;
-        }
-
-        this.setTarget(null);
-
-        double yawRad = Math.toRadians(captain.getYRot());
-
-        double shoulderX = captain.getX() - Math.sin(yawRad) * 0.45D;
-        double shoulderY = captain.getY() + 1.75D;
-        double shoulderZ = captain.getZ() + Math.cos(yawRad) * 0.45D;
-
-        this.getMoveControl().setWantedPosition(shoulderX, shoulderY, shoulderZ, 1.7D);
-
-        double distance = this.distanceToSqr(shoulderX, shoulderY, shoulderZ);
-
-        if (distance <= 0.8D) {
-            captain.setShoulderParrot(true);
-            this.discard();
-            return;
-        }
-
-        if (this.lifeTicks <= 0) {
-            captain.setShoulderParrot(true);
             this.discard();
         }
     }
@@ -127,7 +92,9 @@ public class PirateParrotEntity extends Parrot {
     public static AttributeSupplier.Builder createAttributes() {
         return Parrot.createAttributes()
                 .add(Attributes.MAX_HEALTH, 6.0D)
-                .add(Attributes.ATTACK_DAMAGE, 2.0D)
-                .add(Attributes.FOLLOW_RANGE, 32.0D);
+                .add(Attributes.MOVEMENT_SPEED, 0.55D)
+                .add(Attributes.FLYING_SPEED, 0.95D)
+                .add(Attributes.ATTACK_DAMAGE, 1.0D)
+                .add(Attributes.FOLLOW_RANGE, 40.0D);
     }
 }

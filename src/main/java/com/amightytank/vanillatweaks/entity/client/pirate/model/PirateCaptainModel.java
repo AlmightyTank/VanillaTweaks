@@ -19,7 +19,6 @@ public class PirateCaptainModel<T extends PirateCaptainEntity> extends EntityMod
 	private final ModelPart right_arm;
 	private final ModelPart left_leg;
 	private final ModelPart right_leg;
-	private final ModelPart shoulder_parrot;
 
 	public PirateCaptainModel(ModelPart root) {
 		this.head = root.getChild("head");
@@ -30,7 +29,6 @@ public class PirateCaptainModel<T extends PirateCaptainEntity> extends EntityMod
 		this.right_arm = root.getChild("right_arm");
 		this.left_leg = root.getChild("left_leg");
 		this.right_leg = root.getChild("right_leg");
-		this.shoulder_parrot = root.getChild("shoulder_parrot");
 	}
 
 	public static LayerDefinition createBodyLayer() {
@@ -95,35 +93,12 @@ public class PirateCaptainModel<T extends PirateCaptainEntity> extends EntityMod
 						.addBox(-2.0F, 0.0F, -2.0F, 4.0F, 12.0F, 4.0F, new CubeDeformation(0.0F)),
 				PartPose.offset(-2.0F, 12.0F, 0.0F));
 
-		partdefinition.addOrReplaceChild("shoulder_parrot",
-				CubeListBuilder.create()
-						// Body
-						.texOffs(56, 48)
-						.addBox(-2.0F, -5.0F, -1.5F, 4.0F, 5.0F, 3.0F, new CubeDeformation(0.0F))
-						// Head
-						.texOffs(70, 48)
-						.addBox(-1.5F, -7.5F, -2.0F, 3.0F, 3.0F, 3.0F, new CubeDeformation(0.0F))
-						// Beak
-						.texOffs(82, 48)
-						.addBox(-0.5F, -6.5F, -3.0F, 1.0F, 1.0F, 1.0F, new CubeDeformation(0.0F))
-						// Tail
-						.texOffs(86, 48)
-						.addBox(-1.0F, -1.0F, 1.5F, 2.0F, 5.0F, 1.0F, new CubeDeformation(0.0F)),
-				PartPose.offsetAndRotation(4.6F, 2.0F, 0.0F, 0.0F, -0.35F, 0.0F));
-
 		return LayerDefinition.create(meshdefinition, 112, 64);
 	}
 
 	@Override
 	public void setupAnim(T entity, float limbSwing, float limbSwingAmount, float ageInTicks, float netHeadYaw, float headPitch) {
 		resetPose();
-
-		this.shoulder_parrot.visible = entity.hasShoulderParrot();
-
-		if (entity.hasShoulderParrot()) {
-			this.shoulder_parrot.yRot = -0.35F + Mth.sin(ageInTicks * 0.15F) * 0.08F;
-			this.shoulder_parrot.zRot = Mth.sin(ageInTicks * 0.2F) * 0.03F;
-		}
 
 		this.head.yRot = netHeadYaw * ((float) Math.PI / 180F);
 		this.head.xRot = headPitch * ((float) Math.PI / 180F);
@@ -178,11 +153,6 @@ public class PirateCaptainModel<T extends PirateCaptainEntity> extends EntityMod
 		this.right_leg.xRot = 0.0F;
 		this.right_leg.yRot = 0.0F;
 		this.right_leg.zRot = 0.0F;
-
-		this.shoulder_parrot.xRot = 0.0F;
-		this.shoulder_parrot.yRot = -0.35F;
-		this.shoulder_parrot.zRot = 0.0F;
-		this.shoulder_parrot.visible = true;
 	}
 
 	private void animateSpellCasting(float ageInTicks) {
@@ -227,6 +197,5 @@ public class PirateCaptainModel<T extends PirateCaptainEntity> extends EntityMod
 		this.right_arm.render(poseStack, vertexConsumer, packedLight, packedOverlay, red, green, blue, alpha);
 		this.left_leg.render(poseStack, vertexConsumer, packedLight, packedOverlay, red, green, blue, alpha);
 		this.right_leg.render(poseStack, vertexConsumer, packedLight, packedOverlay, red, green, blue, alpha);
-		this.shoulder_parrot.render(poseStack, vertexConsumer, packedLight, packedOverlay, red, green, blue, alpha);
 	}
 }

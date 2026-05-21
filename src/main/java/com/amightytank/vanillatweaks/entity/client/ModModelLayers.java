@@ -18,6 +18,9 @@ public class ModModelLayers {
     public static final ModelLayerLocation PIRATE_CAPTAIN_LAYER = create("entity/pirate/pirate_captain");
     public static final ModelLayerLocation PIRATE_BRUTE_LAYER = create("entity/pirate/pirate_brute");
 
+    public static final ModelLayerLocation SHOULDER_PIRATE_PARROT_LAYER =
+            create("entity/pirate/shoulder_pirate_parrot");
+
     private static ModelLayerLocation create(String path) {
         return new ModelLayerLocation(new ResourceLocation(VanillaTweaks.MOD_ID, path), "main");
     }
