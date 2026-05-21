@@ -6,13 +6,23 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.InteractionResult;
-import net.minecraft.world.item.Item;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.Mob;
 import net.minecraft.world.item.context.UseOnContext;
+import net.minecraftforge.common.ForgeSpawnEggItem;
 
-public class PiratePatrolSpawnEggItem extends Item {
+import java.util.function.Supplier;
 
-    public PiratePatrolSpawnEggItem(Properties properties) {
-        super(properties);
+public class PiratePatrolSpawnEggItem extends ForgeSpawnEggItem {
+
+    public PiratePatrolSpawnEggItem(
+            Supplier<? extends EntityType<? extends Mob>> captainEntityType,
+            int primaryColor,
+            int secondaryColor,
+            Properties properties
+    ) {
+        super(captainEntityType, primaryColor, secondaryColor, properties);
     }
 
     @Override
@@ -25,7 +35,9 @@ public class PiratePatrolSpawnEggItem extends Item {
                 .relative(context.getClickedFace())
                 .above();
 
-        PiratePatrolSpawner.spawnTestPatrol(level, spawnPos, context.getPlayer());
+        Entity user = context.getPlayer();
+
+        PiratePatrolSpawner.spawnTestPatrol(level, spawnPos, user);
 
         if (context.getPlayer() != null) {
             context.getPlayer().displayClientMessage(

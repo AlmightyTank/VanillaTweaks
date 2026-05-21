@@ -44,58 +44,34 @@ public class ModItems {
         }
     }
 
+    public static final RegistryObject<Item> PIRATE_DECKHAND_SPAWN_EGG = ITEMS.register("pirate_deckhand_spawn_egg",
+            () -> new ForgeSpawnEggItem(ModEntities.PIRATE_DECKHAND, 0x3A2A1A, 0xBFA76A, new Item.Properties()));
+
+    public static final RegistryObject<Item> PIRATE_BRUTE_SPAWN_EGG = ITEMS.register("pirate_brute_spawn_egg",
+            () -> new ForgeSpawnEggItem(ModEntities.PIRATE_BRUTE, 0x4A2C1A, 0xC0392B, new Item.Properties()));
+
     public static final RegistryObject<Item> PIRATE_CAPTAIN_SPAWN_EGG = ITEMS.register("pirate_captain_spawn_egg",
-            () -> new ForgeSpawnEggItem(
-                    ModEntities.PIRATE_CAPTAIN,
-                    0x1F1F1F,
-                    0xD4AF37,
-                    new Item.Properties()
-            ));
+            () -> new ForgeSpawnEggItem(ModEntities.PIRATE_CAPTAIN, 0x111827, 0xD4AF37, new Item.Properties()));
 
     public static final RegistryObject<Item> PIRATE_PARROT_SPAWN_EGG = ITEMS.register("pirate_parrot_spawn_egg",
-            () -> new ForgeSpawnEggItem(
-                    ModEntities.PIRATE_PARROT,
-                    0x2E7D32,
-                    0xFFCC33,
-                    new Item.Properties()
-            ));
+            () -> new ForgeSpawnEggItem(ModEntities.PIRATE_PARROT, 0xC62828, 0x2E7D32, new Item.Properties()));
 
-    public static final RegistryObject<Item> PIRATE_AXE_BRUTE_SPAWN_EGG = ITEMS.register("pirate_axe_brute_spawn_egg",
-            () -> new ForgeSpawnEggItem(
-                    ModEntities.PIRATE_AXE_BRUTE,
-                    0x1F1F1F,
-                    0xD4AF37,
-                    new Item.Properties()
-            ));
+    public static final RegistryObject<Item> PIRATE_GUNNER_SPAWN_EGG = ITEMS.register("pirate_gunner_spawn_egg",
+            () -> new ForgeSpawnEggItem(ModEntities.PIRATE_GUNNER, 0x1B1B1B, 0x8B2E2E, new Item.Properties()));
 
-    public static final RegistryObject<Item> PIRATE_SPEAR_BRUTE_SPAWN_EGG = ITEMS.register("pirate_spear_brute_spawn_egg",
-            () -> new ForgeSpawnEggItem(
-                    ModEntities.PIRATE_SPEAR_BRUTE,
-                    0x1F1F1F,
+    public static final RegistryObject<Item> PIRATE_PATROL_SPAWN_EGG = ITEMS.register("pirate_patrol_spawn_egg",
+            () -> new PiratePatrolSpawnEggItem(
+                    ModEntities.PIRATE_CAPTAIN,
+                    0x0B1F33,
                     0xD4AF37,
                     new Item.Properties()
             ));
 
     public static final RegistryObject<Item> PIRATE_SPEAR = ITEMS.register("pirate_spear",
-            () -> new PirateSpearItem(
-                    new Item.Properties()
-                            .durability(250)
-            ));
-
-    public static final RegistryObject<Item> PIRATE_GUNNER_SPAWN_EGG = ITEMS.register("pirate_gunner_spawn_egg",
-            () -> new ForgeSpawnEggItem(
-                    ModEntities.PIRATE_GUNNER,
-                    0x3b2a1a,
-                    0xb3261e,
-                    new Item.Properties()
-            ));
+            () -> new PirateSpearItem(new Item.Properties().durability(250)));
 
     public static final RegistryObject<Item> PIRATE_DYNAMITE_ARROW = ITEMS.register("pirate_dynamite_arrow",
             () -> new PirateDynamiteArrowItem(new Item.Properties()));
-
-    public static final RegistryObject<Item> PIRATE_DECKHAND_SPAWN_EGG = ITEMS.register("pirate_deckhand_spawn_egg",
-            () -> new ForgeSpawnEggItem(ModEntities.PIRATE_DECKHAND, 0x3f2a1d, 0xb33a2c,
-                    new Item.Properties()));
 
     public static final RegistryObject<Item> BOAT_UPGRADE_TEMPLATE = ITEMS.register("boat_upgrade_template",
             () -> new SmithingTemplateItem(
@@ -111,11 +87,6 @@ public class ModItems {
                             new ResourceLocation("minecraft", "item/empty_slot_planks")
                     )
             ));
-
-    public static final RegistryObject<Item> PIRATE_PATROL_SPAWN_EGG = ITEMS.register("pirate_patrol_spawn_egg",
-            () -> new PiratePatrolSpawnEggItem(new Item.Properties()
-                    .stacksTo(64)
-                    .rarity(Rarity.UNCOMMON)));
 
     private static Supplier<? extends EntityType<? extends Boat>> getBoatEntity(ModBoatEntity.Type type, boolean chest) {
         return switch (type.getBoatSize()) {
