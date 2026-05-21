@@ -1,6 +1,6 @@
 package com.amightytank.vanillatweaks.entity.custom.pirate;
 
-import com.amightytank.vanillatweaks.entity.custom.pirate.goal.PirateParrotPeckGoal;
+import com.amightytank.vanillatweaks.entity.ai.PirateParrotPeckGoal;
 import net.minecraft.network.syncher.EntityDataAccessor;
 import net.minecraft.network.syncher.EntityDataSerializers;
 import net.minecraft.network.syncher.SynchedEntityData;

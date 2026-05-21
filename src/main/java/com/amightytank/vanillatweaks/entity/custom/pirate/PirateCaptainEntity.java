@@ -1,7 +1,7 @@
 package com.amightytank.vanillatweaks.entity.custom.pirate;
 
-import com.amightytank.vanillatweaks.entity.custom.pirate.goal.CaptainParrotSwarmGoal;
-import com.amightytank.vanillatweaks.entity.custom.pirate.goal.CaptainSummonKrakenGoal;
+import com.amightytank.vanillatweaks.entity.ai.CaptainParrotSwarmGoal;
+import com.amightytank.vanillatweaks.entity.ai.CaptainSummonKrakenGoal;
 import net.minecraft.network.syncher.EntityDataAccessor;
 import net.minecraft.network.syncher.EntityDataSerializers;
 import net.minecraft.network.syncher.SynchedEntityData;

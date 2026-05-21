@@ -1,4 +1,4 @@
-package com.amightytank.vanillatweaks.entity.custom.pirate.goal;
+package com.amightytank.vanillatweaks.entity.ai;
 
 import com.amightytank.vanillatweaks.entity.ModEntities;
 import com.amightytank.vanillatweaks.entity.custom.pirate.KrakenTentacleEntity;
