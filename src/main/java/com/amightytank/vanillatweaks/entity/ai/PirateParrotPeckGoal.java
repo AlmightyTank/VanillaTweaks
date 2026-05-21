@@ -1,5 +1,6 @@
 package com.amightytank.vanillatweaks.entity.ai;
 
+import com.amightytank.vanillatweaks.entity.custom.pirate.AbstractPirateEntity;
 import com.amightytank.vanillatweaks.entity.custom.pirate.PirateParrotEntity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.ai.goal.Goal;
@@ -27,7 +28,7 @@ public class PirateParrotPeckGoal extends Goal {
         }
 
         LivingEntity target = this.parrot.getTarget();
-        return target != null && target.isAlive();
+        return AbstractPirateEntity.canPirateAttack(target);
     }
 
     @Override
@@ -37,14 +38,15 @@ public class PirateParrotPeckGoal extends Goal {
         }
 
         LivingEntity target = this.parrot.getTarget();
-        return target != null && target.isAlive();
+        return AbstractPirateEntity.canPirateAttack(target);
     }
 
     @Override
     public void tick() {
         LivingEntity target = this.parrot.getTarget();
 
-        if (target == null || !target.isAlive()) {
+        if (!AbstractPirateEntity.canPirateAttack(target)) {
+            this.parrot.setTarget(null);
             return;
         }
 
@@ -64,7 +66,6 @@ public class PirateParrotPeckGoal extends Goal {
 
         double distance = this.parrot.distanceToSqr(target);
 
-        // 2.25D = about 1.5 blocks away
         if (distance <= 2.25D && this.attackCooldown <= 0) {
             peckTarget(target);
         }
@@ -105,21 +106,19 @@ public class PirateParrotPeckGoal extends Goal {
     }
 
     private void peckTarget(LivingEntity target) {
-        /*
-         * Damage must happen on the server.
-         * 2.0F = 1 heart before armor.
-         * Use 1.0F if you want half-heart pecks.
-         */
-        if (!this.parrot.level().isClientSide) {
-            target.hurt(this.parrot.damageSources().mobAttack(this.parrot), 2.0F);
+        if (!AbstractPirateEntity.canPirateAttack(target)) {
+            this.parrot.setTarget(null);
+            return;
         }
 
-        // Tiny knock so the peck feels physical.
-        double knockX = this.parrot.getX() - target.getX();
-        double knockZ = this.parrot.getZ() - target.getZ();
-        target.knockback(0.12D, knockX, knockZ);
+        if (!this.parrot.level().isClientSide) {
+            target.hurt(this.parrot.damageSources().mobAttack(this.parrot), 2.0F);
 
-        // Parrot bounces back after pecking.
+            double knockX = this.parrot.getX() - target.getX();
+            double knockZ = this.parrot.getZ() - target.getZ();
+            target.knockback(0.12D, knockX, knockZ);
+        }
+
         Vec3 bounce = this.parrot.position().subtract(target.position());
 
         if (bounce.lengthSqr() > 0.01D) {

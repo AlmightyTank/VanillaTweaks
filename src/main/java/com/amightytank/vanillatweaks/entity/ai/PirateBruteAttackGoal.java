@@ -1,6 +1,7 @@
-package com.amightytank.vanillatweaks.entity.custom.pirate.goal;
+package com.amightytank.vanillatweaks.entity.ai;
 
-import com.amightytank.vanillatweaks.entity.custom.pirate.AbstractPirateBruteEntity;
+import com.amightytank.vanillatweaks.entity.custom.pirate.AbstractPirateEntity;
+import com.amightytank.vanillatweaks.entity.custom.pirate.PirateBruteEntity;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.ai.goal.Goal;
@@ -9,47 +10,15 @@ import net.minecraft.world.phys.Vec3;
 import java.util.EnumSet;
 
 public class PirateBruteAttackGoal extends Goal {
-    private final AbstractPirateBruteEntity brute;
-    private final Settings settings;
+    private final PirateBruteEntity brute;
 
     private int attackTick;
     private int cooldown;
     private boolean hasHit;
 
-    public PirateBruteAttackGoal(AbstractPirateBruteEntity brute, Settings settings) {
+    public PirateBruteAttackGoal(PirateBruteEntity brute) {
         this.brute = brute;
-        this.settings = settings;
         this.setFlags(EnumSet.of(Goal.Flag.MOVE, Goal.Flag.LOOK));
-    }
-
-    public static Settings spear() {
-        return new Settings(
-                AbstractPirateBruteEntity.SPEAR_WINDUP,
-                AbstractPirateBruteEntity.SPEAR_LUNGE,
-                AbstractPirateBruteEntity.SPEAR_RECOVER,
-                10,
-                14,
-                26,
-                32,
-                3.4D,
-                0.72D,
-                1.25D
-        );
-    }
-
-    public static Settings axe() {
-        return new Settings(
-                AbstractPirateBruteEntity.AXE_WINDUP,
-                AbstractPirateBruteEntity.AXE_CHOP,
-                AbstractPirateBruteEntity.AXE_RECOVER,
-                14,
-                18,
-                36,
-                44,
-                2.6D,
-                0.52D,
-                1.65D
-        );
     }
 
     @Override
@@ -69,7 +38,9 @@ public class PirateBruteAttackGoal extends Goal {
         this.attackTick = 0;
         this.cooldown = 10;
         this.hasHit = false;
-        this.brute.setAttackState(AbstractPirateBruteEntity.ATTACK_NONE);
+
+        this.brute.setAggressive(true);
+        this.brute.setAttackState(PirateBruteEntity.ATTACK_NONE);
         this.brute.setAttackTick(0);
     }
 
@@ -77,7 +48,9 @@ public class PirateBruteAttackGoal extends Goal {
     public void stop() {
         this.attackTick = 0;
         this.hasHit = false;
-        this.brute.setAttackState(AbstractPirateBruteEntity.ATTACK_NONE);
+
+        this.brute.setAggressive(false);
+        this.brute.setAttackState(PirateBruteEntity.ATTACK_NONE);
         this.brute.setAttackTick(0);
         this.brute.getNavigation().stop();
     }
@@ -85,10 +58,21 @@ public class PirateBruteAttackGoal extends Goal {
     @Override
     public void tick() {
         LivingEntity target = this.brute.getTarget();
-        if (target == null) return;
+        if (target == null) {
+            return;
+        }
+
+        if (!AbstractPirateEntity.canPirateAttack(target)) {
+            this.brute.setTarget(null);
+            return;
+        }
+
+        this.brute.setAggressive(true);
+
+        Settings settings = this.brute.isSpearBrute() ? Settings.spear() : Settings.axe();
 
         double distanceSqr = this.brute.distanceToSqr(target);
-        double attackRangeSqr = this.settings.attackRange * this.settings.attackRange;
+        double attackRangeSqr = settings.attackRange * settings.attackRange;
 
         this.brute.getLookControl().setLookAt(target, 30.0F, 30.0F);
 
@@ -104,65 +88,71 @@ public class PirateBruteAttackGoal extends Goal {
             if (distanceSqr > attackRangeSqr) {
                 this.brute.getNavigation().moveTo(target, this.brute.isInWater() ? 1.45D : 1.18D);
             } else if (this.cooldown <= 0) {
-                this.beginAttack();
+                this.beginAttack(settings);
             }
+
             return;
         }
 
         this.attackTick++;
         this.brute.setAttackTick(this.attackTick);
 
-        if (this.attackTick < this.settings.lungeTick) {
-            this.brute.setAttackState(this.settings.windupState);
+        if (this.attackTick < settings.lungeTick) {
+            this.brute.setAttackState(settings.windupState);
             this.brute.getNavigation().stop();
-        } else if (this.attackTick == this.settings.lungeTick) {
-            this.brute.setAttackState(this.settings.hitState);
-            this.lungeAt(target);
-        } else if (this.attackTick > this.settings.lungeTick && this.attackTick <= this.settings.recoverStartTick) {
-            this.brute.setAttackState(this.settings.hitState);
+        } else if (this.attackTick == settings.lungeTick) {
+            this.brute.setAttackState(settings.hitState);
+            this.lungeAt(target, settings);
+        } else if (this.attackTick > settings.lungeTick && this.attackTick <= settings.recoverStartTick) {
+            this.brute.setAttackState(settings.hitState);
 
             if (!this.hasHit && distanceSqr <= attackRangeSqr + 1.5D) {
                 this.hasHit = true;
 
+                if (!AbstractPirateEntity.canPirateAttack(target)) {
+                    return;
+                }
                 boolean hit = this.brute.doHurtTarget(target);
 
-                if (hit && this.settings.knockback > 0.0D) {
-                    Vec3 push = target.position().subtract(this.brute.position()).normalize().scale(this.settings.knockback);
+                if (hit && settings.knockback > 0.0D) {
+                    Vec3 push = target.position().subtract(this.brute.position()).normalize().scale(settings.knockback);
                     target.push(push.x, 0.18D, push.z);
                     target.hurtMarked = true;
                 }
             }
-        } else if (this.attackTick < this.settings.totalAttackTicks) {
-            this.brute.setAttackState(this.settings.recoverState);
+        } else if (this.attackTick < settings.totalAttackTicks) {
+            this.brute.setAttackState(settings.recoverState);
         } else {
-            this.endAttack();
+            this.endAttack(settings);
         }
     }
 
-    private void beginAttack() {
+    private void beginAttack(Settings settings) {
         this.attackTick = 0;
         this.hasHit = false;
-        this.brute.setAttackState(this.settings.windupState);
+
+        this.brute.setAttackState(settings.windupState);
         this.brute.setAttackTick(0);
         this.brute.swing(net.minecraft.world.InteractionHand.MAIN_HAND);
     }
 
-    private void endAttack() {
+    private void endAttack(Settings settings) {
         this.attackTick = 0;
         this.hasHit = false;
-        this.cooldown = this.settings.cooldownTicks;
-        this.brute.setAttackState(AbstractPirateBruteEntity.ATTACK_NONE);
+        this.cooldown = settings.cooldownTicks;
+
+        this.brute.setAttackState(PirateBruteEntity.ATTACK_NONE);
         this.brute.setAttackTick(0);
     }
 
-    private void lungeAt(LivingEntity target) {
+    private void lungeAt(LivingEntity target, Settings settings) {
         Vec3 direction = target.position().subtract(this.brute.position());
 
         if (direction.lengthSqr() > 0.001D) {
             direction = direction.normalize();
 
-            double x = direction.x * this.settings.lungePower;
-            double z = direction.z * this.settings.lungePower;
+            double x = direction.x * settings.lungePower;
+            double z = direction.z * settings.lungePower;
 
             this.brute.setDeltaMovement(
                     this.brute.getDeltaMovement().add(x, this.brute.onGround() ? 0.12D : 0.04D, z)
@@ -186,7 +176,7 @@ public class PirateBruteAttackGoal extends Goal {
         }
     }
 
-    public record Settings(
+    private record Settings(
             int windupState,
             int hitState,
             int recoverState,
@@ -198,5 +188,34 @@ public class PirateBruteAttackGoal extends Goal {
             double lungePower,
             double knockback
     ) {
+        private static Settings spear() {
+            return new Settings(
+                    PirateBruteEntity.SPEAR_WINDUP,
+                    PirateBruteEntity.SPEAR_LUNGE,
+                    PirateBruteEntity.SPEAR_RECOVER,
+                    10,
+                    14,
+                    26,
+                    30,
+                    3.4D,
+                    0.72D,
+                    1.15D
+            );
+        }
+
+        private static Settings axe() {
+            return new Settings(
+                    PirateBruteEntity.AXE_WINDUP,
+                    PirateBruteEntity.AXE_CHOP,
+                    PirateBruteEntity.AXE_RECOVER,
+                    14,
+                    18,
+                    36,
+                    42,
+                    2.6D,
+                    0.52D,
+                    1.65D
+            );
+        }
     }
 }

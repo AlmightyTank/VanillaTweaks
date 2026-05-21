@@ -1,6 +1,7 @@
 package com.amightytank.vanillatweaks.entity.ai;
 
 import com.amightytank.vanillatweaks.entity.ModEntities;
+import com.amightytank.vanillatweaks.entity.custom.pirate.AbstractPirateEntity;
 import com.amightytank.vanillatweaks.entity.custom.pirate.KrakenTentacleEntity;
 import com.amightytank.vanillatweaks.entity.custom.pirate.PirateCaptainEntity;
 import net.minecraft.core.BlockPos;
@@ -81,6 +82,11 @@ public class CaptainSummonKrakenGoal extends Goal {
             return;
         }
 
+        if (!AbstractPirateEntity.canPirateAttack(target)) {
+            this.captain.setTarget(null);
+            return;
+        }
+
         this.captain.getLookControl().setLookAt(target, 30.0F, 30.0F);
         this.castTime--;
 
@@ -90,6 +96,10 @@ public class CaptainSummonKrakenGoal extends Goal {
     }
 
     private void spawnBasicKrakenAttack(LivingEntity target) {
+        if (!AbstractPirateEntity.canPirateAttack(target)) {
+            return;
+        }
+
         double captainX = this.captain.getX();
         double captainZ = this.captain.getZ();
 
@@ -107,6 +117,7 @@ public class CaptainSummonKrakenGoal extends Goal {
          * Small chase tentacles.
          * Keep these straight for now.
          */
+
         for (int i = 1; i <= 6; i++) {
             double progress = (double) i / 7.0D;
 

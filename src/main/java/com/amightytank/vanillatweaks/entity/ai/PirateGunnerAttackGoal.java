@@ -1,5 +1,6 @@
 package com.amightytank.vanillatweaks.entity.ai;
 
+import com.amightytank.vanillatweaks.entity.custom.pirate.AbstractPirateEntity;
 import com.amightytank.vanillatweaks.entity.custom.pirate.PirateGunnerEntity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.ai.goal.Goal;
@@ -41,8 +42,7 @@ public class PirateGunnerAttackGoal extends Goal {
     public boolean canUse() {
         LivingEntity target = this.gunner.getTarget();
 
-        return target != null
-                && target.isAlive()
+        return AbstractPirateEntity.canPirateAttack(target)
                 && this.gunner.getMainHandItem().is(Items.CROSSBOW);
     }
 
@@ -50,8 +50,7 @@ public class PirateGunnerAttackGoal extends Goal {
     public boolean canContinueToUse() {
         LivingEntity target = this.gunner.getTarget();
 
-        return target != null
-                && target.isAlive()
+        return AbstractPirateEntity.canPirateAttack(target)
                 && this.gunner.getMainHandItem().is(Items.CROSSBOW);
     }
 
@@ -82,7 +81,9 @@ public class PirateGunnerAttackGoal extends Goal {
     public void tick() {
         LivingEntity target = this.gunner.getTarget();
 
-        if (target == null || !target.isAlive()) {
+        if (!AbstractPirateEntity.canPirateAttack(target)) {
+            this.gunner.setTarget(null);
+            this.gunner.setChargingCrossbow(false);
             return;
         }
 
@@ -114,7 +115,7 @@ public class PirateGunnerAttackGoal extends Goal {
             this.gunner.setChargingCrossbow(true);
 
             if (this.chargeTime <= 0) {
-                if (canSeeTarget) {
+                if (canSeeTarget && AbstractPirateEntity.canPirateAttack(target)) {
                     float distanceFactor = (float) Math.sqrt(distanceToTarget) / this.attackRadius;
                     float clampedDistanceFactor = Math.min(Math.max(distanceFactor, 0.1F), 1.0F);
 

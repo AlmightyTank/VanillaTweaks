@@ -81,19 +81,20 @@ public class ModEntities {
                             .clientTrackingRange(10)
                             .build("kraken_tentacle"));
 
-    public static final RegistryObject<EntityType<PirateSpearBruteEntity>> PIRATE_SPEAR_BRUTE =
-            ENTITY_TYPES.register("pirate_spear_brute",
-                    () -> EntityType.Builder.of(PirateSpearBruteEntity::new, MobCategory.MONSTER)
-                            .sized(0.65F, 2.05F)
+    public static final RegistryObject<EntityType<PirateBruteEntity>> PIRATE_BRUTE =
+            ENTITY_TYPES.register("pirate_brute",
+                    () -> EntityType.Builder.of(PirateBruteEntity::new, MobCategory.MONSTER)
+                            .sized(0.7F, 2.05F)
                             .clientTrackingRange(8)
-                            .build("pirate_spear_brute"));
+                            .build("pirate_brute"));
 
-    public static final RegistryObject<EntityType<PirateAxeBruteEntity>> PIRATE_AXE_BRUTE =
-            ENTITY_TYPES.register("pirate_axe_brute",
-                    () -> EntityType.Builder.of(PirateAxeBruteEntity::new, MobCategory.MONSTER)
-                            .sized(0.7F, 2.1F)
-                            .clientTrackingRange(8)
-                            .build("pirate_axe_brute"));
+    public static final RegistryObject<EntityType<PirateSpearEntity>> PIRATE_SPEAR =
+            ENTITY_TYPES.register("pirate_spear",
+                    () -> EntityType.Builder.<PirateSpearEntity>of(PirateSpearEntity::new, MobCategory.MISC)
+                            .sized(0.5F, 0.5F)
+                            .clientTrackingRange(4)
+                            .updateInterval(20)
+                            .build("pirate_spear"));
 
     public static final RegistryObject<EntityType<PirateGunnerEntity>> PIRATE_GUNNER =
             ENTITY_TYPES.register("pirate_gunner",

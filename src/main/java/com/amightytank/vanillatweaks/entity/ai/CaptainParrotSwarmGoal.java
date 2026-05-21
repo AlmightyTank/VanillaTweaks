@@ -1,6 +1,7 @@
 package com.amightytank.vanillatweaks.entity.ai;
 
 import com.amightytank.vanillatweaks.entity.ModEntities;
+import com.amightytank.vanillatweaks.entity.custom.pirate.AbstractPirateEntity;
 import com.amightytank.vanillatweaks.entity.custom.pirate.PirateCaptainEntity;
 import com.amightytank.vanillatweaks.entity.custom.pirate.PirateParrotEntity;
 import net.minecraft.world.entity.LivingEntity;
@@ -24,7 +25,7 @@ public class CaptainParrotSwarmGoal extends Goal {
     public boolean canUse() {
         LivingEntity target = this.captain.getTarget();
 
-        if (target == null || !target.isAlive()) {
+        if (!AbstractPirateEntity.canPirateAttack(target)) {
             return false;
         }
 
@@ -39,7 +40,7 @@ public class CaptainParrotSwarmGoal extends Goal {
     @Override
     public boolean canContinueToUse() {
         LivingEntity target = this.captain.getTarget();
-        return this.castTime > 0 && target != null && target.isAlive();
+        return this.castTime > 0 && AbstractPirateEntity.canPirateAttack(target);
     }
 
     @Override
@@ -52,10 +53,7 @@ public class CaptainParrotSwarmGoal extends Goal {
     @Override
     public void stop() {
         this.castTime = 0;
-
-        // Longer cooldown because the swarm lasts longer.
         this.cooldown = 360;
-
         this.captain.setAggressive(false);
     }
 
@@ -63,7 +61,8 @@ public class CaptainParrotSwarmGoal extends Goal {
     public void tick() {
         LivingEntity target = this.captain.getTarget();
 
-        if (target == null) {
+        if (!AbstractPirateEntity.canPirateAttack(target)) {
+            this.captain.setTarget(null);
             return;
         }
 
@@ -76,13 +75,12 @@ public class CaptainParrotSwarmGoal extends Goal {
     }
 
     private void summonParrots(LivingEntity target) {
+        if (!AbstractPirateEntity.canPirateAttack(target)) {
+            return;
+        }
+
         Level level = this.captain.level();
 
-        /*
-         * Shoulder parrot is permanent.
-         * It does NOT leave the captain anymore.
-         * This spawns exactly 5 attack parrots.
-         */
         for (int i = 0; i < 5; i++) {
             PirateParrotEntity parrot = ModEntities.PIRATE_PARROT.get().create(level);
 
