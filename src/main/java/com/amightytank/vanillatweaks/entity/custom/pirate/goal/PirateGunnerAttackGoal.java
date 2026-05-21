@@ -39,12 +39,31 @@ public class PirateGunnerAttackGoal extends Goal {
 
     @Override
     public boolean canUse() {
-        return this.gunner.getTarget() != null && this.gunner.getMainHandItem().is(Items.CROSSBOW);
+        LivingEntity target = this.gunner.getTarget();
+
+        return target != null
+                && target.isAlive()
+                && this.gunner.getMainHandItem().is(Items.CROSSBOW);
     }
 
     @Override
     public boolean canContinueToUse() {
-        return this.canUse();
+        LivingEntity target = this.gunner.getTarget();
+
+        return target != null
+                && target.isAlive()
+                && this.gunner.getMainHandItem().is(Items.CROSSBOW);
+    }
+
+    @Override
+    public void start() {
+        this.attackTime = 10;
+        this.seeTime = 0;
+        this.chargeTime = 0;
+        this.chargingShot = false;
+
+        this.gunner.setAggressive(true);
+        this.gunner.setChargingCrossbow(false);
     }
 
     @Override
@@ -53,18 +72,26 @@ public class PirateGunnerAttackGoal extends Goal {
         this.attackTime = -1;
         this.chargeTime = 0;
         this.chargingShot = false;
+
+        this.gunner.setAggressive(false);
         this.gunner.setChargingCrossbow(false);
+        this.gunner.getNavigation().stop();
     }
 
     @Override
     public void tick() {
         LivingEntity target = this.gunner.getTarget();
 
-        if (target == null) {
+        if (target == null || !target.isAlive()) {
             return;
         }
 
-        double distanceToTarget = this.gunner.distanceToSqr(target.getX(), target.getY(), target.getZ());
+        double distanceToTarget = this.gunner.distanceToSqr(
+                target.getX(),
+                target.getY(),
+                target.getZ()
+        );
+
         boolean canSeeTarget = this.gunner.getSensing().hasLineOfSight(target);
 
         if (canSeeTarget) {
@@ -102,16 +129,18 @@ public class PirateGunnerAttackGoal extends Goal {
             return;
         }
 
-        if (--this.attackTime == 0) {
-            if (!canSeeTarget) {
-                return;
-            }
-
-            this.chargingShot = true;
-            this.chargeTime = 15;
-            this.gunner.setChargingCrossbow(true);
-        } else if (this.attackTime < 0) {
-            this.attackTime = this.attackInterval;
+        if (this.attackTime > 0) {
+            this.attackTime--;
+            return;
         }
+
+        if (!canSeeTarget) {
+            this.attackTime = 5;
+            return;
+        }
+
+        this.chargingShot = true;
+        this.chargeTime = 15;
+        this.gunner.setChargingCrossbow(true);
     }
 }

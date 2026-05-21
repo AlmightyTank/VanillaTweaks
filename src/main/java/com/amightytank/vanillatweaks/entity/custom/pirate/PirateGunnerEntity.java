@@ -1,6 +1,9 @@
 package com.amightytank.vanillatweaks.entity.custom.pirate;
 
 import com.amightytank.vanillatweaks.entity.custom.pirate.goal.PirateGunnerAttackGoal;
+import net.minecraft.network.syncher.EntityDataAccessor;
+import net.minecraft.network.syncher.EntityDataSerializers;
+import net.minecraft.network.syncher.SynchedEntityData;
 import net.minecraft.sounds.SoundEvent;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
@@ -31,11 +34,18 @@ public class PirateGunnerEntity extends AbstractPirateEntity implements RangedAt
     private static final float ARROW_SPEED = 1.7F;
     private static final float ARROW_INACCURACY = 7.0F;
 
-    private boolean chargingCrossbow = false;
+    private static final EntityDataAccessor<Boolean> DATA_CHARGING_CROSSBOW =
+            SynchedEntityData.defineId(PirateGunnerEntity.class, EntityDataSerializers.BOOLEAN);
 
     public PirateGunnerEntity(EntityType<? extends AbstractPirateEntity> entityType, Level level) {
         super(entityType, level);
         this.setItemSlot(EquipmentSlot.MAINHAND, new ItemStack(Items.CROSSBOW));
+    }
+
+    @Override
+    protected void defineSynchedData() {
+        super.defineSynchedData();
+        this.entityData.define(DATA_CHARGING_CROSSBOW, false);
     }
 
     @Override
@@ -54,9 +64,14 @@ public class PirateGunnerEntity extends AbstractPirateEntity implements RangedAt
     public void tick() {
         super.tick();
 
-        if (this.getTarget() == null) {
-            this.setAggressive(false);
-            this.setChargingCrossbow(false);
+        if (!this.level().isClientSide) {
+            boolean hasTarget = this.getTarget() != null && this.getTarget().isAlive();
+
+            this.setAggressive(hasTarget);
+
+            if (!hasTarget) {
+                this.setChargingCrossbow(false);
+            }
         }
     }
 
@@ -100,16 +115,16 @@ public class PirateGunnerEntity extends AbstractPirateEntity implements RangedAt
     }
 
     public void setChargingCrossbow(boolean chargingCrossbow) {
-        this.chargingCrossbow = chargingCrossbow;
+        this.entityData.set(DATA_CHARGING_CROSSBOW, chargingCrossbow);
     }
 
     public boolean isChargingCrossbow() {
-        return this.chargingCrossbow;
+        return this.entityData.get(DATA_CHARGING_CROSSBOW);
     }
 
     @Override
     public AbstractIllager.IllagerArmPose getArmPose() {
-        if (this.isAggressive() && this.isChargingCrossbow()) {
+        if (this.isChargingCrossbow()) {
             return AbstractIllager.IllagerArmPose.CROSSBOW_CHARGE;
         }
 

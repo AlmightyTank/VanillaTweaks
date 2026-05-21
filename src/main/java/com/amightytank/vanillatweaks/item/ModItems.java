@@ -4,6 +4,7 @@ import com.amightytank.vanillatweaks.VanillaTweaks;
 import com.amightytank.vanillatweaks.entity.ModEntities;
 import com.amightytank.vanillatweaks.entity.custom.boat.ModBoatEntity;
 import com.amightytank.vanillatweaks.item.custom.ModBoatItem;
+import com.amightytank.vanillatweaks.item.custom.PirateDynamiteArrowItem;
 import com.amightytank.vanillatweaks.item.custom.PiratePatrolSpawnEggItem;
 import com.amightytank.vanillatweaks.item.custom.PirateSpearItem;
 import net.minecraft.network.chat.Component;
@@ -88,6 +89,9 @@ public class ModItems {
                     0xb3261e,
                     new Item.Properties()
             ));
+
+    public static final RegistryObject<Item> PIRATE_DYNAMITE_ARROW = ITEMS.register("pirate_dynamite_arrow",
+            () -> new PirateDynamiteArrowItem(new Item.Properties()));
 
     public static final RegistryObject<Item> PIRATE_DECKHAND_SPAWN_EGG = ITEMS.register("pirate_deckhand_spawn_egg",
             () -> new ForgeSpawnEggItem(ModEntities.PIRATE_DECKHAND, 0x3f2a1d, 0xb33a2c,

@@ -1,11 +1,11 @@
 package com.amightytank.vanillatweaks.entity.custom.pirate;
 
 import com.amightytank.vanillatweaks.entity.ModEntities;
+import com.amightytank.vanillatweaks.item.ModItems;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.projectile.AbstractArrow;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.Items;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.HitResult;
 
@@ -23,12 +23,11 @@ public class PirateDynamiteArrowEntity extends AbstractArrow {
         this.setOwner(owner);
         this.setPos(owner.getX(), owner.getEyeY() - 0.1D, owner.getZ());
         this.setBaseDamage(3.0D);
-        this.setShotFromCrossbow(true);
     }
 
     @Override
     protected ItemStack getPickupItem() {
-        return new ItemStack(Items.ARROW);
+        return new ItemStack(ModItems.PIRATE_DYNAMITE_ARROW.get());
     }
 
     @Override
