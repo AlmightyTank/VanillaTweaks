@@ -88,4 +88,17 @@ public abstract class AbstractPirateEntity extends AbstractIllager {
 
         return super.hurt(source, amount);
     }
+
+    @Override
+    public IllagerArmPose getArmPose() {
+        if (this.isAggressive()) {
+            return IllagerArmPose.ATTACKING;
+        }
+
+        if (!this.getMainHandItem().isEmpty()) {
+            return IllagerArmPose.NEUTRAL;
+        }
+
+        return IllagerArmPose.CROSSED;
+    }
 }

@@ -9,6 +9,7 @@ import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.DifficultyInstance;
+import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.EntityType;
@@ -65,11 +66,12 @@ public class PirateGunnerEntity extends AbstractPirateEntity implements RangedAt
         super.tick();
 
         if (!this.level().isClientSide) {
-            boolean hasTarget = this.getTarget() != null && this.getTarget().isAlive();
+            LivingEntity target = this.getTarget();
+            boolean hasValidTarget = AbstractPirateEntity.canPirateAttack(target);
 
-            this.setAggressive(hasTarget);
+            this.setAggressive(hasValidTarget);
 
-            if (!hasTarget) {
+            if (!hasValidTarget) {
                 this.setChargingCrossbow(false);
             }
         }
@@ -110,6 +112,21 @@ public class PirateGunnerEntity extends AbstractPirateEntity implements RangedAt
     }
 
     @Override
+    protected SoundEvent getAmbientSound() {
+        return SoundEvents.PILLAGER_AMBIENT;
+    }
+
+    @Override
+    protected SoundEvent getHurtSound(DamageSource damageSource) {
+        return SoundEvents.PILLAGER_HURT;
+    }
+
+    @Override
+    protected SoundEvent getDeathSound() {
+        return SoundEvents.PILLAGER_DEATH;
+    }
+
+    @Override
     public SoundEvent getCelebrateSound() {
         return SoundEvents.PILLAGER_CELEBRATE;
     }
@@ -132,11 +149,19 @@ public class PirateGunnerEntity extends AbstractPirateEntity implements RangedAt
             return AbstractIllager.IllagerArmPose.CROSSBOW_HOLD;
         }
 
-        return AbstractIllager.IllagerArmPose.NEUTRAL;
+        if (!this.getMainHandItem().isEmpty()) {
+            return AbstractIllager.IllagerArmPose.NEUTRAL;
+        }
+
+        return AbstractIllager.IllagerArmPose.CROSSED;
     }
 
     @Override
     public void performRangedAttack(LivingEntity target, float distanceFactor) {
+        if (!AbstractPirateEntity.canPirateAttack(target)) {
+            return;
+        }
+
         Projectile projectile = this.createPirateProjectile();
 
         double dx = target.getX() - this.getX();

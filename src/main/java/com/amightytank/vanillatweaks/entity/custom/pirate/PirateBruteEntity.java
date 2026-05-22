@@ -7,24 +7,25 @@ import net.minecraft.network.syncher.EntityDataAccessor;
 import net.minecraft.network.syncher.EntityDataSerializers;
 import net.minecraft.network.syncher.SynchedEntityData;
 import net.minecraft.sounds.SoundEvent;
+import net.minecraft.sounds.SoundEvents;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.DifficultyInstance;
+import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.MobSpawnType;
 import net.minecraft.world.entity.MoverType;
 import net.minecraft.world.entity.SpawnGroupData;
+import net.minecraft.world.entity.ai.attributes.AttributeInstance;
 import net.minecraft.world.entity.ai.attributes.AttributeSupplier;
 import net.minecraft.world.entity.ai.attributes.Attributes;
-import net.minecraft.world.entity.monster.AbstractIllager;
 import net.minecraft.world.entity.monster.Monster;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.ServerLevelAccessor;
 import net.minecraft.world.phys.Vec3;
-
-import javax.annotation.Nullable;
+import org.jetbrains.annotations.Nullable;
 
 public class PirateBruteEntity extends AbstractPirateEntity {
     public static final int ATTACK_NONE = 0;
@@ -70,6 +71,7 @@ public class PirateBruteEntity extends AbstractPirateEntity {
     @Override
     protected void defineSynchedData() {
         super.defineSynchedData();
+
         this.entityData.define(DATA_WEAPON_TYPE, BruteWeaponType.SPEAR.getId());
         this.entityData.define(DATA_ATTACK_STATE, ATTACK_NONE);
         this.entityData.define(DATA_ATTACK_TICK, 0);
@@ -91,17 +93,33 @@ public class PirateBruteEntity extends AbstractPirateEntity {
 
         this.chooseRandomWeapon(level.getRandom());
         this.equipBruteWeapon();
+        this.updateWeaponStats();
 
         return data;
     }
 
     @Override
+    protected SoundEvent getAmbientSound() {
+        return SoundEvents.PILLAGER_AMBIENT;
+    }
+
+    @Override
+    protected SoundEvent getHurtSound(DamageSource damageSource) {
+        return SoundEvents.PILLAGER_HURT;
+    }
+
+    @Override
+    protected SoundEvent getDeathSound() {
+        return SoundEvents.PILLAGER_DEATH;
+    }
+
+    @Override
     public SoundEvent getCelebrateSound() {
-        return null;
+        return SoundEvents.PILLAGER_CELEBRATE;
     }
 
     private void chooseRandomWeapon(RandomSource random) {
-        // 70% spear, 30% iron axe
+        // 70% spear brute, 30% axe brute.
         if (random.nextFloat() < 0.70F) {
             this.setBruteWeaponType(BruteWeaponType.SPEAR);
         } else {
@@ -117,6 +135,26 @@ public class PirateBruteEntity extends AbstractPirateEntity {
         }
 
         this.setDropChance(EquipmentSlot.MAINHAND, 0.085F);
+    }
+
+    public void updateWeaponStats() {
+        if (this.isSpearBrute()) {
+            this.setAttributeBaseValue(Attributes.ATTACK_DAMAGE, 7.0D);
+            this.setAttributeBaseValue(Attributes.MOVEMENT_SPEED, 0.34D);
+            this.setAttributeBaseValue(Attributes.KNOCKBACK_RESISTANCE, 0.35D);
+        } else {
+            this.setAttributeBaseValue(Attributes.ATTACK_DAMAGE, 10.0D);
+            this.setAttributeBaseValue(Attributes.MOVEMENT_SPEED, 0.31D);
+            this.setAttributeBaseValue(Attributes.KNOCKBACK_RESISTANCE, 0.45D);
+        }
+    }
+
+    private void setAttributeBaseValue(net.minecraft.world.entity.ai.attributes.Attribute attribute, double value) {
+        AttributeInstance instance = this.getAttribute(attribute);
+
+        if (instance != null) {
+            instance.setBaseValue(value);
+        }
     }
 
     public BruteWeaponType getBruteWeaponType() {
@@ -156,11 +194,6 @@ public class PirateBruteEntity extends AbstractPirateEntity {
     }
 
     @Override
-    public AbstractIllager.IllagerArmPose getArmPose() {
-        return AbstractIllager.IllagerArmPose.ATTACKING;
-    }
-
-    @Override
     protected float getWaterSlowDown() {
         return 0.96F;
     }
@@ -194,6 +227,7 @@ public class PirateBruteEntity extends AbstractPirateEntity {
         this.setAttackTick(tag.getInt("AttackTick"));
 
         this.equipBruteWeapon();
+        this.updateWeaponStats();
     }
 
     public enum BruteWeaponType {
