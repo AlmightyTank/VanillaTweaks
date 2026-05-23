@@ -7,8 +7,6 @@ import com.amightytank.vanillatweaks.item.ModItems;
 import com.amightytank.vanillatweaks.world.PiratePatrolSpawner;
 import com.mojang.logging.LogUtils;
 import net.minecraft.client.renderer.entity.EntityRenderers;
-import net.minecraft.client.renderer.item.ItemProperties;
-import net.minecraft.resources.ResourceLocation;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.event.server.ServerStartingEvent;
@@ -45,10 +43,7 @@ public class VanillaTweaks {
 
         @SubscribeEvent
         public static void onClientSetup(FMLClientSetupEvent event) {
-            event.enqueueWork(() -> {
-                registerBoatRenderers();
-                registerItemProperties();
-            });
+            event.enqueueWork(ClientModEvents::registerBoatRenderers);
         }
 
         private static void registerBoatRenderers() {
@@ -69,36 +64,6 @@ public class VanillaTweaks {
 
             EntityRenderers.register(ModEntities.LARGE_MOD_CHEST_BOAT.get(),
                     context -> new ModBoatRenderer(context, true));
-        }
-
-        private static void registerItemProperties() {
-            ItemProperties.register(
-                    ModItems.PIRATE_SPEAR.get(),
-                    new ResourceLocation(VanillaTweaks.MOD_ID, "in_hand"),
-                    (stack, level, entity, seed) -> {
-                        if (entity == null) {
-                            return 0.0F;
-                        }
-
-                        return entity.getMainHandItem() == stack || entity.getOffhandItem() == stack
-                                ? 1.0F
-                                : 0.0F;
-                    }
-            );
-
-            ItemProperties.register(
-                    ModItems.PIRATE_SPEAR.get(),
-                    new ResourceLocation(VanillaTweaks.MOD_ID, "throwing"),
-                    (stack, level, entity, seed) -> {
-                        if (entity == null) {
-                            return 0.0F;
-                        }
-
-                        return entity.isUsingItem() && entity.getUseItem() == stack
-                                ? 1.0F
-                                : 0.0F;
-                    }
-            );
         }
     }
 }

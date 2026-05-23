@@ -129,12 +129,12 @@ public class PirateBruteEntity extends AbstractPirateEntity {
 
     public void equipBruteWeapon() {
         if (this.isSpearBrute()) {
-            this.setItemSlot(EquipmentSlot.MAINHAND, new ItemStack(ModItems.PIRATE_SPEAR.get()));
+            this.setItemSlot(EquipmentSlot.MAINHAND, new ItemStack(Items.TRIDENT));
         } else {
             this.setItemSlot(EquipmentSlot.MAINHAND, new ItemStack(Items.IRON_AXE));
         }
 
-        this.setDropChance(EquipmentSlot.MAINHAND, 0.085F);
+        this.setDropChance(EquipmentSlot.MAINHAND, 0.055F);
     }
 
     public void updateWeaponStats() {

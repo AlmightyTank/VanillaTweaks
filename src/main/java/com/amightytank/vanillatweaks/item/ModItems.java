@@ -6,7 +6,6 @@ import com.amightytank.vanillatweaks.entity.custom.boat.ModBoatEntity;
 import com.amightytank.vanillatweaks.item.custom.ModBoatItem;
 import com.amightytank.vanillatweaks.item.custom.PirateDynamiteArrowItem;
 import com.amightytank.vanillatweaks.item.custom.PiratePatrolSpawnEggItem;
-import com.amightytank.vanillatweaks.item.custom.PirateSpearItem;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.EntityType;
@@ -66,9 +65,6 @@ public class ModItems {
                     0xD4AF37,
                     new Item.Properties()
             ));
-
-    public static final RegistryObject<Item> PIRATE_SPEAR = ITEMS.register("pirate_spear",
-            () -> new PirateSpearItem(new Item.Properties().durability(250)));
 
     public static final RegistryObject<Item> PIRATE_DYNAMITE_ARROW = ITEMS.register("pirate_dynamite_arrow",
             () -> new PirateDynamiteArrowItem(new Item.Properties()));
