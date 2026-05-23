@@ -86,14 +86,14 @@ public class PirateSpearItemRenderer extends BlockEntityWithoutLevelRenderer {
             }
 
             case FIRST_PERSON_RIGHT_HAND -> {
-                poseStack.translate(0.0D, -0.13D, 0.0D);
-                poseStack.mulPose(com.mojang.math.Axis.XP.rotationDegrees(90.0F));
+                poseStack.translate(0.04D, -0.13D, 0.0D);
+                poseStack.mulPose(com.mojang.math.Axis.XP.rotationDegrees(-90.0F));
                 poseStack.scale(0.75F, 0.75F, 0.75F);
             }
 
             case FIRST_PERSON_LEFT_HAND -> {
-                poseStack.translate(0.0D, -0.13D, 0.0D);
-                poseStack.mulPose(com.mojang.math.Axis.XP.rotationDegrees(90.0F));
+                poseStack.translate(0.04D, -0.13D, 0.0D);
+                poseStack.mulPose(com.mojang.math.Axis.XP.rotationDegrees(-90.0F));
                 poseStack.scale(0.75F, 0.75F, 0.75F);
             }
 
