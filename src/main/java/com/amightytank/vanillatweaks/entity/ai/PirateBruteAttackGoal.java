@@ -1,8 +1,10 @@
 package com.amightytank.vanillatweaks.entity.ai;
 
+import com.amightytank.vanillatweaks.entity.custom.pirate.AbstractPirateEntity;
 import com.amightytank.vanillatweaks.entity.custom.pirate.PirateBruteEntity;
 import com.amightytank.vanillatweaks.entity.custom.pirate.PirateThrownWeaponEntity;
 import net.minecraft.util.Mth;
+import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.ai.goal.Goal;
@@ -35,13 +37,13 @@ public class PirateBruteAttackGoal extends Goal {
     @Override
     public boolean canUse() {
         LivingEntity target = this.brute.getTarget();
-        return target != null && target.isAlive();
+        return AbstractPirateEntity.canPirateAttack(target);
     }
 
     @Override
     public boolean canContinueToUse() {
         LivingEntity target = this.brute.getTarget();
-        return target != null && target.isAlive();
+        return AbstractPirateEntity.canPirateAttack(target);
     }
 
     @Override
@@ -54,6 +56,10 @@ public class PirateBruteAttackGoal extends Goal {
         this.brute.setAggressive(true);
         this.brute.setAttackState(PirateBruteEntity.ATTACK_NONE);
         this.brute.setAttackTick(0);
+
+        if (this.brute.getMainHandItem().isEmpty()) {
+            this.brute.equipBruteWeapon();
+        }
     }
 
     @Override
@@ -76,13 +82,15 @@ public class PirateBruteAttackGoal extends Goal {
     @Override
     public void tick() {
         LivingEntity target = this.brute.getTarget();
-        if (target == null) {
+
+        if (!AbstractPirateEntity.canPirateAttack(target)) {
+            this.brute.setTarget(null);
             return;
         }
 
         this.brute.setAggressive(true);
 
-        Settings settings = this.brute.isSpearBrute() ? Settings.trident() : Settings.axe();
+        Settings settings = this.brute.isTridentBrute() ? Settings.trident() : Settings.axe();
 
         this.brute.getLookControl().setLookAt(target, 30.0F, 30.0F);
 
@@ -109,13 +117,15 @@ public class PirateBruteAttackGoal extends Goal {
         }
 
         double distanceSqr = this.brute.distanceToSqr(target);
+
         double lungeRangeSqr = settings.lungeRange * settings.lungeRange;
-        double throwMinSqr = settings.throwMinRange * settings.throwMinRange;
-        double throwMaxSqr = settings.throwMaxRange * settings.throwMaxRange;
+        double throwMinRangeSqr = settings.throwMinRange * settings.throwMinRange;
+        double throwMaxRangeSqr = settings.throwMaxRange * settings.throwMaxRange;
 
         boolean canLunge = distanceSqr <= lungeRangeSqr && this.lungeCooldown <= 0;
-        boolean canThrow = distanceSqr >= throwMinSqr
-                && distanceSqr <= throwMaxSqr
+
+        boolean canThrow = distanceSqr >= throwMinRangeSqr
+                && distanceSqr <= throwMaxRangeSqr
                 && this.throwCooldown <= 0
                 && this.brute.hasLineOfSight(target);
 
@@ -137,9 +147,11 @@ public class PirateBruteAttackGoal extends Goal {
         this.attackTick = 0;
         this.hasHit = false;
 
+        this.brute.equipBruteWeapon();
+
         this.brute.setAttackState(settings.windupState);
         this.brute.setAttackTick(0);
-        this.brute.swing(net.minecraft.world.InteractionHand.MAIN_HAND);
+        this.brute.swing(InteractionHand.MAIN_HAND);
         this.brute.getNavigation().stop();
     }
 
@@ -193,9 +205,11 @@ public class PirateBruteAttackGoal extends Goal {
         this.attackTick = 0;
         this.hasThrown = false;
 
+        this.brute.equipBruteWeapon();
+
         this.brute.setAttackState(PirateBruteEntity.THROW_WINDUP);
         this.brute.setAttackTick(0);
-        this.brute.swing(net.minecraft.world.InteractionHand.MAIN_HAND);
+        this.brute.swing(InteractionHand.MAIN_HAND);
         this.brute.getNavigation().stop();
     }
 
@@ -213,9 +227,10 @@ public class PirateBruteAttackGoal extends Goal {
 
             if (!this.hasThrown) {
                 this.hasThrown = true;
+
                 this.fireThrownWeapon(target, settings);
 
-                // Makes it look like he actually threw the weapon.
+                // Empty hand for recover frames so it looks like the weapon left his hand.
                 this.brute.setItemSlot(EquipmentSlot.MAINHAND, ItemStack.EMPTY);
             }
         } else if (this.attackTick < settings.totalThrowTicks) {
@@ -239,6 +254,10 @@ public class PirateBruteAttackGoal extends Goal {
     }
 
     private void fireThrownWeapon(LivingEntity target, Settings settings) {
+        if (this.brute.level().isClientSide) {
+            return;
+        }
+
         PirateThrownWeaponEntity projectile = new PirateThrownWeaponEntity(this.brute.level(), this.brute);
 
         projectile.setWeaponType(this.brute.getBruteWeaponType());

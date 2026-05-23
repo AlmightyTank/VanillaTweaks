@@ -34,7 +34,7 @@ public class PirateThrownWeaponEntity extends ThrowableItemProjectile {
     @Override
     protected void defineSynchedData() {
         super.defineSynchedData();
-        this.entityData.define(DATA_WEAPON_TYPE, PirateBruteEntity.BruteWeaponType.SPEAR.getId());
+        this.entityData.define(DATA_WEAPON_TYPE, PirateBruteEntity.BruteWeaponType.TRIDENT.getId());
     }
 
     public void setWeaponType(PirateBruteEntity.BruteWeaponType type) {

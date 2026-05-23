@@ -1,21 +1,19 @@
 package com.amightytank.vanillatweaks.entity.custom.pirate;
 
 import com.amightytank.vanillatweaks.entity.ai.PirateBruteAttackGoal;
-import com.amightytank.vanillatweaks.item.ModItems;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.syncher.EntityDataAccessor;
 import net.minecraft.network.syncher.EntityDataSerializers;
 import net.minecraft.network.syncher.SynchedEntityData;
 import net.minecraft.sounds.SoundEvent;
-import net.minecraft.sounds.SoundEvents;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.DifficultyInstance;
-import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.MobSpawnType;
 import net.minecraft.world.entity.MoverType;
 import net.minecraft.world.entity.SpawnGroupData;
+import net.minecraft.world.entity.ai.attributes.Attribute;
 import net.minecraft.world.entity.ai.attributes.AttributeInstance;
 import net.minecraft.world.entity.ai.attributes.AttributeSupplier;
 import net.minecraft.world.entity.ai.attributes.Attributes;
@@ -37,6 +35,10 @@ public class PirateBruteEntity extends AbstractPirateEntity {
     public static final int AXE_WINDUP = 4;
     public static final int AXE_CHOP = 5;
     public static final int AXE_RECOVER = 6;
+
+    public static final int THROW_WINDUP = 7;
+    public static final int THROW_RELEASE = 8;
+    public static final int THROW_RECOVER = 9;
 
     private static final EntityDataAccessor<Integer> DATA_WEAPON_TYPE =
             SynchedEntityData.defineId(PirateBruteEntity.class, EntityDataSerializers.INT);
@@ -72,7 +74,7 @@ public class PirateBruteEntity extends AbstractPirateEntity {
     protected void defineSynchedData() {
         super.defineSynchedData();
 
-        this.entityData.define(DATA_WEAPON_TYPE, BruteWeaponType.SPEAR.getId());
+        this.entityData.define(DATA_WEAPON_TYPE, BruteWeaponType.TRIDENT.getId());
         this.entityData.define(DATA_ATTACK_STATE, ATTACK_NONE);
         this.entityData.define(DATA_ATTACK_TICK, 0);
     }
@@ -99,46 +101,31 @@ public class PirateBruteEntity extends AbstractPirateEntity {
     }
 
     @Override
-    protected SoundEvent getAmbientSound() {
-        return SoundEvents.PILLAGER_AMBIENT;
-    }
-
-    @Override
-    protected SoundEvent getHurtSound(DamageSource damageSource) {
-        return SoundEvents.PILLAGER_HURT;
-    }
-
-    @Override
-    protected SoundEvent getDeathSound() {
-        return SoundEvents.PILLAGER_DEATH;
-    }
-
-    @Override
     public SoundEvent getCelebrateSound() {
-        return SoundEvents.PILLAGER_CELEBRATE;
+        return null;
     }
 
     private void chooseRandomWeapon(RandomSource random) {
-        // 70% spear brute, 30% axe brute.
+        // 70% trident brute, 30% axe brute.
         if (random.nextFloat() < 0.70F) {
-            this.setBruteWeaponType(BruteWeaponType.SPEAR);
+            this.setBruteWeaponType(BruteWeaponType.TRIDENT);
         } else {
             this.setBruteWeaponType(BruteWeaponType.AXE);
         }
     }
 
     public void equipBruteWeapon() {
-        if (this.isSpearBrute()) {
+        if (this.isTridentBrute()) {
             this.setItemSlot(EquipmentSlot.MAINHAND, new ItemStack(Items.TRIDENT));
         } else {
             this.setItemSlot(EquipmentSlot.MAINHAND, new ItemStack(Items.IRON_AXE));
         }
 
-        this.setDropChance(EquipmentSlot.MAINHAND, 0.055F);
+        this.setDropChance(EquipmentSlot.MAINHAND, 0.085F);
     }
 
     public void updateWeaponStats() {
-        if (this.isSpearBrute()) {
+        if (this.isTridentBrute()) {
             this.setAttributeBaseValue(Attributes.ATTACK_DAMAGE, 7.0D);
             this.setAttributeBaseValue(Attributes.MOVEMENT_SPEED, 0.34D);
             this.setAttributeBaseValue(Attributes.KNOCKBACK_RESISTANCE, 0.35D);
@@ -149,7 +136,7 @@ public class PirateBruteEntity extends AbstractPirateEntity {
         }
     }
 
-    private void setAttributeBaseValue(net.minecraft.world.entity.ai.attributes.Attribute attribute, double value) {
+    private void setAttributeBaseValue(Attribute attribute, double value) {
         AttributeInstance instance = this.getAttribute(attribute);
 
         if (instance != null) {
@@ -165,8 +152,13 @@ public class PirateBruteEntity extends AbstractPirateEntity {
         this.entityData.set(DATA_WEAPON_TYPE, type.getId());
     }
 
+    public boolean isTridentBrute() {
+        return this.getBruteWeaponType() == BruteWeaponType.TRIDENT;
+    }
+
     public boolean isSpearBrute() {
-        return this.getBruteWeaponType() == BruteWeaponType.SPEAR;
+        // Kept so your existing PirateBruteModel / PirateBruteAttackGoal code still works.
+        return this.isTridentBrute();
     }
 
     public boolean isAxeBrute() {
@@ -231,7 +223,7 @@ public class PirateBruteEntity extends AbstractPirateEntity {
     }
 
     public enum BruteWeaponType {
-        SPEAR(0),
+        TRIDENT(0),
         AXE(1);
 
         private final int id;
@@ -251,7 +243,7 @@ public class PirateBruteEntity extends AbstractPirateEntity {
                 }
             }
 
-            return SPEAR;
+            return TRIDENT;
         }
     }
 }

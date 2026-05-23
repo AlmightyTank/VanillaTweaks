@@ -88,20 +88,20 @@ public class ModEntities {
                             .clientTrackingRange(8)
                             .build("pirate_brute"));
 
-    public static final RegistryObject<EntityType<PirateSpearEntity>> PIRATE_SPEAR =
-            ENTITY_TYPES.register("pirate_spear",
-                    () -> EntityType.Builder.<PirateSpearEntity>of(PirateSpearEntity::new, MobCategory.MISC)
-                            .sized(0.5F, 0.5F)
-                            .clientTrackingRange(4)
-                            .updateInterval(20)
-                            .build("pirate_spear"));
-
     public static final RegistryObject<EntityType<PirateGunnerEntity>> PIRATE_GUNNER =
             ENTITY_TYPES.register("pirate_gunner",
                     () -> EntityType.Builder.of(PirateGunnerEntity::new, MobCategory.MONSTER)
                             .sized(0.6F, 1.95F)
                             .clientTrackingRange(8)
                             .build("pirate_gunner"));
+
+    public static final RegistryObject<EntityType<PirateThrownWeaponEntity>> PIRATE_THROWN_WEAPON =
+            ENTITY_TYPES.register("pirate_thrown_weapon",
+                    () -> EntityType.Builder.<PirateThrownWeaponEntity>of(PirateThrownWeaponEntity::new, MobCategory.MISC)
+                            .sized(0.35F, 0.35F)
+                            .clientTrackingRange(4)
+                            .updateInterval(10)
+                            .build("pirate_thrown_weapon"));
 
     public static final RegistryObject<EntityType<PirateDynamiteArrowEntity>> PIRATE_DYNAMITE_ARROW =
             ENTITY_TYPES.register("pirate_dynamite_arrow",

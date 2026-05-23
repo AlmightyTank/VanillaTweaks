@@ -7,6 +7,7 @@ import com.amightytank.vanillatweaks.entity.client.pirate.PirateDeckhandRenderer
 import com.amightytank.vanillatweaks.entity.client.boat.model.*;
 import com.amightytank.vanillatweaks.entity.client.pirate.*;
 import com.amightytank.vanillatweaks.entity.client.pirate.model.*;
+import net.minecraft.client.renderer.entity.ThrownItemRenderer;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.client.event.EntityRenderersEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
@@ -38,6 +39,7 @@ public class ModEventBusClientEvents {
         event.registerEntityRenderer(ModEntities.PIRATE_PARROT.get(), PirateParrotRenderer::new);
         event.registerEntityRenderer(ModEntities.KRAKEN_TENTACLE.get(), KrakenTentacleRenderer::new);
         event.registerEntityRenderer(ModEntities.PIRATE_BRUTE.get(), PirateBruteRenderer::new);
+        event.registerEntityRenderer(ModEntities.PIRATE_THROWN_WEAPON.get(), ThrownItemRenderer::new);
         event.registerEntityRenderer(ModEntities.PIRATE_GUNNER.get(), PirateGunnerRenderer::new);
         event.registerEntityRenderer(ModEntities.PIRATE_DYNAMITE_ARROW.get(), PirateDynamiteArrowRenderer::new);
         event.registerEntityRenderer(ModEntities.PIRATE_DECKHAND.get(), PirateDeckhandRenderer::new);

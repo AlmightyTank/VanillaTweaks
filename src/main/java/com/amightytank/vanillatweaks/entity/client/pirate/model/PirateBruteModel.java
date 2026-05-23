@@ -27,44 +27,53 @@ public class PirateBruteModel<T extends PirateBruteEntity> extends IllagerModel<
                           float ageInTicks,
                           float netHeadYaw,
                           float headPitch) {
+        // Let vanilla IllagerModel handle:
+        // - head movement
+        // - walking legs
+        // - NEUTRAL arm pose
+        // - normal idle/walk arm swing
         super.setupAnim(entity, limbSwing, limbSwingAmount, ageInTicks, netHeadYaw, headPitch);
-
-        // Always use normal weapon arms.
-        // Vanilla crossed illager arms hide right_arm and left_arm,
-        // so we force weapon arms visible for the brute.
-        this.showWeaponArms();
 
         int state = entity.getAttackState();
         int tick = entity.getAttackTick();
 
+        // No custom attack state.
+        // If neutral, vanilla NEUTRAL pose handles it.
+        // If aggressive but not attacking yet, use a custom chase pose.
         if (state == PirateBruteEntity.ATTACK_NONE) {
             if (entity.isAggressive()) {
+                this.showWeaponArms();
+
                 if (entity.isSpearBrute()) {
-                    this.animateSpearChase(limbSwing, limbSwingAmount);
+                    this.animateTridentChase(limbSwing, limbSwingAmount);
                 } else {
                     this.animateAxeChase(limbSwing, limbSwingAmount);
-                }
-            } else {
-                if (entity.isSpearBrute()) {
-                    this.animateSpearNeutral(limbSwing, limbSwingAmount, ageInTicks);
-                } else {
-                    this.animateAxeNeutral(limbSwing, limbSwingAmount, ageInTicks);
                 }
             }
 
             return;
         }
 
+        this.showWeaponArms();
+
         if (state == PirateBruteEntity.SPEAR_WINDUP ||
                 state == PirateBruteEntity.SPEAR_LUNGE ||
                 state == PirateBruteEntity.SPEAR_RECOVER) {
-            this.animateSpearAttack(state, tick);
+            this.animateTridentLunge(state, tick);
+            return;
         }
 
         if (state == PirateBruteEntity.AXE_WINDUP ||
                 state == PirateBruteEntity.AXE_CHOP ||
                 state == PirateBruteEntity.AXE_RECOVER) {
-            this.animateAxeAttack(state, tick);
+            this.animateAxeLunge(state, tick);
+            return;
+        }
+
+        if (state == PirateBruteEntity.THROW_WINDUP ||
+                state == PirateBruteEntity.THROW_RELEASE ||
+                state == PirateBruteEntity.THROW_RECOVER) {
+            this.animateThrowAttack(entity, state, tick);
         }
     }
 
@@ -74,63 +83,17 @@ public class PirateBruteModel<T extends PirateBruteEntity> extends IllagerModel<
         this.leftArm.visible = true;
     }
 
-    private void animateSpearNeutral(float limbSwing, float limbSwingAmount, float ageInTicks) {
-        float breathing = Mth.sin(ageInTicks * 0.08F) * 0.025F;
-
-        // Free hand swings a little like vanilla walking.
-        float freeArmSwing = Mth.cos(limbSwing * 0.6662F + (float) Math.PI) * 1.4F * limbSwingAmount;
-        freeArmSwing *= 0.45F;
-
-        this.body.xRot = breathing;
-        this.body.yRot = 0.0F;
-        this.body.zRot = 0.0F;
-
-        // Weapon arm: spear held ready and mostly steady.
-        this.rightArm.xRot = -0.85F + breathing;
-        this.rightArm.yRot = -0.18F;
-        this.rightArm.zRot = 0.05F;
-
-        // Free hand: small vanilla-style swing.
-        this.leftArm.xRot = freeArmSwing + breathing;
-        this.leftArm.yRot = 0.12F;
-        this.leftArm.zRot = -0.05F;
-    }
-
-    private void animateAxeNeutral(float limbSwing, float limbSwingAmount, float ageInTicks) {
-        float breathing = Mth.sin(ageInTicks * 0.08F) * 0.025F;
-
-        // Free hand swings a little like vanilla walking.
-        float freeArmSwing = Mth.cos(limbSwing * 0.6662F + (float) Math.PI) * 1.4F * limbSwingAmount;
-        freeArmSwing *= 0.45F;
-
-        this.body.xRot = breathing;
-        this.body.yRot = 0.0F;
-        this.body.zRot = 0.0F;
-
-        // Weapon arm: axe held low and ready.
-        this.rightArm.xRot = -0.55F + breathing;
-        this.rightArm.yRot = -0.22F;
-        this.rightArm.zRot = 0.08F;
-
-        // Free hand: small vanilla-style swing.
-        this.leftArm.xRot = freeArmSwing + breathing;
-        this.leftArm.yRot = 0.12F;
-        this.leftArm.zRot = -0.05F;
-    }
-
-    private void animateSpearChase(float limbSwing, float limbSwingAmount) {
+    private void animateTridentChase(float limbSwing, float limbSwingAmount) {
         float walk = Mth.cos(limbSwing * 0.6662F) * 0.25F * limbSwingAmount;
 
         this.body.xRot = -0.05F;
         this.body.yRot = 0.0F;
         this.body.zRot = 0.0F;
 
-        // Spear forward while chasing.
         this.rightArm.xRot = -1.15F + walk;
         this.rightArm.yRot = -0.12F;
         this.rightArm.zRot = 0.0F;
 
-        // Free hand moves opposite.
         this.leftArm.xRot = -0.35F - walk;
         this.leftArm.yRot = 0.25F;
         this.leftArm.zRot = 0.0F;
@@ -143,18 +106,16 @@ public class PirateBruteModel<T extends PirateBruteEntity> extends IllagerModel<
         this.body.yRot = 0.0F;
         this.body.zRot = 0.0F;
 
-        // Axe ready while chasing.
         this.rightArm.xRot = -0.75F + walk;
         this.rightArm.yRot = -0.25F;
         this.rightArm.zRot = 0.1F;
 
-        // Free hand moves opposite.
         this.leftArm.xRot = -0.25F - walk;
         this.leftArm.yRot = 0.25F;
         this.leftArm.zRot = 0.0F;
     }
 
-    private void animateSpearAttack(int state, int tick) {
+    private void animateTridentLunge(int state, int tick) {
         this.body.xRot = -0.08F;
         this.body.yRot = 0.0F;
         this.body.zRot = 0.0F;
@@ -202,7 +163,7 @@ public class PirateBruteModel<T extends PirateBruteEntity> extends IllagerModel<
         }
     }
 
-    private void animateAxeAttack(int state, int tick) {
+    private void animateAxeLunge(int state, int tick) {
         this.body.xRot = 0.0F;
         this.body.yRot = 0.0F;
         this.body.zRot = 0.0F;
@@ -245,6 +206,63 @@ public class PirateBruteModel<T extends PirateBruteEntity> extends IllagerModel<
             this.rightArm.zRot = 0.1F;
 
             this.leftArm.xRot = -0.25F;
+            this.leftArm.yRot = 0.25F;
+            this.leftArm.zRot = 0.0F;
+        }
+    }
+
+    private void animateThrowAttack(T entity, int state, int tick) {
+        this.body.xRot = 0.0F;
+        this.body.yRot = 0.0F;
+        this.body.zRot = 0.0F;
+
+        this.leftArm.xRot = -0.25F;
+        this.leftArm.yRot = 0.25F;
+        this.leftArm.zRot = 0.0F;
+
+        boolean axe = entity.isAxeBrute();
+
+        if (state == PirateBruteEntity.THROW_WINDUP) {
+            float maxTick = axe ? 16.0F : 14.0F;
+            float p = Mth.clamp(tick / maxTick, 0.0F, 1.0F);
+
+            this.body.yRot = Mth.lerp(p, 0.0F, 0.35F);
+
+            if (axe) {
+                this.rightArm.xRot = Mth.lerp(p, -0.55F, -2.45F);
+                this.rightArm.yRot = Mth.lerp(p, -0.15F, -0.55F);
+                this.rightArm.zRot = Mth.lerp(p, 0.05F, 0.45F);
+            } else {
+                this.rightArm.xRot = Mth.lerp(p, -0.85F, -2.15F);
+                this.rightArm.yRot = Mth.lerp(p, -0.18F, -0.45F);
+                this.rightArm.zRot = Mth.lerp(p, 0.05F, 0.25F);
+            }
+        }
+
+        if (state == PirateBruteEntity.THROW_RELEASE) {
+            this.body.xRot = -0.18F;
+            this.body.yRot = -0.25F;
+            this.body.zRot = 0.0F;
+
+            this.rightArm.xRot = -1.05F;
+            this.rightArm.yRot = 0.05F;
+            this.rightArm.zRot = 0.0F;
+
+            this.leftArm.xRot = 0.15F;
+            this.leftArm.yRot = 0.45F;
+            this.leftArm.zRot = 0.0F;
+        }
+
+        if (state == PirateBruteEntity.THROW_RECOVER) {
+            this.body.xRot = -0.05F;
+            this.body.yRot = 0.0F;
+            this.body.zRot = 0.0F;
+
+            this.rightArm.xRot = -0.65F;
+            this.rightArm.yRot = -0.2F;
+            this.rightArm.zRot = 0.05F;
+
+            this.leftArm.xRot = -0.15F;
             this.leftArm.yRot = 0.25F;
             this.leftArm.zRot = 0.0F;
         }
