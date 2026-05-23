@@ -42,16 +42,12 @@ public class VanillaTweaks {
 
     @Mod.EventBusSubscriber(modid = MOD_ID, bus = Mod.EventBusSubscriber.Bus.MOD, value = Dist.CLIENT)
     public static class ClientModEvents {
+
         @SubscribeEvent
         public static void onClientSetup(FMLClientSetupEvent event) {
-            registerBoatRenderers();
             event.enqueueWork(() -> {
-                ItemProperties.register(
-                        ModItems.PIRATE_SPEAR.get(),
-                        new ResourceLocation("throwing"),
-                        (stack, level, entity, seed) ->
-                                entity != null && entity.isUsingItem() && entity.getUseItem() == stack ? 1.0F : 0.0F
-                );
+                registerBoatRenderers();
+                registerItemProperties();
             });
         }
 
@@ -73,6 +69,36 @@ public class VanillaTweaks {
 
             EntityRenderers.register(ModEntities.LARGE_MOD_CHEST_BOAT.get(),
                     context -> new ModBoatRenderer(context, true));
+        }
+
+        private static void registerItemProperties() {
+            ItemProperties.register(
+                    ModItems.PIRATE_SPEAR.get(),
+                    new ResourceLocation(VanillaTweaks.MOD_ID, "in_hand"),
+                    (stack, level, entity, seed) -> {
+                        if (entity == null) {
+                            return 0.0F;
+                        }
+
+                        return entity.getMainHandItem() == stack || entity.getOffhandItem() == stack
+                                ? 1.0F
+                                : 0.0F;
+                    }
+            );
+
+            ItemProperties.register(
+                    ModItems.PIRATE_SPEAR.get(),
+                    new ResourceLocation(VanillaTweaks.MOD_ID, "throwing"),
+                    (stack, level, entity, seed) -> {
+                        if (entity == null) {
+                            return 0.0F;
+                        }
+
+                        return entity.isUsingItem() && entity.getUseItem() == stack
+                                ? 1.0F
+                                : 0.0F;
+                    }
+            );
         }
     }
 }

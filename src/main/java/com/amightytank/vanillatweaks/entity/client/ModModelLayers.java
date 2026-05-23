@@ -17,7 +17,7 @@ public class ModModelLayers {
     public static final ModelLayerLocation KRAKEN_TENTACLE_LAYER = create("entity/pirate/kraken_tentacle");
     public static final ModelLayerLocation PIRATE_CAPTAIN_LAYER = create("entity/pirate/pirate_captain");
     public static final ModelLayerLocation PIRATE_BRUTE_LAYER = create("entity/pirate/pirate_brute");
-    public static final ModelLayerLocation PIRATE_SPEAR_LAYER = create("pirate_spear");
+    public static final ModelLayerLocation PIRATE_SPEAR_LAYER = create("entity/pirate/projectiles/pirate_spear");
 
     public static final ModelLayerLocation SHOULDER_PIRATE_PARROT_LAYER = create("entity/pirate/shoulder_pirate_parrot");
 

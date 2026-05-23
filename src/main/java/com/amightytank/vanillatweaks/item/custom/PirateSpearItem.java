@@ -1,6 +1,8 @@
 package com.amightytank.vanillatweaks.item.custom;
 
+import com.amightytank.vanillatweaks.entity.client.pirate.PirateSpearItemRenderer;
 import com.amightytank.vanillatweaks.entity.custom.pirate.PirateSpearEntity;
+import net.minecraft.client.renderer.BlockEntityWithoutLevelRenderer;
 import net.minecraft.sounds.SoundEvent;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
@@ -43,8 +45,9 @@ public class PirateSpearItem extends TridentItem {
             return InteractionResultHolder.fail(stack);
         }
 
-        int riptide = EnchantmentHelper.getRiptide(stack);
-        if (riptide > 0 && !player.isInWaterOrRain()) {
+        int riptideLevel = EnchantmentHelper.getRiptide(stack);
+
+        if (riptideLevel > 0 && !player.isInWaterOrRain()) {
             return InteractionResultHolder.fail(stack);
         }
 
@@ -53,29 +56,39 @@ public class PirateSpearItem extends TridentItem {
     }
 
     @Override
-    public void releaseUsing(ItemStack stack, Level level, LivingEntity livingEntity, int timeLeft) {
-        if (!(livingEntity instanceof Player player)) {
+    public void releaseUsing(ItemStack stack, Level level, LivingEntity user, int timeLeft) {
+        if (!(user instanceof Player player)) {
             return;
         }
 
-        int charge = this.getUseDuration(stack) - timeLeft;
-        if (charge < 10) {
+        int chargeTime = this.getUseDuration(stack) - timeLeft;
+
+        if (chargeTime < 10) {
             return;
         }
 
-        int riptide = EnchantmentHelper.getRiptide(stack);
-        if (riptide > 0 && !player.isInWaterOrRain()) {
+        int riptideLevel = EnchantmentHelper.getRiptide(stack);
+
+        if (riptideLevel > 0 && !player.isInWaterOrRain()) {
             return;
         }
 
         if (!level.isClientSide) {
             stack.hurtAndBreak(1, player, brokenPlayer ->
-                    brokenPlayer.broadcastBreakEvent(livingEntity.getUsedItemHand())
+                    brokenPlayer.broadcastBreakEvent(user.getUsedItemHand())
             );
 
-            if (riptide == 0) {
+            if (riptideLevel == 0) {
                 PirateSpearEntity spear = new PirateSpearEntity(level, player, stack);
-                spear.shootFromRotation(player, player.getXRot(), player.getYRot(), 0.0F, 2.5F, 1.0F);
+
+                spear.shootFromRotation(
+                        player,
+                        player.getXRot(),
+                        player.getYRot(),
+                        0.0F,
+                        2.5F + riptideLevel * 0.5F,
+                        1.0F
+                );
 
                 if (player.getAbilities().instabuild) {
                     spear.pickup = AbstractArrow.Pickup.CREATIVE_ONLY;
@@ -92,7 +105,7 @@ public class PirateSpearItem extends TridentItem {
 
         player.awardStat(Stats.ITEM_USED.get(this));
 
-        if (riptide > 0) {
+        if (riptideLevel > 0) {
             float yRot = player.getYRot();
             float xRot = player.getXRot();
 
@@ -101,7 +114,7 @@ public class PirateSpearItem extends TridentItem {
             float z = Mth.cos(yRot * ((float) Math.PI / 180F)) * Mth.cos(xRot * ((float) Math.PI / 180F));
 
             float length = Mth.sqrt(x * x + y * y + z * z);
-            float power = 3.0F * ((1.0F + (float) riptide) / 4.0F);
+            float power = 3.0F * ((1.0F + (float) riptideLevel) / 4.0F);
 
             x *= power / length;
             y *= power / length;
@@ -115,9 +128,10 @@ public class PirateSpearItem extends TridentItem {
             }
 
             SoundEvent soundEvent;
-            if (riptide >= 3) {
+
+            if (riptideLevel >= 3) {
                 soundEvent = SoundEvents.TRIDENT_RIPTIDE_3;
-            } else if (riptide == 2) {
+            } else if (riptideLevel == 2) {
                 soundEvent = SoundEvents.TRIDENT_RIPTIDE_2;
             } else {
                 soundEvent = SoundEvents.TRIDENT_RIPTIDE_1;
@@ -125,5 +139,21 @@ public class PirateSpearItem extends TridentItem {
 
             level.playSound(null, player, soundEvent, SoundSource.PLAYERS, 1.0F, 1.0F);
         }
+    }
+
+    @Override
+    public void initializeClient(java.util.function.Consumer<net.minecraftforge.client.extensions.common.IClientItemExtensions> consumer) {
+        consumer.accept(new net.minecraftforge.client.extensions.common.IClientItemExtensions() {
+            private com.amightytank.vanillatweaks.entity.client.pirate.PirateSpearItemRenderer renderer;
+
+            @Override
+            public net.minecraft.client.renderer.BlockEntityWithoutLevelRenderer getCustomRenderer() {
+                if (this.renderer == null) {
+                    this.renderer = new com.amightytank.vanillatweaks.entity.client.pirate.PirateSpearItemRenderer();
+                }
+
+                return this.renderer;
+            }
+        });
     }
 }

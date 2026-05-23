@@ -29,49 +29,17 @@ public class PirateSpearModel extends EntityModel<PirateSpearEntity> {
         MeshDefinition meshdefinition = new MeshDefinition();
         PartDefinition partdefinition = meshdefinition.getRoot();
 
-        PartDefinition body = partdefinition.addOrReplaceChild("body",
-                CubeListBuilder.create()
-                        .texOffs(0, 6)
-                        .addBox(-0.5F, 2.0F, -0.5F, 1.0F, 25.0F, 1.0F, new CubeDeformation(0.0F))
-                        .texOffs(4, 23)
-                        .addBox(-1.0F, 18.0F, -1.0F, 2.0F, 7.0F, 2.0F, new CubeDeformation(0.0F)),
-                PartPose.offset(0.0F, -3.0F, 0.0F)
-        );
+        PartDefinition body = partdefinition.addOrReplaceChild("body", CubeListBuilder.create().texOffs(0, 6).addBox(-0.5F, 2.0F, -0.5F, 1.0F, 25.0F, 1.0F, new CubeDeformation(0.0F))
+                .texOffs(5, 23).addBox(-0.5F, 18.0F, -1.0F, 1.0F, 7.0F, 2.0F, new CubeDeformation(0.0F)), PartPose.offset(0.0F, -3.0F, 0.0F));
 
-        PartDefinition base = partdefinition.addOrReplaceChild("base",
-                CubeListBuilder.create()
-                        .texOffs(6, 14)
-                        .addBox(-1.5F, -2.5F, -0.5F, 1.0F, 3.0F, 1.0F, new CubeDeformation(0.0F))
-                        .texOffs(6, 14)
-                        .addBox(-2.5F, -2.5F, 0.5F, 1.0F, 3.0F, 1.0F, new CubeDeformation(0.0F))
-                        .texOffs(6, 14)
-                        .addBox(-3.5F, -2.5F, -0.5F, 1.0F, 3.0F, 1.0F, new CubeDeformation(0.0F))
-                        .texOffs(6, 14)
-                        .addBox(-2.5F, -2.5F, -1.5F, 1.0F, 3.0F, 1.0F, new CubeDeformation(0.0F)),
-                PartPose.offset(2.0F, -1.0F, 0.0F)
-        );
+        PartDefinition base = partdefinition.addOrReplaceChild("base", CubeListBuilder.create().texOffs(6, 14).addBox(-2.5F, -2.5F, 0.5F, 1.0F, 3.0F, 1.0F, new CubeDeformation(0.0F))
+                .texOffs(6, 14).addBox(-2.5F, -2.5F, -1.5F, 1.0F, 3.0F, 1.0F, new CubeDeformation(0.0F)), PartPose.offset(2.0F, -1.0F, 0.0F));
 
-        PartDefinition middle = partdefinition.addOrReplaceChild("middle",
-                CubeListBuilder.create()
-                        .texOffs(4, 18)
-                        .addBox(-1.0F, -1.0F, 0.0F, 2.0F, 3.0F, 2.0F, new CubeDeformation(0.0F)),
-                PartPose.offset(0.0F, -3.0F, -1.0F)
-        );
+        PartDefinition middle = partdefinition.addOrReplaceChild("middle", CubeListBuilder.create().texOffs(5, 18).addBox(-0.5F, -1.0F, 0.0F, 1.0F, 3.0F, 2.0F, new CubeDeformation(0.0F)), PartPose.offset(0.0F, -3.0F, -1.0F));
 
-        PartDefinition middle_spike = partdefinition.addOrReplaceChild("middle_spike",
-                CubeListBuilder.create()
-                        .texOffs(0, 3)
-                        .addBox(-0.5F, -3.0F, -0.5F, 1.0F, 2.0F, 1.0F, new CubeDeformation(0.0F))
-                        .texOffs(0, 3)
-                        .addBox(-0.5F, -2.0F, 0.0F, 1.0F, 2.0F, 1.0F, new CubeDeformation(0.0F))
-                        .texOffs(0, 3)
-                        .addBox(-0.5F, -2.0F, -1.0F, 1.0F, 2.0F, 1.0F, new CubeDeformation(0.0F))
-                        .texOffs(0, 3)
-                        .addBox(0.0F, -2.0F, -0.5F, 1.0F, 2.0F, 1.0F, new CubeDeformation(0.0F))
-                        .texOffs(0, 3)
-                        .addBox(-1.0F, -2.0F, -0.5F, 1.0F, 2.0F, 1.0F, new CubeDeformation(0.0F)),
-                PartPose.offset(0.0F, -3.0F, 0.0F)
-        );
+        PartDefinition middle_spike = partdefinition.addOrReplaceChild("middle_spike", CubeListBuilder.create().texOffs(0, 3).addBox(-0.5F, -3.0F, -0.5F, 1.0F, 2.0F, 1.0F, new CubeDeformation(0.0F))
+                .texOffs(0, 3).addBox(-0.5F, -2.0F, 0.0F, 1.0F, 2.0F, 1.0F, new CubeDeformation(0.0F))
+                .texOffs(0, 3).addBox(-0.5F, -2.0F, -1.0F, 1.0F, 2.0F, 1.0F, new CubeDeformation(0.0F)), PartPose.offset(0.0F, -3.0F, 0.0F));
 
         return LayerDefinition.create(meshdefinition, 32, 32);
     }

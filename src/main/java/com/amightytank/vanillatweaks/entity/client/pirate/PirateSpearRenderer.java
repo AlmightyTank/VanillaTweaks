@@ -17,7 +17,7 @@ import net.minecraft.util.Mth;
 
 public class PirateSpearRenderer extends EntityRenderer<PirateSpearEntity> {
     private static final ResourceLocation TEXTURE =
-            new ResourceLocation(VanillaTweaks.MOD_ID, "textures/entity/projectile/pirate_spear.png");
+            new ResourceLocation(VanillaTweaks.MOD_ID, "textures/entity/pirate/projectiles/pirate_spear.png");
 
     private final PirateSpearModel model;
 
