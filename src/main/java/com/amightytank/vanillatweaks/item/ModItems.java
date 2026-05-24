@@ -46,8 +46,8 @@ public class ModItems {
     public static final RegistryObject<Item> PIRATE_DECKHAND_SPAWN_EGG = ITEMS.register("pirate_deckhand_spawn_egg",
             () -> new ForgeSpawnEggItem(ModEntities.PIRATE_DECKHAND, 0x3A2A1A, 0xBFA76A, new Item.Properties()));
 
-    public static final RegistryObject<Item> PIRATE_BRUTE_SPAWN_EGG = ITEMS.register("pirate_brute_spawn_egg",
-            () -> new ForgeSpawnEggItem(ModEntities.PIRATE_BRUTE, 0x4A2C1A, 0xC0392B, new Item.Properties()));
+    public static final RegistryObject<Item> PIRATE_MARAUDER_SPAWN_EGG = ITEMS.register("pirate_marauder_spawn_egg",
+            () -> new ForgeSpawnEggItem(ModEntities.PIRATE_MARAUDER,0x2f3133,0x8b1e1e,new Item.Properties()));
 
     public static final RegistryObject<Item> PIRATE_CAPTAIN_SPAWN_EGG = ITEMS.register("pirate_captain_spawn_egg",
             () -> new ForgeSpawnEggItem(ModEntities.PIRATE_CAPTAIN, 0x111827, 0xD4AF37, new Item.Properties()));

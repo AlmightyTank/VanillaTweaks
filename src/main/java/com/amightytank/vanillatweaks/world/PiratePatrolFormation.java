@@ -274,7 +274,7 @@ public class PiratePatrolFormation {
         } else if (roll < 85) {
             pirate = ModEntities.PIRATE_GUNNER.get().create(level);
         } else {
-            pirate = ModEntities.PIRATE_BRUTE.get().create(level);
+            pirate = ModEntities.PIRATE_MARAUDER.get().create(level);
         }
 
         if (pirate == null) return null;

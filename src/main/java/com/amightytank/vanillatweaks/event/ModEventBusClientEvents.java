@@ -29,7 +29,6 @@ public class ModEventBusClientEvents {
 
         event.registerLayerDefinition(ModModelLayers.KRAKEN_TENTACLE_LAYER, KrakenTentacleModel::createBodyLayer);
         event.registerLayerDefinition(ModModelLayers.PIRATE_CAPTAIN_LAYER, PirateCaptainModel::createBodyLayer);
-        event.registerLayerDefinition(ModModelLayers.PIRATE_BRUTE_LAYER, PirateBruteModel::createBodyLayer);
         event.registerLayerDefinition(ModModelLayers.SHOULDER_PIRATE_PARROT_LAYER, ShoulderPirateParrotModel::createBodyLayer);
     }
 
@@ -38,8 +37,8 @@ public class ModEventBusClientEvents {
         event.registerEntityRenderer(ModEntities.PIRATE_CAPTAIN.get(), PirateCaptainRenderer::new);
         event.registerEntityRenderer(ModEntities.PIRATE_PARROT.get(), PirateParrotRenderer::new);
         event.registerEntityRenderer(ModEntities.KRAKEN_TENTACLE.get(), KrakenTentacleRenderer::new);
-        event.registerEntityRenderer(ModEntities.PIRATE_BRUTE.get(), PirateBruteRenderer::new);
-        event.registerEntityRenderer(ModEntities.PIRATE_THROWN_WEAPON.get(), ThrownItemRenderer::new);
+        event.registerEntityRenderer(ModEntities.PIRATE_MARAUDER.get(), PirateMarauderRenderer::new);
+        event.registerEntityRenderer(ModEntities.PIRATE_THROWN_WEAPON.get(), PirateThrownWeaponRenderer::new);
         event.registerEntityRenderer(ModEntities.PIRATE_GUNNER.get(), PirateGunnerRenderer::new);
         event.registerEntityRenderer(ModEntities.PIRATE_DYNAMITE_ARROW.get(), PirateDynamiteArrowRenderer::new);
         event.registerEntityRenderer(ModEntities.PIRATE_DECKHAND.get(), PirateDeckhandRenderer::new);

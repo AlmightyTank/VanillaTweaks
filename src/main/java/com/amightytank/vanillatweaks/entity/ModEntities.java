@@ -81,12 +81,11 @@ public class ModEntities {
                             .clientTrackingRange(10)
                             .build("kraken_tentacle"));
 
-    public static final RegistryObject<EntityType<PirateBruteEntity>> PIRATE_BRUTE =
-            ENTITY_TYPES.register("pirate_brute",
-                    () -> EntityType.Builder.of(PirateBruteEntity::new, MobCategory.MONSTER)
-                            .sized(0.7F, 2.05F)
-                            .clientTrackingRange(8)
-                            .build("pirate_brute"));
+    public static final RegistryObject<EntityType<PirateMarauderEntity>> PIRATE_MARAUDER =
+            ENTITY_TYPES.register("pirate_marauder",
+                    () -> EntityType.Builder.of(PirateMarauderEntity::new, MobCategory.MONSTER)
+                            .sized(0.8F, 2.2F)
+                            .build("pirate_marauder"));
 
     public static final RegistryObject<EntityType<PirateGunnerEntity>> PIRATE_GUNNER =
             ENTITY_TYPES.register("pirate_gunner",
@@ -96,12 +95,13 @@ public class ModEntities {
                             .build("pirate_gunner"));
 
     public static final RegistryObject<EntityType<PirateThrownWeaponEntity>> PIRATE_THROWN_WEAPON =
-            ENTITY_TYPES.register("pirate_thrown_weapon",
-                    () -> EntityType.Builder.<PirateThrownWeaponEntity>of(PirateThrownWeaponEntity::new, MobCategory.MISC)
-                            .sized(0.35F, 0.35F)
-                            .clientTrackingRange(4)
+            ENTITY_TYPES.register("pirate_thrown_weapon", () ->
+                    EntityType.Builder.<PirateThrownWeaponEntity>of(PirateThrownWeaponEntity::new, MobCategory.MISC)
+                            .sized(0.5F, 0.5F)
+                            .clientTrackingRange(8)
                             .updateInterval(10)
-                            .build("pirate_thrown_weapon"));
+                            .build("pirate_thrown_weapon")
+            );
 
     public static final RegistryObject<EntityType<PirateDynamiteArrowEntity>> PIRATE_DYNAMITE_ARROW =
             ENTITY_TYPES.register("pirate_dynamite_arrow",
