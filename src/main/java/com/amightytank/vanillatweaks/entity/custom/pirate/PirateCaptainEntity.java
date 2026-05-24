@@ -2,6 +2,7 @@ package com.amightytank.vanillatweaks.entity.custom.pirate;
 
 import com.amightytank.vanillatweaks.entity.ai.CaptainParrotSwarmGoal;
 import com.amightytank.vanillatweaks.entity.ai.CaptainSummonKrakenGoal;
+import com.amightytank.vanillatweaks.entity.ai.PirateBoatRangedRaidGoal;
 import net.minecraft.network.syncher.EntityDataAccessor;
 import net.minecraft.network.syncher.EntityDataSerializers;
 import net.minecraft.network.syncher.SynchedEntityData;
@@ -67,9 +68,10 @@ public class PirateCaptainEntity extends AbstractPirateEntity {
     protected void registerGoals() {
         super.registerGoals();
 
-        this.goalSelector.addGoal(1, new CaptainSummonKrakenGoal(this));
-        this.goalSelector.addGoal(2, new CaptainParrotSwarmGoal(this));
-        this.goalSelector.addGoal(3, new MeleeAttackGoal(this, 1.0D, false));
+        this.goalSelector.addGoal(1, new PirateBoatRangedRaidGoal(this));
+        this.goalSelector.addGoal(2, new CaptainSummonKrakenGoal(this));
+        this.goalSelector.addGoal(3, new CaptainParrotSwarmGoal(this));
+        this.goalSelector.addGoal(4, new MeleeAttackGoal(this, 1.0D, false));
     }
 
     @Override

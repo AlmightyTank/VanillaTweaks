@@ -1,5 +1,6 @@
 package com.amightytank.vanillatweaks.entity.custom.pirate;
 
+import com.amightytank.vanillatweaks.entity.custom.boat.ModBoatEntity;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
@@ -12,6 +13,7 @@ import net.minecraft.world.entity.ai.goal.target.HurtByTargetGoal;
 import net.minecraft.world.entity.ai.goal.target.NearestAttackableTargetGoal;
 import net.minecraft.world.entity.monster.AbstractIllager;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.entity.vehicle.Boat;
 import net.minecraft.world.level.Level;
 import org.jetbrains.annotations.Nullable;
 
@@ -87,6 +89,21 @@ public abstract class AbstractPirateEntity extends AbstractIllager {
         }
 
         return super.hurt(source, amount);
+    }
+
+    public boolean canBoatRangedAttackTarget(LivingEntity target) {
+        if (!(this.getVehicle() instanceof Boat boat)) {
+            return true;
+        }
+
+        // 90 left + 90 right = 180 total attack view.
+        // They cannot shoot/throw behind the boat.
+        return ModBoatEntity.canBoatPassengerAttackTarget(
+                boat,
+                this,
+                target,
+                90.0F
+        );
     }
 
     @Override

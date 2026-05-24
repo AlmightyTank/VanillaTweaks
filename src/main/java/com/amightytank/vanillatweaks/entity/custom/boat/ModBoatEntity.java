@@ -1,6 +1,7 @@
 package com.amightytank.vanillatweaks.entity.custom.boat;
 
 import com.amightytank.vanillatweaks.entity.ModEntities;
+import com.amightytank.vanillatweaks.entity.custom.pirate.AbstractPirateEntity;
 import com.amightytank.vanillatweaks.item.ModItems;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.syncher.EntityDataAccessor;
@@ -29,6 +30,11 @@ public class ModBoatEntity extends Boat {
 
     private static final EntityDataAccessor<Integer> DATA_BANNER_COUNT =
             SynchedEntityData.defineId(ModBoatEntity.class, EntityDataSerializers.INT);
+
+    private static final float PIRATE_BODY_YAW_OFFSET = 0.0F;
+
+    // 90 left + 90 right = 180 total head turn
+    private static final float PIRATE_MAX_HEAD_TURN = 90.0F;
 
     private boolean sailInputLeft;
     private boolean sailInputRight;
@@ -258,6 +264,62 @@ public class ModBoatEntity extends Boat {
                 riderY + seat.y,
                 boat.getZ() + rotatedSeat.z
         );
+
+        if (passenger instanceof AbstractPirateEntity) {
+            ModBoatEntity.clampPiratePassengerRotation(boat, passenger);
+        }
+    }
+
+    private static void clampPiratePassengerRotation(Boat boat, Entity passenger) {
+        float bodyYaw = Mth.wrapDegrees(boat.getYRot() + PIRATE_BODY_YAW_OFFSET);
+
+        float wantedHeadYaw = passenger.getYHeadRot();
+        float headDifference = Mth.wrapDegrees(wantedHeadYaw - bodyYaw);
+
+        float clampedHeadDifference = Mth.clamp(
+                headDifference,
+                -PIRATE_MAX_HEAD_TURN,
+                PIRATE_MAX_HEAD_TURN
+        );
+
+        float finalHeadYaw = Mth.wrapDegrees(bodyYaw + clampedHeadDifference);
+
+        passenger.setYBodyRot(bodyYaw);
+        passenger.setYHeadRot(finalHeadYaw);
+        passenger.setYRot(finalHeadYaw);
+    }
+
+    public static boolean canBoatPassengerAttackTarget(
+            Boat boat,
+            Entity passenger,
+            Entity target,
+            float maxTurnDegrees
+    ) {
+        if (target == null || !target.isAlive()) {
+            return false;
+        }
+
+        Vec3 toTarget = target.position().subtract(passenger.position());
+        toTarget = new Vec3(toTarget.x, 0.0D, toTarget.z);
+
+        if (toTarget.lengthSqr() < 1.0E-7D) {
+            return true;
+        }
+
+        toTarget = toTarget.normalize();
+
+        float yaw = (boat.getYRot() + PIRATE_BODY_YAW_OFFSET) * Mth.DEG_TO_RAD;
+
+        Vec3 boatForward = new Vec3(
+                Mth.sin(-yaw),
+                0.0D,
+                Mth.cos(yaw)
+        ).normalize();
+
+        double dot = boatForward.dot(toTarget);
+        double minDot = Math.cos(Math.toRadians(maxTurnDegrees));
+
+        return dot >= minDot;
     }
 
     public static void saveSailboatData(CompoundTag tag, Type variant, int bannerCount) {
@@ -280,7 +342,7 @@ public class ModBoatEntity extends Boat {
     public enum BoatSize implements StringRepresentable {
         SAILBOAT("sailboat", 1.375F, 1.60F, 0.35F, 1, 1, 1.35F, 0.020F, 0.36D, 0),
         MEDIUM_SAILBOAT("medium_sailboat", 1.55F, 2.85F, 0.40F, 2, 1, 0.75F, 0.014F, 0.42D, 0),
-        LARGE_SAILBOAT("large_sailboat", 1.85F, 4.35F, 0.45F, 3, 2, 0.35F, 0.009F, 0.48D, 2);
+        LARGE_SAILBOAT("large_sailboat", 1.85F, 4.35F, 0.45F, 4, 3, 0.35F, 0.009F, 0.48D, 2);
 
         private final String name;
         private final float hitboxWidth;
@@ -369,7 +431,8 @@ public class ModBoatEntity extends Boat {
                     case MEDIUM_SAILBOAT -> new Vec3(0.0D, 0.0D, 0.45D);
                     case LARGE_SAILBOAT -> switch (index) {
                         case 0 -> new Vec3(0.0D, 0.25D, 1.15D);
-                        case 1 -> new Vec3(0.0D, 0.25D, -0.15D);
+                        case 1 -> new Vec3(0.0D, 0.25D, 0.15D);
+                        case 2 -> new Vec3(0.0D, 0.25D, -0.85D);
                         default -> Vec3.ZERO;
                     };
                 };
@@ -384,8 +447,9 @@ public class ModBoatEntity extends Boat {
                 };
                 case LARGE_SAILBOAT -> switch (index) {
                     case 0 -> new Vec3(0.0D, 0.25D, 1.15D);
-                    case 1 -> new Vec3(0.0D, 0.25D, -0.15D);
-                    case 2 -> new Vec3(0.0D, 0.25D, -1.85D);
+                    case 1 -> new Vec3(0.0D, 0.25D, 0.15D);
+                    case 2 -> new Vec3(0.0D, 0.25D, -0.85D);
+                    case 3 -> new Vec3(0.0D, 0.25D, -1.85D);
                     default -> Vec3.ZERO;
                 };
             };

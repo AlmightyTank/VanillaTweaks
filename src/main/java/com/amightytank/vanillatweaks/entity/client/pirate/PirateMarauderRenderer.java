@@ -12,7 +12,7 @@ import net.minecraft.resources.ResourceLocation;
 
 public class PirateMarauderRenderer extends MobRenderer<PirateMarauderEntity, IllagerModel<PirateMarauderEntity>> {
     private static final ResourceLocation TEXTURE =
-            new ResourceLocation(VanillaTweaks.MOD_ID, "textures/entity/pirate/pirate_brute.png");
+            new ResourceLocation(VanillaTweaks.MOD_ID, "textures/entity/pirate/pirate_marauder.png");
 
     public PirateMarauderRenderer(EntityRendererProvider.Context context) {
         super(context, new IllagerModel<>(context.bakeLayer(ModelLayers.PILLAGER)), 0.65F);

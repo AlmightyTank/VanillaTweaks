@@ -5,6 +5,7 @@ import com.amightytank.vanillatweaks.entity.client.boat.ModBoatRenderer;
 import com.amightytank.vanillatweaks.item.ModCreativeModTabs;
 import com.amightytank.vanillatweaks.item.ModItems;
 import com.amightytank.vanillatweaks.world.PiratePatrolSpawner;
+import com.amightytank.vanillatweaks.world.pirate_raid.PirateTreasureRaidEvents;
 import com.mojang.logging.LogUtils;
 import net.minecraft.client.renderer.entity.EntityRenderers;
 import net.minecraftforge.api.distmarker.Dist;
@@ -31,6 +32,7 @@ public class VanillaTweaks {
 
         MinecraftForge.EVENT_BUS.register(this);
         MinecraftForge.EVENT_BUS.register(PiratePatrolSpawner.class);
+        MinecraftForge.EVENT_BUS.register(PirateTreasureRaidEvents.class);
     }
 
     @SubscribeEvent

@@ -1,5 +1,6 @@
 package com.amightytank.vanillatweaks.entity.custom.pirate;
 
+import com.amightytank.vanillatweaks.entity.ai.PirateBoatRangedRaidGoal;
 import com.amightytank.vanillatweaks.entity.ai.PirateGunnerAttackGoal;
 import net.minecraft.network.syncher.EntityDataAccessor;
 import net.minecraft.network.syncher.EntityDataSerializers;
@@ -52,6 +53,8 @@ public class PirateGunnerEntity extends AbstractPirateEntity implements RangedAt
     @Override
     protected void registerGoals() {
         super.registerGoals();
+
+        this.goalSelector.addGoal(1, new PirateBoatRangedRaidGoal(this));
 
         this.goalSelector.addGoal(2, new PirateGunnerAttackGoal(
                 this,
@@ -159,6 +162,10 @@ public class PirateGunnerEntity extends AbstractPirateEntity implements RangedAt
     @Override
     public void performRangedAttack(LivingEntity target, float distanceFactor) {
         if (!AbstractPirateEntity.canPirateAttack(target)) {
+            return;
+        }
+
+        if (!this.canBoatRangedAttackTarget(target)) {
             return;
         }
 

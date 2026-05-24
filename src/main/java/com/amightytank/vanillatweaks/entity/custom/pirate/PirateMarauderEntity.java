@@ -1,6 +1,7 @@
 package com.amightytank.vanillatweaks.entity.custom.pirate;
 
 import com.amightytank.vanillatweaks.entity.ModEntities;
+import com.amightytank.vanillatweaks.entity.ai.PirateBoatBoarderRaidGoal;
 import com.amightytank.vanillatweaks.entity.ai.PirateMarauderCloseMeleeGoal;
 import com.amightytank.vanillatweaks.entity.ai.PirateMarauderRangedAttackGoal;
 import net.minecraft.nbt.CompoundTag;
@@ -19,7 +20,6 @@ import net.minecraft.world.entity.ai.attributes.AttributeSupplier;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.ai.goal.FloatGoal;
 import net.minecraft.world.entity.ai.goal.LookAtPlayerGoal;
-import net.minecraft.world.entity.ai.goal.MeleeAttackGoal;
 import net.minecraft.world.entity.ai.goal.RandomLookAroundGoal;
 import net.minecraft.world.entity.ai.goal.target.HurtByTargetGoal;
 import net.minecraft.world.entity.ai.goal.target.NearestAttackableTargetGoal;
@@ -35,7 +35,7 @@ import net.minecraft.world.level.ServerLevelAccessor;
 import javax.annotation.Nullable;
 
 public class PirateMarauderEntity extends AbstractPirateEntity implements RangedAttackMob {
-    private static final float TRIDENT_BRUTE_CHANCE = 0.70F;
+    private static final float TRIDENT_BRUTE_CHANCE = 0.50F;
 
     public PirateMarauderEntity(EntityType<? extends AbstractIllager> entityType, Level level) {
         super(entityType, level);
@@ -50,9 +50,10 @@ public class PirateMarauderEntity extends AbstractPirateEntity implements Ranged
         // The brute has its own full goal setup.
 
         this.goalSelector.addGoal(0, new FloatGoal(this));
+        this.goalSelector.addGoal(1, new PirateBoatBoarderRaidGoal(this));
 
         // Melee only when close.
-        this.goalSelector.addGoal(1, new PirateMarauderCloseMeleeGoal(
+        this.goalSelector.addGoal(2, new PirateMarauderCloseMeleeGoal(
                 this,
                 1.05D,
                 false,
@@ -61,7 +62,7 @@ public class PirateMarauderEntity extends AbstractPirateEntity implements Ranged
         ));
 
         // Throw only when farther away.
-        this.goalSelector.addGoal(2, new PirateMarauderRangedAttackGoal(
+        this.goalSelector.addGoal(3, new PirateMarauderRangedAttackGoal(
                 this,
                 1.0D,
                 45,
@@ -168,6 +169,14 @@ public class PirateMarauderEntity extends AbstractPirateEntity implements Ranged
 
     @Override
     public void performRangedAttack(LivingEntity target, float distanceFactor) {
+        if (!this.canBoatRangedAttackTarget(target)) {
+            return;
+        }
+
+        if (!AbstractPirateEntity.canPirateAttack(target)) {
+            return;
+        }
+
         this.throwWeaponAt(target);
     }
 
