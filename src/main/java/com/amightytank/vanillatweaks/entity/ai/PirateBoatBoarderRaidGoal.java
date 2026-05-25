@@ -1,7 +1,6 @@
 package com.amightytank.vanillatweaks.entity.ai;
 
 import com.amightytank.vanillatweaks.entity.custom.boat.ModBoatEntity;
-import com.amightytank.vanillatweaks.entity.custom.boat.ModChestBoatEntity;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.Mth;
@@ -241,14 +240,9 @@ public class PirateBoatBoarderRaidGoal extends Goal {
         int maxPassengers = 2;
 
         if (boat instanceof ModBoatEntity modBoat) {
-            maxPassengers = ModBoatEntity.getSailboatMaxPassengers(
-                    modBoat.getModVariant(),
-                    false
-            );
-        } else if (boat instanceof ModChestBoatEntity modChestBoat) {
-            maxPassengers = ModBoatEntity.getSailboatMaxPassengers(
-                    modChestBoat.getModVariant(),
-                    true
+            maxPassengers = Math.max(
+                    1,
+                    modBoat.getBasePassengerSlots() - modBoat.getChestCount()
             );
         }
 

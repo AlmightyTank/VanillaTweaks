@@ -1,7 +1,5 @@
 package com.amightytank.vanillatweaks.world;
 
-import com.amightytank.vanillatweaks.entity.custom.boat.ModBoatEntity;
-import com.amightytank.vanillatweaks.entity.custom.boat.ModChestBoatEntity;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -17,11 +15,15 @@ public class PiratePatrolSpawner {
 
     @SubscribeEvent
     public static void onServerTick(TickEvent.ServerTickEvent event) {
-        if (event.phase != TickEvent.Phase.END) return;
+        if (event.phase != TickEvent.Phase.END) {
+            return;
+        }
 
         piratePatrolDelay--;
 
-        if (piratePatrolDelay > 0) return;
+        if (piratePatrolDelay > 0) {
+            return;
+        }
 
         piratePatrolDelay = 20 * 60 * 5;
 
@@ -33,18 +35,26 @@ public class PiratePatrolSpawner {
     private static void trySpawnPiratePatrol(ServerLevel level) {
         RandomSource random = level.random;
 
-        if (level.players().isEmpty()) return;
+        if (level.players().isEmpty()) {
+            return;
+        }
 
         ServerPlayer player = level.players().get(random.nextInt(level.players().size()));
 
-        if (!isPlayerSailing(player)) return;
+        if (!isPlayerSailing(player)) {
+            return;
+        }
 
         // 25% chance every 5-minute check while sailing.
-        if (random.nextFloat() > 0.25F) return;
+        if (random.nextFloat() > 0.25F) {
+            return;
+        }
 
         BlockPos spawnPos = findWaterSpawnPos(level, player.blockPosition(), random);
 
-        if (spawnPos == null) return;
+        if (spawnPos == null) {
+            return;
+        }
 
         PiratePatrolSize size = pickPatrolSize(random);
 
@@ -66,9 +76,7 @@ public class PiratePatrolSpawner {
     private static boolean isPlayerSailing(ServerPlayer player) {
         Entity vehicle = player.getVehicle();
 
-        return vehicle instanceof Boat
-                || vehicle instanceof ModBoatEntity
-                || vehicle instanceof ModChestBoatEntity;
+        return vehicle instanceof Boat;
     }
 
     private static BlockPos findWaterSpawnPos(ServerLevel level, BlockPos playerPos, RandomSource random) {

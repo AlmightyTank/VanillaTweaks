@@ -1,45 +1,50 @@
 package com.amightytank.vanillatweaks.entity.custom.boat;
 
 import com.amightytank.vanillatweaks.entity.ModEntities;
-import com.amightytank.vanillatweaks.entity.custom.pirate.AbstractPirateEntity;
 import com.amightytank.vanillatweaks.item.ModItems;
+import com.amightytank.vanillatweaks.menu.SailboatChestMenu;
+import net.minecraft.core.NonNullList;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.network.chat.Component;
 import net.minecraft.network.syncher.EntityDataAccessor;
 import net.minecraft.network.syncher.EntityDataSerializers;
 import net.minecraft.network.syncher.SynchedEntityData;
-import net.minecraft.util.ByIdMap;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.util.Mth;
-import net.minecraft.util.StringRepresentable;
+import net.minecraft.world.Container;
+import net.minecraft.world.ContainerHelper;
+import net.minecraft.world.Containers;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.SimpleMenuProvider;
+import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.EntityDimensions;
 import net.minecraft.world.entity.EntityType;
-import net.minecraft.world.entity.Pose;
+import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.entity.vehicle.Boat;
 import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
 import net.minecraft.world.level.Level;
-import net.minecraft.world.level.block.Block;
-import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.phys.Vec3;
+import net.minecraftforge.network.NetworkHooks;
 
-import java.util.function.IntFunction;
-
-public class ModBoatEntity extends Boat {
+public class ModBoatEntity extends Boat implements Container {
     private static final EntityDataAccessor<Integer> DATA_ID_TYPE =
             SynchedEntityData.defineId(ModBoatEntity.class, EntityDataSerializers.INT);
 
     private static final EntityDataAccessor<Integer> DATA_BANNER_COUNT =
             SynchedEntityData.defineId(ModBoatEntity.class, EntityDataSerializers.INT);
 
-    private static final float PIRATE_BODY_YAW_OFFSET = 0.0F;
+    private static final EntityDataAccessor<Integer> DATA_CHEST_COUNT =
+            SynchedEntityData.defineId(ModBoatEntity.class, EntityDataSerializers.INT);
 
-    // 90 left + 90 right = 180 total head turn
-    private static final float PIRATE_MAX_HEAD_TURN = 90.0F;
+    private static final int SLOTS_PER_CHEST = 27;
+    private static final int MAX_CHESTS = 3;
+    private static final int MAX_SLOTS = SLOTS_PER_CHEST * MAX_CHESTS;
 
-    private boolean sailInputLeft;
-    private boolean sailInputRight;
-    private boolean sailInputForward;
-    private boolean sailInputBack;
+    private NonNullList<ItemStack> inventory = NonNullList.withSize(MAX_SLOTS, ItemStack.EMPTY);
 
     public ModBoatEntity(EntityType<? extends Boat> entityType, Level level) {
         super(entityType, level);
@@ -54,538 +59,361 @@ public class ModBoatEntity extends Boat {
     }
 
     @Override
-    public void setInput(boolean left, boolean right, boolean forward, boolean back) {
-        super.setInput(left, right, forward, back);
-
-        this.sailInputLeft = left;
-        this.sailInputRight = right;
-        this.sailInputForward = forward;
-        this.sailInputBack = back;
+    protected void defineSynchedData() {
+        super.defineSynchedData();
+        this.entityData.define(DATA_ID_TYPE, Boat.Type.OAK.ordinal());
+        this.entityData.define(DATA_BANNER_COUNT, 1);
+        this.entityData.define(DATA_CHEST_COUNT, 0);
     }
 
-    @Override
-    public void tick() {
-        float oldYRot = this.getYRot();
+    public Boat.Type getModVariant() {
+        return Boat.Type.byId(this.entityData.get(DATA_ID_TYPE));
+    }
 
-        super.tick();
-
-        ModBoatEntity.applySailboatMovement(
-                this,
-                this.getModVariant().getBoatSize(),
-                this.sailInputForward,
-                this.getBannerCount(),
-                oldYRot
-        );
+    public void setModVariant(Boat.Type type) {
+        this.entityData.set(DATA_ID_TYPE, type.ordinal());
     }
 
     public int getBannerCount() {
         return this.entityData.get(DATA_BANNER_COUNT);
     }
 
-    public void setBannerCount(int count) {
-        this.entityData.set(
-                DATA_BANNER_COUNT,
-                ModBoatEntity.clampBannerCount(this.getModVariant(), count)
-        );
+    public void setBannerCount(int bannerCount) {
+        this.entityData.set(DATA_BANNER_COUNT, Math.max(1, Math.min(3, bannerCount)));
     }
 
-    @Override
-    public EntityDimensions getDimensions(Pose pose) {
-        return ModBoatEntity.getSailboatDimensions(this.getModVariant(), false);
+    public boolean isMediumSailboat() {
+        return this.getBannerCount() == 2;
+    }
+
+    public boolean isLargeSailboat() {
+        return this.getBannerCount() >= 3;
+    }
+
+    public int getChestCount() {
+        return this.entityData.get(DATA_CHEST_COUNT);
+    }
+
+    public void setChestCount(int chestCount) {
+        this.entityData.set(DATA_CHEST_COUNT, Math.max(0, Math.min(this.getMaxChestCount(), chestCount)));
+    }
+
+    public boolean hasChest() {
+        return this.getChestCount() > 0;
+    }
+
+    public int getChestRows() {
+        return this.getChestCount() * 3;
+    }
+
+    public int getActiveSlotCount() {
+        return this.getChestCount() * SLOTS_PER_CHEST;
+    }
+
+    public int getMaxChestCount() {
+        if (this.isLargeSailboat()) {
+            return 3;
+        }
+
+        if (this.isMediumSailboat()) {
+            return 2;
+        }
+
+        return 1;
+    }
+
+    public int getBasePassengerSlots() {
+        if (this.isLargeSailboat()) {
+            return 4;
+        }
+
+        if (this.isMediumSailboat()) {
+            return 3;
+        }
+
+        return 2;
     }
 
     @Override
     protected int getMaxPassengers() {
-        return ModBoatEntity.getSailboatMaxPassengers(this.getModVariant(), false);
+        return Math.max(1, this.getBasePassengerSlots() - this.getChestCount());
+    }
+
+    public static boolean canBoatPassengerAttackTarget(
+            Boat boat,
+            Entity passenger,
+            LivingEntity target,
+            float maxAttackAngle
+    ) {
+        if (boat == null || passenger == null || target == null) {
+            return false;
+        }
+
+        if (!target.isAlive()) {
+            return false;
+        }
+
+        if (!passenger.isPassengerOfSameVehicle(boat)) {
+            return false;
+        }
+
+        Vec3 toTarget = target.position().subtract(boat.position());
+
+        if (toTarget.lengthSqr() < 0.001D) {
+            return true;
+        }
+
+        float targetYaw = (float) (Mth.atan2(toTarget.z, toTarget.x) * Mth.RAD_TO_DEG) - 90.0F;
+        float boatYaw = boat.getYRot();
+
+        float angleDifference = Math.abs(Mth.wrapDegrees(targetYaw - boatYaw));
+
+        return angleDifference <= maxAttackAngle * 0.5F;
+    }
+
+    public boolean canAddChest() {
+        if (this.getChestCount() >= this.getMaxChestCount()) {
+            return false;
+        }
+
+        int newChestCount = this.getChestCount() + 1;
+        int newPassengerLimit = Math.max(1, this.getBasePassengerSlots() - newChestCount);
+
+        return this.getPassengers().size() <= newPassengerLimit;
+    }
+
+    public boolean canRemoveLastChest() {
+        int chestCount = this.getChestCount();
+
+        if (chestCount <= 0) {
+            return false;
+        }
+
+        int start = (chestCount - 1) * SLOTS_PER_CHEST;
+        int end = start + SLOTS_PER_CHEST;
+
+        for (int i = start; i < end; i++) {
+            if (!this.inventory.get(i).isEmpty()) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    public void removeLastChest() {
+        if (!this.canRemoveLastChest()) {
+            return;
+        }
+
+        int chestCount = this.getChestCount();
+        int start = (chestCount - 1) * SLOTS_PER_CHEST;
+        int end = start + SLOTS_PER_CHEST;
+
+        for (int i = start; i < end; i++) {
+            this.inventory.set(i, ItemStack.EMPTY);
+        }
+
+        this.setChestCount(chestCount - 1);
     }
 
     @Override
-    public void positionRider(Entity passenger, Entity.MoveFunction callback) {
-        ModBoatEntity.positionSailboatRider(
-                this,
-                passenger,
-                callback,
-                this.getModVariant(),
-                false
+    public InteractionResult interact(Player player, InteractionHand hand) {
+        ItemStack stack = player.getItemInHand(hand);
+
+        if (stack.is(Items.CHEST)) {
+            if (this.level().isClientSide) {
+                return InteractionResult.SUCCESS;
+            }
+
+            if (!this.canAddChest()) {
+                player.displayClientMessage(Component.literal("There is no room to add another chest."), true);
+                return InteractionResult.CONSUME;
+            }
+
+            this.setChestCount(this.getChestCount() + 1);
+
+            if (!player.getAbilities().instabuild) {
+                stack.shrink(1);
+            }
+
+            return InteractionResult.CONSUME;
+        }
+
+        if (stack.isEmpty() && player.isShiftKeyDown() && this.hasChest()) {
+            if (this.level().isClientSide) {
+                return InteractionResult.SUCCESS;
+            }
+
+            if (!this.canRemoveLastChest()) {
+                player.displayClientMessage(Component.literal("That chest is not empty."), true);
+                return InteractionResult.CONSUME;
+            }
+
+            this.removeLastChest();
+            this.spawnAtLocation(Items.CHEST);
+
+            return InteractionResult.CONSUME;
+        }
+
+        if (this.hasChest() && player.isShiftKeyDown()) {
+            if (!this.level().isClientSide && player instanceof ServerPlayer serverPlayer) {
+                this.openChestInventory(serverPlayer);
+            }
+
+            return InteractionResult.sidedSuccess(this.level().isClientSide);
+        }
+
+        return super.interact(player, hand);
+    }
+
+    private void openChestInventory(ServerPlayer player) {
+        NetworkHooks.openScreen(
+                player,
+                new SimpleMenuProvider(
+                        (containerId, playerInventory, p) ->
+                                new SailboatChestMenu(containerId, playerInventory, this, this.getChestRows()),
+                        Component.literal("Sailboat")
+                ),
+                buffer -> {
+                    buffer.writeInt(this.getId());
+                    buffer.writeVarInt(this.getChestRows());
+                }
         );
-    }
-
-    @Override
-    public Item getDropItem() {
-        return ModItems.getBoatItem(this.getModVariant()).get();
-    }
-
-    public void setVariant(Type variant) {
-        this.entityData.set(DATA_ID_TYPE, variant.ordinal());
-        this.setBannerCount(this.getBannerCount());
-        this.refreshDimensions();
-    }
-
-    public Type getModVariant() {
-        return Type.byId(this.entityData.get(DATA_ID_TYPE));
-    }
-
-    @Override
-    protected void defineSynchedData() {
-        super.defineSynchedData();
-        this.entityData.define(DATA_ID_TYPE, Type.OAK_SAILBOAT.ordinal());
-        this.entityData.define(DATA_BANNER_COUNT, 0);
     }
 
     @Override
     protected void addAdditionalSaveData(CompoundTag tag) {
         super.addAdditionalSaveData(tag);
 
-        ModBoatEntity.saveSailboatData(
-                tag,
-                this.getModVariant(),
-                this.getBannerCount()
-        );
+        tag.putString("Type", this.getModVariant().getName());
+        tag.putInt("BannerCount", this.getBannerCount());
+        tag.putInt("ChestCount", this.getChestCount());
+
+        ContainerHelper.saveAllItems(tag, this.inventory);
     }
 
     @Override
     protected void readAdditionalSaveData(CompoundTag tag) {
         super.readAdditionalSaveData(tag);
 
-        this.setVariant(ModBoatEntity.loadSailboatVariant(tag));
+        if (tag.contains("Type", 8)) {
+            this.setModVariant(Boat.Type.byName(tag.getString("Type")));
+        }
 
-        if (tag.contains("BannerCount", 3)) {
+        if (tag.contains("BannerCount")) {
             this.setBannerCount(tag.getInt("BannerCount"));
         }
-    }
 
-    public static void applySailboatMovement(
-            Boat boat,
-            BoatSize size,
-            boolean forwardInput,
-            int bannerCount,
-            float oldYRot
-    ) {
-        if (!boat.isVehicle()) {
-            return;
-        }
+        this.inventory = NonNullList.withSize(MAX_SLOTS, ItemStack.EMPTY);
+        ContainerHelper.loadAllItems(tag, this.inventory);
 
-        float vanillaTurn = Mth.wrapDegrees(boat.getYRot() - oldYRot);
-        boat.setYRot(oldYRot + vanillaTurn * size.getTurnScale());
-
-        if (forwardInput) {
-            int rowers = ModBoatEntity.getRowingPassengerCount(boat);
-
-            float rowerBonus = 1.0F + Math.max(0, rowers - 1) * 0.25F;
-            float bannerBonus = 1.0F + bannerCount * 0.18F;
-
-            float acceleration = size.getBaseAcceleration() * rowerBonus * bannerBonus;
-            float yaw = boat.getYRot() * Mth.DEG_TO_RAD;
-
-            boat.setDeltaMovement(boat.getDeltaMovement().add(
-                    Mth.sin(-yaw) * acceleration,
-                    0.0D,
-                    Mth.cos(yaw) * acceleration
-            ));
-        }
-
-        ModBoatEntity.limitSailboatTopSpeed(boat, size, bannerCount);
-    }
-
-    private static void limitSailboatTopSpeed(Boat boat, BoatSize size, int bannerCount) {
-        Vec3 motion = boat.getDeltaMovement();
-
-        double horizontalSpeed = Math.sqrt(motion.x * motion.x + motion.z * motion.z);
-        if (horizontalSpeed <= 0.0D) {
-            return;
-        }
-
-        int rowers = ModBoatEntity.getRowingPassengerCount(boat);
-
-        double rowerBonus = 1.0D + Math.max(0, rowers - 1) * 0.15D;
-        double bannerBonus = 1.0D + bannerCount * 0.12D;
-
-        double maxSpeed = size.getBaseTopSpeed() * rowerBonus * bannerBonus;
-
-        if (horizontalSpeed > maxSpeed) {
-            double scale = maxSpeed / horizontalSpeed;
-
-            boat.setDeltaMovement(
-                    motion.x * scale,
-                    motion.y,
-                    motion.z * scale
-            );
+        if (tag.contains("ChestCount")) {
+            this.setChestCount(tag.getInt("ChestCount"));
+        } else {
+            this.setChestCount(0);
         }
     }
 
-    private static int getRowingPassengerCount(Boat boat) {
-        int count = 0;
+    @Override
+    public Item getDropItem() {
+        if (this.isLargeSailboat()) {
+            return ModItems.LARGE_SAILBOAT.get();
+        }
 
-        for (Entity passenger : boat.getPassengers()) {
-            if (passenger instanceof Player) {
-                count++;
+        if (this.isMediumSailboat()) {
+            return ModItems.MEDIUM_SAILBOAT.get();
+        }
+
+        return ModItems.MOD_BOAT.get();
+    }
+
+    @Override
+    public void destroy(DamageSource damageSource) {
+        int chestCount = this.getChestCount();
+
+        super.destroy(damageSource);
+
+        if (!this.level().isClientSide) {
+            Containers.dropContents(this.level(), this, this);
+
+            for (int i = 0; i < chestCount; i++) {
+                this.spawnAtLocation(Items.CHEST);
+            }
+        }
+    }
+
+    @Override
+    public int getContainerSize() {
+        return this.getActiveSlotCount();
+    }
+
+    @Override
+    public boolean isEmpty() {
+        for (int i = 0; i < this.getContainerSize(); i++) {
+            if (!this.inventory.get(i).isEmpty()) {
+                return false;
             }
         }
 
-        return Math.max(1, count);
+        return true;
     }
 
-    public static int clampBannerCount(Type variant, int count) {
-        BoatSize size = variant.getBoatSize();
-        return Math.max(0, Math.min(count, size.getMaxBanners()));
+    @Override
+    public ItemStack getItem(int slot) {
+        if (slot < 0 || slot >= this.getContainerSize()) {
+            return ItemStack.EMPTY;
+        }
+
+        return this.inventory.get(slot);
     }
 
-    public static EntityDimensions getSailboatDimensions(Type variant, boolean chestBoat) {
-        return variant.getBoatSize().getDimensions(chestBoat);
+    @Override
+    public ItemStack removeItem(int slot, int amount) {
+        if (slot < 0 || slot >= this.getContainerSize()) {
+            return ItemStack.EMPTY;
+        }
+
+        return ContainerHelper.removeItem(this.inventory, slot, amount);
     }
 
-    public static int getSailboatMaxPassengers(Type variant, boolean chestBoat) {
-        return variant.getBoatSize().getMaxPassengers(chestBoat);
+    @Override
+    public ItemStack removeItemNoUpdate(int slot) {
+        if (slot < 0 || slot >= this.getContainerSize()) {
+            return ItemStack.EMPTY;
+        }
+
+        return ContainerHelper.takeItem(this.inventory, slot);
     }
 
-    public static void positionSailboatRider(
-            Boat boat,
-            Entity passenger,
-            Entity.MoveFunction callback,
-            Type variant,
-            boolean chestBoat
-    ) {
-        if (!boat.hasPassenger(passenger)) {
+    @Override
+    public void setItem(int slot, ItemStack stack) {
+        if (slot < 0 || slot >= this.getContainerSize()) {
             return;
         }
 
-        int index = boat.getPassengers().indexOf(passenger);
-        Vec3 seat = variant.getBoatSize().getSeatOffset(index, chestBoat);
+        this.inventory.set(slot, stack);
 
-        double riderY = boat.getY()
-                + boat.getPassengersRidingOffset()
-                + passenger.getMyRidingOffset();
-
-        Vec3 rotatedSeat = seat.yRot(-boat.getYRot() * Mth.DEG_TO_RAD);
-
-        callback.accept(
-                passenger,
-                boat.getX() + rotatedSeat.x,
-                riderY + seat.y,
-                boat.getZ() + rotatedSeat.z
-        );
-
-        if (passenger instanceof AbstractPirateEntity) {
-            ModBoatEntity.clampPiratePassengerRotation(boat, passenger);
+        if (stack.getCount() > this.getMaxStackSize()) {
+            stack.setCount(this.getMaxStackSize());
         }
+
+        this.setChanged();
     }
 
-    private static void clampPiratePassengerRotation(Boat boat, Entity passenger) {
-        float bodyYaw = Mth.wrapDegrees(boat.getYRot() + PIRATE_BODY_YAW_OFFSET);
-
-        float wantedHeadYaw = passenger.getYHeadRot();
-        float headDifference = Mth.wrapDegrees(wantedHeadYaw - bodyYaw);
-
-        float clampedHeadDifference = Mth.clamp(
-                headDifference,
-                -PIRATE_MAX_HEAD_TURN,
-                PIRATE_MAX_HEAD_TURN
-        );
-
-        float finalHeadYaw = Mth.wrapDegrees(bodyYaw + clampedHeadDifference);
-
-        passenger.setYBodyRot(bodyYaw);
-        passenger.setYHeadRot(finalHeadYaw);
-        passenger.setYRot(finalHeadYaw);
+    @Override
+    public void setChanged() {
     }
 
-    public static boolean canBoatPassengerAttackTarget(
-            Boat boat,
-            Entity passenger,
-            Entity target,
-            float maxTurnDegrees
-    ) {
-        if (target == null || !target.isAlive()) {
-            return false;
-        }
-
-        Vec3 toTarget = target.position().subtract(passenger.position());
-        toTarget = new Vec3(toTarget.x, 0.0D, toTarget.z);
-
-        if (toTarget.lengthSqr() < 1.0E-7D) {
-            return true;
-        }
-
-        toTarget = toTarget.normalize();
-
-        float yaw = (boat.getYRot() + PIRATE_BODY_YAW_OFFSET) * Mth.DEG_TO_RAD;
-
-        Vec3 boatForward = new Vec3(
-                Mth.sin(-yaw),
-                0.0D,
-                Mth.cos(yaw)
-        ).normalize();
-
-        double dot = boatForward.dot(toTarget);
-        double minDot = Math.cos(Math.toRadians(maxTurnDegrees));
-
-        return dot >= minDot;
+    @Override
+    public boolean stillValid(Player player) {
+        return !this.isRemoved() && player.distanceToSqr(this) <= 64.0D;
     }
 
-    public static void saveSailboatData(CompoundTag tag, Type variant, int bannerCount) {
-        tag.putString("ModBoatType", variant.getSerializedName());
-        tag.putInt("BannerCount", bannerCount);
-    }
-
-    public static Type loadSailboatVariant(CompoundTag tag) {
-        if (tag.contains("ModBoatType", 8)) {
-            return Type.byName(tag.getString("ModBoatType"));
-        }
-
-        if (tag.contains("Type", 8)) {
-            return Type.byName(tag.getString("Type"));
-        }
-
-        return Type.OAK_SAILBOAT;
-    }
-
-    public enum BoatSize implements StringRepresentable {
-        SAILBOAT("sailboat", 1.375F, 1.60F, 0.35F, 1, 1, 1.35F, 0.020F, 0.36D, 0),
-        MEDIUM_SAILBOAT("medium_sailboat", 1.55F, 2.85F, 0.40F, 2, 1, 0.75F, 0.014F, 0.42D, 0),
-        LARGE_SAILBOAT("large_sailboat", 1.85F, 4.35F, 0.45F, 4, 3, 0.35F, 0.009F, 0.48D, 2);
-
-        private final String name;
-        private final float hitboxWidth;
-        private final float hitboxLength;
-        private final float hitboxHeight;
-        private final int maxPassengers;
-        private final int maxChestPassengers;
-        private final float turnScale;
-        private final float baseAcceleration;
-        private final double baseTopSpeed;
-        private final int maxBanners;
-
-        BoatSize(
-                String name,
-                float hitboxWidth,
-                float hitboxLength,
-                float hitboxHeight,
-                int maxPassengers,
-                int maxChestPassengers,
-                float turnScale,
-                float baseAcceleration,
-                double baseTopSpeed,
-                int maxBanners
-        ) {
-            this.name = name;
-            this.hitboxWidth = hitboxWidth;
-            this.hitboxLength = hitboxLength;
-            this.hitboxHeight = hitboxHeight;
-            this.maxPassengers = maxPassengers;
-            this.maxChestPassengers = maxChestPassengers;
-            this.turnScale = turnScale;
-            this.baseAcceleration = baseAcceleration;
-            this.baseTopSpeed = baseTopSpeed;
-            this.maxBanners = maxBanners;
-        }
-
-        @Override
-        public String getSerializedName() {
-            return this.name;
-        }
-
-        public String getName() {
-            return this.name;
-        }
-
-        public float getHitboxWidth() {
-            return this.hitboxWidth;
-        }
-
-        public float getHitboxLength() {
-            return this.hitboxLength;
-        }
-
-        public float getHitboxHeight() {
-            return this.hitboxHeight;
-        }
-
-        public EntityDimensions getDimensions(boolean chestBoat) {
-            return EntityDimensions.scalable(this.hitboxWidth, this.hitboxHeight);
-        }
-
-        public int getMaxPassengers(boolean chestBoat) {
-            return chestBoat ? this.maxChestPassengers : this.maxPassengers;
-        }
-
-        public float getTurnScale() {
-            return this.turnScale;
-        }
-
-        public float getBaseAcceleration() {
-            return this.baseAcceleration;
-        }
-
-        public double getBaseTopSpeed() {
-            return this.baseTopSpeed;
-        }
-
-        public int getMaxBanners() {
-            return this.maxBanners;
-        }
-
-        public Vec3 getSeatOffset(int index, boolean chestBoat) {
-            if (chestBoat) {
-                return switch (this) {
-                    case SAILBOAT -> new Vec3(0.0D, 0.0D, 0.0D);
-                    case MEDIUM_SAILBOAT -> new Vec3(0.0D, 0.0D, 0.45D);
-                    case LARGE_SAILBOAT -> switch (index) {
-                        case 0 -> new Vec3(0.0D, 0.25D, 1.15D);
-                        case 1 -> new Vec3(0.0D, 0.25D, 0.15D);
-                        case 2 -> new Vec3(0.0D, 0.25D, -0.85D);
-                        default -> Vec3.ZERO;
-                    };
-                };
-            }
-
-            return switch (this) {
-                case SAILBOAT -> new Vec3(0.0D, 0.0D, 0.0D);
-                case MEDIUM_SAILBOAT -> switch (index) {
-                    case 0 -> new Vec3(0.0D, 0.0D, 0.45D);
-                    case 1 -> new Vec3(0.0D, 0.0D, -1.15D);
-                    default -> Vec3.ZERO;
-                };
-                case LARGE_SAILBOAT -> switch (index) {
-                    case 0 -> new Vec3(0.0D, 0.25D, 1.15D);
-                    case 1 -> new Vec3(0.0D, 0.25D, 0.15D);
-                    case 2 -> new Vec3(0.0D, 0.25D, -0.85D);
-                    case 3 -> new Vec3(0.0D, 0.25D, -1.85D);
-                    default -> Vec3.ZERO;
-                };
-            };
-        }
-    }
-
-    public enum WoodKind implements StringRepresentable {
-        OAK("oak", Blocks.OAK_PLANKS),
-        SPRUCE("spruce", Blocks.SPRUCE_PLANKS),
-        BIRCH("birch", Blocks.BIRCH_PLANKS),
-        JUNGLE("jungle", Blocks.JUNGLE_PLANKS),
-        ACACIA("acacia", Blocks.ACACIA_PLANKS),
-        DARK_OAK("dark_oak", Blocks.DARK_OAK_PLANKS),
-        MANGROVE("mangrove", Blocks.MANGROVE_PLANKS),
-        CHERRY("cherry", Blocks.CHERRY_PLANKS),
-        BAMBOO("bamboo", Blocks.BAMBOO_PLANKS);
-
-        private final String name;
-        private final Block planks;
-
-        WoodKind(String name, Block planks) {
-            this.name = name;
-            this.planks = planks;
-        }
-
-        @Override
-        public String getSerializedName() {
-            return this.name;
-        }
-
-        public String getName() {
-            return this.name;
-        }
-
-        public Block getPlanks() {
-            return this.planks;
-        }
-    }
-
-    public enum Type implements StringRepresentable {
-        OAK_SAILBOAT(WoodKind.OAK, BoatSize.SAILBOAT, "oak_sailboat"),
-        OAK_MEDIUM_SAILBOAT(WoodKind.OAK, BoatSize.MEDIUM_SAILBOAT, "oak_medium_sailboat"),
-        OAK_LARGE_SAILBOAT(WoodKind.OAK, BoatSize.LARGE_SAILBOAT, "oak_large_sailboat"),
-
-        SPRUCE_SAILBOAT(WoodKind.SPRUCE, BoatSize.SAILBOAT, "spruce_sailboat"),
-        SPRUCE_MEDIUM_SAILBOAT(WoodKind.SPRUCE, BoatSize.MEDIUM_SAILBOAT, "spruce_medium_sailboat"),
-        SPRUCE_LARGE_SAILBOAT(WoodKind.SPRUCE, BoatSize.LARGE_SAILBOAT, "spruce_large_sailboat"),
-
-        BIRCH_SAILBOAT(WoodKind.BIRCH, BoatSize.SAILBOAT, "birch_sailboat"),
-        BIRCH_MEDIUM_SAILBOAT(WoodKind.BIRCH, BoatSize.MEDIUM_SAILBOAT, "birch_medium_sailboat"),
-        BIRCH_LARGE_SAILBOAT(WoodKind.BIRCH, BoatSize.LARGE_SAILBOAT, "birch_large_sailboat"),
-
-        JUNGLE_SAILBOAT(WoodKind.JUNGLE, BoatSize.SAILBOAT, "jungle_sailboat"),
-        JUNGLE_MEDIUM_SAILBOAT(WoodKind.JUNGLE, BoatSize.MEDIUM_SAILBOAT, "jungle_medium_sailboat"),
-        JUNGLE_LARGE_SAILBOAT(WoodKind.JUNGLE, BoatSize.LARGE_SAILBOAT, "jungle_large_sailboat"),
-
-        ACACIA_SAILBOAT(WoodKind.ACACIA, BoatSize.SAILBOAT, "acacia_sailboat"),
-        ACACIA_MEDIUM_SAILBOAT(WoodKind.ACACIA, BoatSize.MEDIUM_SAILBOAT, "acacia_medium_sailboat"),
-        ACACIA_LARGE_SAILBOAT(WoodKind.ACACIA, BoatSize.LARGE_SAILBOAT, "acacia_large_sailboat"),
-
-        DARK_OAK_SAILBOAT(WoodKind.DARK_OAK, BoatSize.SAILBOAT, "dark_oak_sailboat"),
-        DARK_OAK_MEDIUM_SAILBOAT(WoodKind.DARK_OAK, BoatSize.MEDIUM_SAILBOAT, "dark_oak_medium_sailboat"),
-        DARK_OAK_LARGE_SAILBOAT(WoodKind.DARK_OAK, BoatSize.LARGE_SAILBOAT, "dark_oak_large_sailboat"),
-
-        MANGROVE_SAILBOAT(WoodKind.MANGROVE, BoatSize.SAILBOAT, "mangrove_sailboat"),
-        MANGROVE_MEDIUM_SAILBOAT(WoodKind.MANGROVE, BoatSize.MEDIUM_SAILBOAT, "mangrove_medium_sailboat"),
-        MANGROVE_LARGE_SAILBOAT(WoodKind.MANGROVE, BoatSize.LARGE_SAILBOAT, "mangrove_large_sailboat"),
-
-        CHERRY_SAILBOAT(WoodKind.CHERRY, BoatSize.SAILBOAT, "cherry_sailboat"),
-        CHERRY_MEDIUM_SAILBOAT(WoodKind.CHERRY, BoatSize.MEDIUM_SAILBOAT, "cherry_medium_sailboat"),
-        CHERRY_LARGE_SAILBOAT(WoodKind.CHERRY, BoatSize.LARGE_SAILBOAT, "cherry_large_sailboat"),
-
-        BAMBOO_SAILBOAT(WoodKind.BAMBOO, BoatSize.SAILBOAT, "bamboo_sailboat"),
-        BAMBOO_MEDIUM_SAILBOAT(WoodKind.BAMBOO, BoatSize.MEDIUM_SAILBOAT, "bamboo_medium_sailboat"),
-        BAMBOO_LARGE_SAILBOAT(WoodKind.BAMBOO, BoatSize.LARGE_SAILBOAT, "bamboo_large_sailboat");
-
-        private final WoodKind woodKind;
-        private final BoatSize boatSize;
-        private final String name;
-
-        public static final StringRepresentable.EnumCodec<Type> CODEC =
-                StringRepresentable.fromEnum(Type::values);
-
-        private static final IntFunction<Type> BY_ID =
-                ByIdMap.continuous(Enum::ordinal, values(), ByIdMap.OutOfBoundsStrategy.ZERO);
-
-        Type(WoodKind woodKind, BoatSize boatSize, String name) {
-            this.woodKind = woodKind;
-            this.boatSize = boatSize;
-            this.name = name;
-        }
-
-        @Override
-        public String getSerializedName() {
-            return this.name;
-        }
-
-        public String getName() {
-            return this.name;
-        }
-
-        public WoodKind getWoodKind() {
-            return this.woodKind;
-        }
-
-        public BoatSize getBoatSize() {
-            return this.boatSize;
-        }
-
-        public Block getPlanks() {
-            return this.woodKind.getPlanks();
-        }
-
-        public String getTextureName() {
-            return this.name;
-        }
-
-        public String getItemName() {
-            return this.name;
-        }
-
-        public String getChestItemName() {
-            return this.name + "_chest_boat";
-        }
-
-        @Override
-        public String toString() {
-            return this.name;
-        }
-
-        public static Type byId(int id) {
-            return BY_ID.apply(id);
-        }
-
-        public static Type byName(String name) {
-            return CODEC.byName(name, OAK_SAILBOAT);
+    @Override
+    public void clearContent() {
+        for (int i = 0; i < this.getContainerSize(); i++) {
+            this.inventory.set(i, ItemStack.EMPTY);
         }
     }
 }

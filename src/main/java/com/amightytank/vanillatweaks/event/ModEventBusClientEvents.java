@@ -19,13 +19,8 @@ public class ModEventBusClientEvents {
     @SubscribeEvent
     public static void registerLayer(EntityRenderersEvent.RegisterLayerDefinitions event) {
         event.registerLayerDefinition(ModModelLayers.SAILBOAT_LAYER, SmallSailboatModel::createBodyLayer);
-        event.registerLayerDefinition(ModModelLayers.SAILBOAT_CHEST_LAYER, SmallChestSailboatModel::createBodyLayer);
-
         event.registerLayerDefinition(ModModelLayers.MEDIUM_SAILBOAT_LAYER, MediumSailboatModel::createBodyLayer);
-        event.registerLayerDefinition(ModModelLayers.MEDIUM_SAILBOAT_CHEST_LAYER, MediumChestSailboatModel::createBodyLayer);
-
         event.registerLayerDefinition(ModModelLayers.LARGE_SAILBOAT_LAYER, LargeSailboatModel::createBodyLayer);
-        event.registerLayerDefinition(ModModelLayers.LARGE_SAILBOAT_CHEST_LAYER, LargeChestSailboatModel::createBodyLayer);
 
         event.registerLayerDefinition(ModModelLayers.KRAKEN_TENTACLE_LAYER, KrakenTentacleModel::createBodyLayer);
         event.registerLayerDefinition(ModModelLayers.PIRATE_CAPTAIN_LAYER, PirateCaptainModel::createBodyLayer);

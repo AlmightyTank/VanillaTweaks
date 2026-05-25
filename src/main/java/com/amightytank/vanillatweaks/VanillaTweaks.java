@@ -4,9 +4,12 @@ import com.amightytank.vanillatweaks.entity.ModEntities;
 import com.amightytank.vanillatweaks.entity.client.boat.ModBoatRenderer;
 import com.amightytank.vanillatweaks.item.ModCreativeModTabs;
 import com.amightytank.vanillatweaks.item.ModItems;
+import com.amightytank.vanillatweaks.screen.ModMenuTypes;
+import com.amightytank.vanillatweaks.screen.SailboatChestScreen;
 import com.amightytank.vanillatweaks.world.PiratePatrolSpawner;
 import com.amightytank.vanillatweaks.world.pirate_raid.PirateTreasureRaidEvents;
 import com.mojang.logging.LogUtils;
+import net.minecraft.client.gui.screens.MenuScreens;
 import net.minecraft.client.renderer.entity.EntityRenderers;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.common.MinecraftForge;
@@ -29,6 +32,7 @@ public class VanillaTweaks {
         ModCreativeModTabs.register(modEventBus);
         ModItems.register(modEventBus);
         ModEntities.register(modEventBus);
+        ModMenuTypes.register(modEventBus);
 
         MinecraftForge.EVENT_BUS.register(this);
         MinecraftForge.EVENT_BUS.register(PiratePatrolSpawner.class);
@@ -45,27 +49,27 @@ public class VanillaTweaks {
 
         @SubscribeEvent
         public static void onClientSetup(FMLClientSetupEvent event) {
-            event.enqueueWork(ClientModEvents::registerBoatRenderers);
+            event.enqueueWork(() -> {
+                registerBoatRenderers();
+                MenuScreens.register(ModMenuTypes.SAILBOAT_CHEST_MENU.get(), SailboatChestScreen::new);
+            });
         }
 
         private static void registerBoatRenderers() {
-            EntityRenderers.register(ModEntities.MOD_BOAT.get(),
-                    context -> new ModBoatRenderer(context, false));
+            EntityRenderers.register(
+                    ModEntities.MOD_BOAT.get(),
+                    ModBoatRenderer::new
+            );
 
-            EntityRenderers.register(ModEntities.MOD_CHEST_BOAT.get(),
-                    context -> new ModBoatRenderer(context, true));
+            EntityRenderers.register(
+                    ModEntities.MEDIUM_MOD_BOAT.get(),
+                    ModBoatRenderer::new
+            );
 
-            EntityRenderers.register(ModEntities.MEDIUM_MOD_BOAT.get(),
-                    context -> new ModBoatRenderer(context, false));
-
-            EntityRenderers.register(ModEntities.MEDIUM_MOD_CHEST_BOAT.get(),
-                    context -> new ModBoatRenderer(context, true));
-
-            EntityRenderers.register(ModEntities.LARGE_MOD_BOAT.get(),
-                    context -> new ModBoatRenderer(context, false));
-
-            EntityRenderers.register(ModEntities.LARGE_MOD_CHEST_BOAT.get(),
-                    context -> new ModBoatRenderer(context, true));
+            EntityRenderers.register(
+                    ModEntities.LARGE_MOD_BOAT.get(),
+                    ModBoatRenderer::new
+            );
         }
     }
 }

@@ -2,8 +2,6 @@ package com.amightytank.vanillatweaks.world.pirate_raid;
 
 import com.amightytank.vanillatweaks.entity.ModEntities;
 import com.amightytank.vanillatweaks.entity.custom.boat.ModBoatEntity;
-import com.amightytank.vanillatweaks.entity.custom.boat.ModChestBoatEntity;
-import com.amightytank.vanillatweaks.world.FleetWoodType;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
@@ -12,6 +10,7 @@ import net.minecraft.tags.FluidTags;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.MobSpawnType;
+import net.minecraft.world.entity.vehicle.Boat;
 import net.minecraft.world.phys.Vec3;
 
 import java.util.ArrayList;
@@ -45,11 +44,8 @@ public class PirateShipSpawner {
                 false
         );
 
-        double angleStep = 360.0D / wavePlan.size();
-
         for (int i = 0; i < wavePlan.size(); i++) {
             PirateShipSpawnEntry entry = wavePlan.get(i);
-            int angleOffset = (int) (angleStep * i);
 
             BlockPos formationPos = getVFormationPosition(
                     level,
@@ -194,67 +190,35 @@ public class PirateShipSpawner {
     }
 
     private static Entity spawnRaidBoat(ServerLevel level, BlockPos spawnPos, PirateShipSpawnEntry entry) {
-        boolean chestBoat = entry.role() == PirateShipRole.LOOT
+        boolean lootBoat = entry.role() == PirateShipRole.LOOT
                 || entry.role() == PirateShipRole.CAPTAIN_LOOT;
 
-        if (chestBoat) {
-            return spawnChestSailboat(level, spawnPos, entry.size(), entry.role());
-        }
+        PirateShipSize finalSize = entry.role() == PirateShipRole.CAPTAIN_LOOT
+                ? PirateShipSize.LARGE
+                : entry.size();
 
-        return spawnSailboat(level, spawnPos, entry.size());
+        int chestCount = lootBoat ? getChestCountForSize(finalSize) : 0;
+
+        return spawnSailboat(level, spawnPos, finalSize, chestCount);
     }
 
-    private static Entity spawnSailboat(ServerLevel level, BlockPos spawnPos, PirateShipSize size) {
-        ModBoatEntity boat = ModEntities.MOD_BOAT.get().create(level);
-
-        if (boat == null) {
-            return null;
-        }
-
-        FleetWoodType woodType = FleetWoodType.getRandom(level.random);
-
-        applyBoatType(
-                boat,
-                woodType.getWoodKind(),
-                size
-        );
-
-        boat.moveTo(
-                spawnPos.getX() + 0.5D,
-                spawnPos.getY(),
-                spawnPos.getZ() + 0.5D,
-                level.random.nextFloat() * 360.0F,
-                0.0F
-        );
-
-        level.addFreshEntity(boat);
-
-        return boat;
-    }
-
-    private static Entity spawnChestSailboat(
+    private static Entity spawnSailboat(
             ServerLevel level,
             BlockPos spawnPos,
             PirateShipSize size,
-            PirateShipRole role
+            int chestCount
     ) {
-        ModChestBoatEntity boat = ModEntities.MOD_CHEST_BOAT.get().create(level);
+        ModBoatEntity boat = createBoatForSize(level, size);
 
         if (boat == null) {
             return null;
         }
 
-        FleetWoodType woodType = FleetWoodType.getRandom(level.random);
+        Boat.Type woodType = getRandomBoatType(level);
 
-        PirateShipSize finalSize = role == PirateShipRole.CAPTAIN_LOOT
-                ? PirateShipSize.LARGE
-                : size;
-
-        applyChestBoatType(
-                boat,
-                woodType.getWoodKind(),
-                finalSize
-        );
+        boat.setModVariant(woodType);
+        boat.setBannerCount(getBannerCountForSize(size));
+        boat.setChestCount(chestCount);
 
         boat.moveTo(
                 spawnPos.getX() + 0.5D,
@@ -269,41 +233,32 @@ public class PirateShipSpawner {
         return boat;
     }
 
-    private static void applyBoatType(
-            ModBoatEntity boat,
-            ModBoatEntity.WoodKind woodKind,
-            PirateShipSize size
-    ) {
-        ModBoatEntity.Type type = getBoatType(woodKind, size);
-        boat.setVariant(type);
-    }
-
-    private static void applyChestBoatType(
-            ModChestBoatEntity boat,
-            ModBoatEntity.WoodKind woodKind,
-            PirateShipSize size
-    ) {
-        ModBoatEntity.Type type = getBoatType(woodKind, size);
-        boat.setVariant(type);
-    }
-
-    private static ModBoatEntity.Type getBoatType(
-            ModBoatEntity.WoodKind woodKind,
-            PirateShipSize size
-    ) {
-        ModBoatEntity.BoatSize boatSize = switch (size) {
-            case SMALL -> ModBoatEntity.BoatSize.SAILBOAT;
-            case MEDIUM -> ModBoatEntity.BoatSize.MEDIUM_SAILBOAT;
-            case LARGE -> ModBoatEntity.BoatSize.LARGE_SAILBOAT;
+    private static ModBoatEntity createBoatForSize(ServerLevel level, PirateShipSize size) {
+        return switch (size) {
+            case SMALL -> ModEntities.MOD_BOAT.get().create(level);
+            case MEDIUM -> ModEntities.MEDIUM_MOD_BOAT.get().create(level);
+            case LARGE -> ModEntities.LARGE_MOD_BOAT.get().create(level);
         };
+    }
 
-        for (ModBoatEntity.Type type : ModBoatEntity.Type.values()) {
-            if (type.getWoodKind() == woodKind && type.getBoatSize() == boatSize) {
-                return type;
-            }
-        }
+    private static int getBannerCountForSize(PirateShipSize size) {
+        return switch (size) {
+            case SMALL, MEDIUM -> 1;
+            case LARGE -> 3;
+        };
+    }
 
-        return ModBoatEntity.Type.OAK_SAILBOAT;
+    private static int getChestCountForSize(PirateShipSize size) {
+        return switch (size) {
+            case SMALL -> 1;
+            case MEDIUM -> 2;
+            case LARGE -> 3;
+        };
+    }
+
+    private static Boat.Type getRandomBoatType(ServerLevel level) {
+        Boat.Type[] types = Boat.Type.values();
+        return types[level.random.nextInt(types.length)];
     }
 
     private static void setupRaidBoat(Entity boat, ServerPlayer target, UUID raidId) {
