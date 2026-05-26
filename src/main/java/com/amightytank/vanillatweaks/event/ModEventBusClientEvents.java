@@ -3,6 +3,7 @@ package com.amightytank.vanillatweaks.event;
 import com.amightytank.vanillatweaks.VanillaTweaks;
 import com.amightytank.vanillatweaks.entity.ModEntities;
 import com.amightytank.vanillatweaks.entity.client.ModModelLayers;
+import com.amightytank.vanillatweaks.entity.client.boat.SailboatCollisionPartRenderer;
 import com.amightytank.vanillatweaks.entity.client.pirate.PirateDeckhandRenderer;
 import com.amightytank.vanillatweaks.entity.client.boat.model.*;
 import com.amightytank.vanillatweaks.entity.client.pirate.*;
@@ -37,5 +38,6 @@ public class ModEventBusClientEvents {
         event.registerEntityRenderer(ModEntities.PIRATE_GUNNER.get(), PirateGunnerRenderer::new);
         event.registerEntityRenderer(ModEntities.PIRATE_DYNAMITE_ARROW.get(), PirateDynamiteArrowRenderer::new);
         event.registerEntityRenderer(ModEntities.PIRATE_DECKHAND.get(), PirateDeckhandRenderer::new);
+        event.registerEntityRenderer(ModEntities.SAILBOAT_COLLISION_PART.get(), SailboatCollisionPartRenderer::new);
     }
 }

@@ -2,28 +2,69 @@ package com.amightytank.vanillatweaks.entity.client.boat;
 
 import com.amightytank.vanillatweaks.VanillaTweaks;
 import com.amightytank.vanillatweaks.entity.client.ModModelLayers;
+import com.amightytank.vanillatweaks.entity.client.boat.model.BoatBannerModel;
 import com.amightytank.vanillatweaks.entity.client.boat.model.LargeSailboatModel;
 import com.amightytank.vanillatweaks.entity.client.boat.model.MediumSailboatModel;
 import com.amightytank.vanillatweaks.entity.client.boat.model.SmallSailboatModel;
 import com.amightytank.vanillatweaks.entity.custom.boat.ModBoatEntity;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
+import com.mojang.datafixers.util.Pair;
 import com.mojang.math.Axis;
 import net.minecraft.client.model.EntityModel;
 import net.minecraft.client.model.WaterPatchModel;
+import net.minecraft.client.model.geom.ModelLayers;
+import net.minecraft.client.model.geom.ModelPart;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.RenderType;
+import net.minecraft.client.renderer.blockentity.BannerRenderer;
+import net.minecraft.client.renderer.culling.Frustum;
 import net.minecraft.client.renderer.entity.EntityRenderer;
 import net.minecraft.client.renderer.entity.EntityRendererProvider;
 import net.minecraft.client.renderer.texture.OverlayTexture;
+import net.minecraft.client.resources.model.ModelBakery;
+import net.minecraft.core.Holder;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.Tag;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.vehicle.Boat;
+import net.minecraft.world.item.*;
+import net.minecraft.world.level.block.entity.BannerBlockEntity;
+import net.minecraft.world.level.block.entity.BannerPattern;
+
+import java.util.List;
 
 public class ModBoatRenderer extends EntityRenderer<ModBoatEntity> {
+    private static final float BOAT_BANNER_SCALE = 0.7F;
+    private static final float BOAT_BANNER_SCALE1 = 0.65F;
+
+    /*
+     * Your banner_panel cubes are 14x26.
+     * Vanilla banner flag is 20x40.
+     * 20 * 0.65 = 13 wide
+     * 40 * 0.65 = 26 tall
+     *
+     * These offsets move the vanilla banner cloth into the banner_panel rectangle.
+     */
+    private static final double BANNER_PANEL_X_OFFSET = -0.035D;
+    private static final double BANNER_PANEL_Y_OFFSET = -0.8D;
+    private static final double BANNER_PANEL_Z_OFFSET = -0.004D;
+
+    // Large sailboat banner offset.
+// Tweak these 3 values until the banner sits perfectly inside the large banner_panel.
+    private static final double LARGE_BANNER_PANEL_X_OFFSET = -0.001D;
+    private static final double LARGE_BANNER_PANEL_Y_OFFSET = -0.85D;
+    private static final double LARGE_BANNER_PANEL_Z_OFFSET = -0.05D;
+
     private final EntityModel<ModBoatEntity> smallSailboatModel;
     private final EntityModel<ModBoatEntity> mediumSailboatModel;
     private final EntityModel<ModBoatEntity> largeSailboatModel;
+
+    private final ModelPart bannerFlag;
+    private final ModelPart bannerPole;
+    private final ModelPart bannerBar;
 
     public ModBoatRenderer(EntityRendererProvider.Context context) {
         super(context);
@@ -32,14 +73,34 @@ public class ModBoatRenderer extends EntityRenderer<ModBoatEntity> {
         this.smallSailboatModel = new SmallSailboatModel(context.bakeLayer(ModModelLayers.SAILBOAT_LAYER));
         this.mediumSailboatModel = new MediumSailboatModel(context.bakeLayer(ModModelLayers.MEDIUM_SAILBOAT_LAYER));
         this.largeSailboatModel = new LargeSailboatModel(context.bakeLayer(ModModelLayers.LARGE_SAILBOAT_LAYER));
+
+        ModelPart bannerRoot = context.bakeLayer(ModelLayers.BANNER);
+        this.bannerFlag = bannerRoot.getChild("flag");
+        this.bannerPole = bannerRoot.getChild("pole");
+        this.bannerBar = bannerRoot.getChild("bar");
+
+        // Your sailboat model already has its own mast/poles.
+        this.bannerPole.visible = false;
+        this.bannerBar.visible = false;
     }
 
     @Override
-    public void render(ModBoatEntity boat, float entityYaw, float partialTick, PoseStack poseStack,
-                       MultiBufferSource bufferSource, int packedLight) {
+    public boolean shouldRender(ModBoatEntity boat, Frustum frustum, double camX, double camY, double camZ) {
+        return true;
+    }
+
+    @Override
+    public void render(
+            ModBoatEntity boat,
+            float entityYaw,
+            float partialTick,
+            PoseStack poseStack,
+            MultiBufferSource bufferSource,
+            int packedLight
+    ) {
         poseStack.pushPose();
 
-        poseStack.translate(0.0D, 2.375D, 0.0D);
+        poseStack.translate(0.0D, 1.375D, 0.0D);
         poseStack.mulPose(Axis.YP.rotationDegrees(180.0F - entityYaw));
 
         float hurtTime = (float) boat.getHurtTime() - partialTick;
@@ -68,6 +129,14 @@ public class ModBoatRenderer extends EntityRenderer<ModBoatEntity> {
 
         model.setupAnim(boat, partialTick, 0.0F, -0.1F, 0.0F, 0.0F);
 
+        if (model instanceof SailboatPaddleModel paddleModel) {
+            SailboatPaddleAnimator.animateOarSetsByPassengerCount(
+                    boat,
+                    paddleModel.getPaddleSets(),
+                    partialTick
+            );
+        }
+
         VertexConsumer vertexConsumer = bufferSource.getBuffer(model.renderType(texture));
         model.renderToBuffer(
                 poseStack,
@@ -79,6 +148,8 @@ public class ModBoatRenderer extends EntityRenderer<ModBoatEntity> {
                 1.0F,
                 1.0F
         );
+
+        this.renderBoatBanners(boat, model, poseStack, bufferSource, packedLight);
 
         if (!boat.isUnderWater() && model instanceof WaterPatchModel waterPatchModel) {
             VertexConsumer waterVertexConsumer = bufferSource.getBuffer(RenderType.waterMask());
@@ -95,6 +166,57 @@ public class ModBoatRenderer extends EntityRenderer<ModBoatEntity> {
         super.render(boat, entityYaw, partialTick, poseStack, bufferSource, packedLight);
     }
 
+    private void renderBoatBanners(
+            ModBoatEntity boat,
+            EntityModel<ModBoatEntity> model,
+            PoseStack poseStack,
+            MultiBufferSource bufferSource,
+            int packedLight
+    ) {
+        if (!(model instanceof BoatBannerModel bannerModel)) {
+            return;
+        }
+
+        ItemStack bannerStack = this.getVisualBannerStack(boat);
+
+        poseStack.pushPose();
+
+        bannerModel.translateToBannerPanel(poseStack);
+        this.alignBannerToPanel(boat, poseStack);
+        this.renderBoatBanner(bannerStack, poseStack, bufferSource, packedLight);
+
+        poseStack.popPose();
+
+        if (boat.isLargeSailboat() && bannerModel.hasRearBannerPanel()) {
+            poseStack.pushPose();
+
+            bannerModel.translateToRearBannerPanel(poseStack);
+            this.alignBannerToPanel(boat, poseStack);
+            this.renderBoatBanner(bannerStack, poseStack, bufferSource, packedLight);
+
+            poseStack.popPose();
+        }
+    }
+
+    private void alignBannerToPanel(ModBoatEntity boat, PoseStack poseStack) {
+        double xOffset = boat.isLargeSailboat()
+                ? LARGE_BANNER_PANEL_X_OFFSET
+                : BANNER_PANEL_X_OFFSET;
+
+        double yOffset = boat.isLargeSailboat()
+                ? LARGE_BANNER_PANEL_Y_OFFSET
+                : BANNER_PANEL_Y_OFFSET;
+
+        double zOffset = boat.isLargeSailboat()
+                ? LARGE_BANNER_PANEL_Z_OFFSET
+                : BANNER_PANEL_Z_OFFSET;
+
+        poseStack.translate(xOffset, yOffset, zOffset);
+
+        poseStack.mulPose(Axis.YP.rotationDegrees(180.0F));
+        poseStack.scale(BOAT_BANNER_SCALE, BOAT_BANNER_SCALE1, BOAT_BANNER_SCALE1);
+    }
+
     private EntityModel<ModBoatEntity> getModel(ModBoatEntity boat) {
         if (boat.isLargeSailboat()) {
             return this.largeSailboatModel;
@@ -105,6 +227,50 @@ public class ModBoatRenderer extends EntityRenderer<ModBoatEntity> {
         }
 
         return this.smallSailboatModel;
+    }
+
+    private void renderBoatBanner(
+            ItemStack bannerStack,
+            PoseStack poseStack,
+            MultiBufferSource buffer,
+            int packedLight
+    ) {
+        if (!(bannerStack.getItem() instanceof BannerItem bannerItem)) {
+            return;
+        }
+
+        DyeColor baseColor = bannerItem.getColor();
+
+        CompoundTag blockEntityTag = BlockItem.getBlockEntityData(bannerStack);
+        ListTag patternsTag = null;
+
+        if (blockEntityTag != null && blockEntityTag.contains("Patterns", Tag.TAG_LIST)) {
+            patternsTag = blockEntityTag.getList("Patterns", Tag.TAG_COMPOUND);
+        }
+
+        List<Pair<Holder<BannerPattern>, DyeColor>> patterns =
+                BannerBlockEntity.createPatterns(baseColor, patternsTag);
+
+        BannerRenderer.renderPatterns(
+                poseStack,
+                buffer,
+                packedLight,
+                OverlayTexture.NO_OVERLAY,
+                this.bannerFlag,
+                ModelBakery.BANNER_BASE,
+                true,
+                patterns
+        );
+    }
+
+    private ItemStack getVisualBannerStack(ModBoatEntity boat) {
+        ItemStack bannerStack = boat.getBannerStack();
+
+        if (!bannerStack.isEmpty()) {
+            return bannerStack;
+        }
+
+        return new ItemStack(Items.WHITE_BANNER);
     }
 
     @Override

@@ -10,6 +10,7 @@ import net.minecraft.tags.FluidTags;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.MobSpawnType;
+import net.minecraft.world.entity.raid.Raid;
 import net.minecraft.world.entity.vehicle.Boat;
 import net.minecraft.world.phys.Vec3;
 
@@ -217,8 +218,15 @@ public class PirateShipSpawner {
         Boat.Type woodType = getRandomBoatType(level);
 
         boat.setModVariant(woodType);
+
+        /*
+         * Keep this as your size flag:
+         * small = 1, medium = 2, large = 3.
+         * The renderer decides that large boats draw the same banner twice.
+         */
         boat.setBannerCount(getBannerCountForSize(size));
         boat.setChestCount(chestCount);
+        boat.setBannerStack(Raid.getLeaderBannerInstance());
 
         boat.moveTo(
                 spawnPos.getX() + 0.5D,

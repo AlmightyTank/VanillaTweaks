@@ -2,6 +2,7 @@ package com.amightytank.vanillatweaks.entity;
 
 import com.amightytank.vanillatweaks.VanillaTweaks;
 import com.amightytank.vanillatweaks.entity.custom.boat.ModBoatEntity;
+import com.amightytank.vanillatweaks.entity.custom.boat.SailboatCollisionPartEntity;
 import com.amightytank.vanillatweaks.entity.custom.pirate.*;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.MobCategory;
@@ -37,6 +38,16 @@ public class ModEntities {
                             .sized(1.85F, 0.45F)
                             .clientTrackingRange(10)
                             .build("large_mod_boat"));
+
+    public static final RegistryObject<EntityType<SailboatCollisionPartEntity>> SAILBOAT_COLLISION_PART =
+            ENTITY_TYPES.register("sailboat_collision_part", () ->
+                    EntityType.Builder.<SailboatCollisionPartEntity>of(SailboatCollisionPartEntity::new, MobCategory.MISC)
+                            .sized(1.0F, 0.5F)
+                            .clientTrackingRange(10)
+                            .updateInterval(1)
+                            .noSave()
+                            .noSummon()
+                            .build("sailboat_collision_part"));
 
     public static final RegistryObject<EntityType<PirateCaptainEntity>> PIRATE_CAPTAIN =
             ENTITY_TYPES.register("pirate_captain",

@@ -38,7 +38,7 @@ public class SailboatChestMenu extends AbstractContainerMenu {
         super(ModMenuTypes.SAILBOAT_CHEST_MENU.get(), containerId);
 
         this.boatContainer = boatContainer;
-        this.rows = Math.max(1, Math.min(9, rows));
+        this.rows = Math.max(1, Math.min(6, rows));
 
         int boatSlotCount = this.rows * 9;
 

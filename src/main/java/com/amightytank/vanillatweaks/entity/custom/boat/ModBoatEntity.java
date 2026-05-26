@@ -23,6 +23,7 @@ import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.entity.vehicle.Boat;
+import net.minecraft.world.item.BannerItem;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
@@ -30,21 +31,33 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.network.NetworkHooks;
 
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
+
 public class ModBoatEntity extends Boat implements Container {
     private static final EntityDataAccessor<Integer> DATA_ID_TYPE =
             SynchedEntityData.defineId(ModBoatEntity.class, EntityDataSerializers.INT);
 
-    private static final EntityDataAccessor<Integer> DATA_BANNER_COUNT =
+    private static final EntityDataAccessor<Integer> DATA_BOAT_SIZE_TIER =
             SynchedEntityData.defineId(ModBoatEntity.class, EntityDataSerializers.INT);
+
+    private static final EntityDataAccessor<ItemStack> DATA_BANNER_STACK =
+            SynchedEntityData.defineId(ModBoatEntity.class, EntityDataSerializers.ITEM_STACK);
+
+    private static final EntityDataAccessor<ItemStack> DATA_SECOND_BANNER_STACK =
+            SynchedEntityData.defineId(ModBoatEntity.class, EntityDataSerializers.ITEM_STACK);
 
     private static final EntityDataAccessor<Integer> DATA_CHEST_COUNT =
             SynchedEntityData.defineId(ModBoatEntity.class, EntityDataSerializers.INT);
 
-    private static final int SLOTS_PER_CHEST = 27;
+    private static final int ROWS_PER_CHEST = 2;
+    private static final int SLOTS_PER_CHEST = ROWS_PER_CHEST * 9;
     private static final int MAX_CHESTS = 3;
     private static final int MAX_SLOTS = SLOTS_PER_CHEST * MAX_CHESTS;
 
     private NonNullList<ItemStack> inventory = NonNullList.withSize(MAX_SLOTS, ItemStack.EMPTY);
+    private final List<SailboatCollisionPartEntity> sailboatCollisionParts = new ArrayList<>();
 
     public ModBoatEntity(EntityType<? extends Boat> entityType, Level level) {
         super(entityType, level);
@@ -62,7 +75,9 @@ public class ModBoatEntity extends Boat implements Container {
     protected void defineSynchedData() {
         super.defineSynchedData();
         this.entityData.define(DATA_ID_TYPE, Boat.Type.OAK.ordinal());
-        this.entityData.define(DATA_BANNER_COUNT, 1);
+        this.entityData.define(DATA_BOAT_SIZE_TIER, 1);
+        this.entityData.define(DATA_BANNER_STACK, ItemStack.EMPTY);
+        this.entityData.define(DATA_SECOND_BANNER_STACK, ItemStack.EMPTY);
         this.entityData.define(DATA_CHEST_COUNT, 0);
     }
 
@@ -74,20 +89,242 @@ public class ModBoatEntity extends Boat implements Container {
         this.entityData.set(DATA_ID_TYPE, type.ordinal());
     }
 
-    public int getBannerCount() {
-        return this.entityData.get(DATA_BANNER_COUNT);
+    public int getBoatSizeTier() {
+        return this.entityData.get(DATA_BOAT_SIZE_TIER);
     }
 
+    public void setBoatSizeTier(int boatSizeTier) {
+        this.entityData.set(DATA_BOAT_SIZE_TIER, Math.max(1, Math.min(3, boatSizeTier)));
+
+        if (!this.level().isClientSide) {
+            this.updateSailboatCollisionParts();
+        }
+    }
+
+    @Deprecated
+    public int getBannerCount() {
+        return this.getBoatSizeTier();
+    }
+
+    @Deprecated
     public void setBannerCount(int bannerCount) {
-        this.entityData.set(DATA_BANNER_COUNT, Math.max(1, Math.min(3, bannerCount)));
+        this.setBoatSizeTier(bannerCount);
+    }
+
+    public ItemStack getBannerStack() {
+        return this.entityData.get(DATA_BANNER_STACK);
+    }
+
+    public void setBannerStack(ItemStack stack) {
+        if (stack.isEmpty()) {
+            this.entityData.set(DATA_BANNER_STACK, ItemStack.EMPTY);
+            return;
+        }
+
+        ItemStack copy = stack.copy();
+        copy.setCount(1);
+        this.entityData.set(DATA_BANNER_STACK, copy);
+    }
+
+    public boolean hasBanner() {
+        return !this.getBannerStack().isEmpty();
+    }
+
+    public ItemStack getSecondBannerStack() {
+        if (!this.isLargeSailboat()) {
+            return ItemStack.EMPTY;
+        }
+
+        return this.getBannerStack();
+    }
+
+    public void setSecondBannerStack(ItemStack stack) {
+        this.setBannerStack(stack);
+    }
+
+    public boolean hasSecondBanner() {
+        return this.isLargeSailboat() && this.hasBanner();
     }
 
     public boolean isMediumSailboat() {
-        return this.getBannerCount() == 2;
+        return this.getBoatSizeTier() == 2;
     }
 
     public boolean isLargeSailboat() {
-        return this.getBannerCount() >= 3;
+        return this.getBoatSizeTier() >= 3;
+    }
+
+    public int getBannerSlotCount() {
+        return this.isLargeSailboat() ? 2 : 1;
+    }
+
+    private int getSailboatCollisionPartCount() {
+        if (this.isLargeSailboat()) {
+            return 6;
+        }
+
+        if (this.isMediumSailboat()) {
+            return 4;
+        }
+
+        return 2;
+    }
+
+    private double getSailboatCollisionDeckLength() {
+        if (this.isLargeSailboat()) {
+            return 97.0D / 16.0D;
+        }
+
+        if (this.isMediumSailboat()) {
+            return 72.0D / 16.0D;
+        }
+
+        return 33.0D / 16.0D;
+    }
+
+    private float getSailboatCollisionPartWidth() {
+        if (this.isLargeSailboat()) {
+            return 28.0F / 16.0F;
+        }
+
+        if (this.isMediumSailboat()) {
+            return 24.0F / 16.0F;
+        }
+
+        return 21.0F / 16.0F;
+    }
+
+    private float getSailboatCollisionPartHeight() {
+        if (this.isLargeSailboat()) {
+            return 10.0F / 16.0F;
+        }
+
+        if (this.isMediumSailboat()) {
+            return 9.0F / 16.0F;
+        }
+
+        return 10.0F / 16.0F;
+    }
+
+    @Override
+    public boolean canCollideWith(Entity entity) {
+        if (entity instanceof SailboatCollisionPartEntity part && part.isParentBoat(this)) {
+            return false;
+        }
+
+        return super.canCollideWith(entity);
+    }
+
+    private void updateSailboatCollisionParts() {
+        if (this.isRemoved()) {
+            this.removeSailboatCollisionParts();
+            return;
+        }
+
+        Iterator<SailboatCollisionPartEntity> iterator = this.sailboatCollisionParts.iterator();
+
+        while (iterator.hasNext()) {
+            SailboatCollisionPartEntity part = iterator.next();
+
+            if (part == null || part.isRemoved()) {
+                iterator.remove();
+            }
+        }
+
+        int wantedCount = this.getSailboatCollisionPartCount();
+
+        while (this.sailboatCollisionParts.size() > wantedCount) {
+            SailboatCollisionPartEntity part = this.sailboatCollisionParts.remove(this.sailboatCollisionParts.size() - 1);
+            part.discard();
+        }
+
+        while (this.sailboatCollisionParts.size() < wantedCount) {
+            SailboatCollisionPartEntity part = new SailboatCollisionPartEntity(this.level(), this);
+            part.setPartSize(this.getSailboatCollisionPartWidth(), this.getSailboatCollisionPartHeight());
+            part.setPos(this.getX(), this.getY(), this.getZ());
+            part.setYRot(this.getYRot());
+            part.setXRot(0.0F);
+            part.setDeltaMovement(Vec3.ZERO);
+
+            this.level().addFreshEntity(part);
+            this.sailboatCollisionParts.add(part);
+        }
+
+        float partWidth = this.getSailboatCollisionPartWidth();
+        float partHeight = this.getSailboatCollisionPartHeight();
+
+        double deckLength = this.getSailboatCollisionDeckLength();
+        double halfDeckLength = deckLength * 0.5D;
+        double halfPartWidth = partWidth * 0.5D;
+        double usableHalfLength = Math.max(0.0D, halfDeckLength - halfPartWidth);
+
+        double yawRadians = Math.toRadians(this.getYRot());
+
+        /*
+         * This follows the model's long X axis.
+         * If the line of hitboxes is sideways, swap this axis with the alternate one below.
+         */
+        double axisX = -Math.sin(yawRadians);
+        double axisZ = Math.cos(yawRadians);
+
+        /*
+         * Alternate axis:
+         * double axisX = -Math.sin(yawRadians);
+         * double axisZ = Math.cos(yawRadians);
+         * double axisX = Math.cos(yawRadians);
+            double axisZ = Math.sin(yawRadians);
+         */
+
+        int count = this.sailboatCollisionParts.size();
+
+        for (int i = 0; i < count; i++) {
+            SailboatCollisionPartEntity part = this.sailboatCollisionParts.get(i);
+
+            double along;
+
+            if (count <= 1) {
+                along = 0.0D;
+            } else {
+                double progress = (double) i / (double) (count - 1);
+                along = -usableHalfLength + progress * usableHalfLength * 2.0D;
+            }
+
+            double x = this.getX() + axisX * along;
+            double y = this.getY() + 0.02D;
+            double z = this.getZ() + axisZ * along;
+
+            part.setParentBoat(this);
+            part.setPartSize(partWidth, partHeight);
+            part.setPos(x, y, z);
+            part.setYRot(this.getYRot());
+            part.setXRot(0.0F);
+            part.setDeltaMovement(Vec3.ZERO);
+        }
+    }
+
+    private void removeSailboatCollisionParts() {
+        for (SailboatCollisionPartEntity part : this.sailboatCollisionParts) {
+            if (part != null && !part.isRemoved()) {
+                part.discard();
+            }
+        }
+
+        this.sailboatCollisionParts.clear();
+    }
+
+    @Override
+    public void tick() {
+        super.tick();
+
+        if (!this.level().isClientSide) {
+            this.updateSailboatCollisionParts();
+        }
+    }
+
+    @Override
+    public void remove(RemovalReason reason) {
+        super.remove(reason);
+        this.removeSailboatCollisionParts();
     }
 
     public int getChestCount() {
@@ -103,7 +340,7 @@ public class ModBoatEntity extends Boat implements Container {
     }
 
     public int getChestRows() {
-        return this.getChestCount() * 3;
+        return this.getChestCount() * ROWS_PER_CHEST;
     }
 
     public int getActiveSlotCount() {
@@ -221,6 +458,28 @@ public class ModBoatEntity extends Boat implements Container {
     public InteractionResult interact(Player player, InteractionHand hand) {
         ItemStack stack = player.getItemInHand(hand);
 
+        if (stack.getItem() instanceof BannerItem && player.isShiftKeyDown()) {
+            if (this.level().isClientSide) {
+                return InteractionResult.SUCCESS;
+            }
+
+            ItemStack oldBanner = this.getBannerStack();
+
+            if (!oldBanner.isEmpty()) {
+                this.spawnAtLocation(oldBanner.copy());
+            }
+
+            ItemStack newBanner = stack.copy();
+            newBanner.setCount(1);
+            this.setBannerStack(newBanner);
+
+            if (!player.getAbilities().instabuild) {
+                stack.shrink(1);
+            }
+
+            return InteractionResult.CONSUME;
+        }
+
         if (stack.is(Items.CHEST)) {
             if (this.level().isClientSide) {
                 return InteractionResult.SUCCESS;
@@ -240,28 +499,30 @@ public class ModBoatEntity extends Boat implements Container {
             return InteractionResult.CONSUME;
         }
 
-        if (stack.isEmpty() && player.isShiftKeyDown() && this.hasChest()) {
+        if (this.hasChest() && player.isShiftKeyDown()) {
             if (this.level().isClientSide) {
                 return InteractionResult.SUCCESS;
             }
 
-            if (!this.canRemoveLastChest()) {
-                player.displayClientMessage(Component.literal("That chest is not empty."), true);
+            if (stack.isEmpty()) {
+                if (this.canRemoveLastChest()) {
+                    this.removeLastChest();
+                    this.spawnAtLocation(Items.CHEST);
+                    return InteractionResult.CONSUME;
+                }
+
+                if (player instanceof ServerPlayer serverPlayer) {
+                    this.openChestInventory(serverPlayer);
+                }
+
                 return InteractionResult.CONSUME;
             }
 
-            this.removeLastChest();
-            this.spawnAtLocation(Items.CHEST);
-
-            return InteractionResult.CONSUME;
-        }
-
-        if (this.hasChest() && player.isShiftKeyDown()) {
-            if (!this.level().isClientSide && player instanceof ServerPlayer serverPlayer) {
+            if (player instanceof ServerPlayer serverPlayer) {
                 this.openChestInventory(serverPlayer);
             }
 
-            return InteractionResult.sidedSuccess(this.level().isClientSide);
+            return InteractionResult.CONSUME;
         }
 
         return super.interact(player, hand);
@@ -287,7 +548,7 @@ public class ModBoatEntity extends Boat implements Container {
         super.addAdditionalSaveData(tag);
 
         tag.putString("Type", this.getModVariant().getName());
-        tag.putInt("BannerCount", this.getBannerCount());
+        tag.putInt("BoatSizeTier", this.getBoatSizeTier());
         tag.putInt("ChestCount", this.getChestCount());
 
         ContainerHelper.saveAllItems(tag, this.inventory);
@@ -301,8 +562,10 @@ public class ModBoatEntity extends Boat implements Container {
             this.setModVariant(Boat.Type.byName(tag.getString("Type")));
         }
 
-        if (tag.contains("BannerCount")) {
-            this.setBannerCount(tag.getInt("BannerCount"));
+        if (tag.contains("BoatSizeTier")) {
+            this.setBoatSizeTier(tag.getInt("BoatSizeTier"));
+        } else if (tag.contains("BannerCount")) {
+            this.setBoatSizeTier(tag.getInt("BannerCount"));
         }
 
         this.inventory = NonNullList.withSize(MAX_SLOTS, ItemStack.EMPTY);
@@ -335,6 +598,8 @@ public class ModBoatEntity extends Boat implements Container {
         super.destroy(damageSource);
 
         if (!this.level().isClientSide) {
+            this.removeSailboatCollisionParts();
+
             Containers.dropContents(this.level(), this, this);
 
             for (int i = 0; i < chestCount; i++) {
