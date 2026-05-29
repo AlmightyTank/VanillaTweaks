@@ -66,6 +66,8 @@ public class ModBoatEntity extends Boat implements Container {
 
     private static final int EMPTY_SEAT = -1;
 
+    private static final double SPEED_PER_BANNER = 0.08D;
+
     private static final int ROWS_PER_CHEST = 2;
     private static final int SLOTS_PER_CHEST = ROWS_PER_CHEST * 9;
     private static final int MAX_CHESTS = 3;
@@ -124,6 +126,10 @@ public class ModBoatEntity extends Boat implements Container {
     public void setBoatSizeTier(int boatSizeTier) {
         this.entityData.set(DATA_BOAT_SIZE_TIER, Math.max(1, Math.min(3, boatSizeTier)));
 
+        if (!this.isLargeSailboat()) {
+            this.entityData.set(DATA_SECOND_BANNER_STACK, ItemStack.EMPTY);
+        }
+
         if (!this.level().isClientSide) {
             this.updateSailboatCollisionParts();
         }
@@ -163,15 +169,22 @@ public class ModBoatEntity extends Boat implements Container {
             return ItemStack.EMPTY;
         }
 
-        return this.getBannerStack();
+        return this.entityData.get(DATA_SECOND_BANNER_STACK);
     }
 
     public void setSecondBannerStack(ItemStack stack) {
-        this.setBannerStack(stack);
+        if (!this.isLargeSailboat() || stack.isEmpty()) {
+            this.entityData.set(DATA_SECOND_BANNER_STACK, ItemStack.EMPTY);
+            return;
+        }
+
+        ItemStack copy = stack.copy();
+        copy.setCount(1);
+        this.entityData.set(DATA_SECOND_BANNER_STACK, copy);
     }
 
     public boolean hasSecondBanner() {
-        return this.isLargeSailboat() && this.hasBanner();
+        return !this.getSecondBannerStack().isEmpty();
     }
 
     public boolean isMediumSailboat() {
@@ -188,6 +201,24 @@ public class ModBoatEntity extends Boat implements Container {
 
     public int getBannerSlotCount() {
         return this.isLargeSailboat() ? 2 : 1;
+    }
+
+    public int getActiveBannerCount() {
+        int count = 0;
+
+        if (!this.getBannerStack().isEmpty()) {
+            count++;
+        }
+
+        if (this.isLargeSailboat() && !this.getSecondBannerStack().isEmpty()) {
+            count++;
+        }
+
+        return count;
+    }
+
+    public double getBannerSpeedMultiplier() {
+        return 1.0D + (this.getActiveBannerCount() * SPEED_PER_BANNER);
     }
 
     private int getSailboatCollisionPartCount() {
@@ -1005,15 +1036,22 @@ public class ModBoatEntity extends Boat implements Container {
                 return InteractionResult.SUCCESS;
             }
 
-            ItemStack oldBanner = this.getBannerStack();
-
-            if (!oldBanner.isEmpty()) {
-                this.spawnAtLocation(oldBanner.copy());
-            }
-
             ItemStack newBanner = stack.copy();
             newBanner.setCount(1);
-            this.setBannerStack(newBanner);
+
+            if (this.getBannerStack().isEmpty()) {
+                this.setBannerStack(newBanner);
+            } else if (this.isLargeSailboat() && this.getSecondBannerStack().isEmpty()) {
+                this.setSecondBannerStack(newBanner);
+            } else {
+                ItemStack oldBanner = this.getBannerStack();
+
+                if (!oldBanner.isEmpty()) {
+                    this.spawnAtLocation(oldBanner.copy());
+                }
+
+                this.setBannerStack(newBanner);
+            }
 
             if (!player.getAbilities().instabuild) {
                 stack.shrink(1);
@@ -1093,6 +1131,14 @@ public class ModBoatEntity extends Boat implements Container {
         tag.putInt("BoatSizeTier", this.getBoatSizeTier());
         tag.putInt("ChestCount", this.getChestCount());
 
+        if (!this.getBannerStack().isEmpty()) {
+            tag.put("BannerStack", this.getBannerStack().save(new CompoundTag()));
+        }
+
+        if (!this.getSecondBannerStack().isEmpty()) {
+            tag.put("SecondBannerStack", this.getSecondBannerStack().save(new CompoundTag()));
+        }
+
         ContainerHelper.saveAllItems(tag, this.inventory);
     }
 
@@ -1108,6 +1154,18 @@ public class ModBoatEntity extends Boat implements Container {
             this.setBoatSizeTier(tag.getInt("BoatSizeTier"));
         } else if (tag.contains("BannerCount")) {
             this.setBoatSizeTier(tag.getInt("BannerCount"));
+        }
+
+        if (tag.contains("BannerStack", 10)) {
+            this.setBannerStack(ItemStack.of(tag.getCompound("BannerStack")));
+        } else {
+            this.setBannerStack(ItemStack.EMPTY);
+        }
+
+        if (tag.contains("SecondBannerStack", 10)) {
+            this.setSecondBannerStack(ItemStack.of(tag.getCompound("SecondBannerStack")));
+        } else {
+            this.setSecondBannerStack(ItemStack.EMPTY);
         }
 
         this.inventory = NonNullList.withSize(MAX_SLOTS, ItemStack.EMPTY);
@@ -1136,11 +1194,21 @@ public class ModBoatEntity extends Boat implements Container {
     @Override
     public void destroy(DamageSource damageSource) {
         int chestCount = this.getChestCount();
+        ItemStack bannerStack = this.getBannerStack().copy();
+        ItemStack secondBannerStack = this.getSecondBannerStack().copy();
 
         super.destroy(damageSource);
 
         if (!this.level().isClientSide) {
             this.removeSailboatCollisionParts();
+
+            if (!bannerStack.isEmpty()) {
+                this.spawnAtLocation(bannerStack);
+            }
+
+            if (!secondBannerStack.isEmpty()) {
+                this.spawnAtLocation(secondBannerStack);
+            }
 
             Containers.dropContents(this.level(), this, this);
 
