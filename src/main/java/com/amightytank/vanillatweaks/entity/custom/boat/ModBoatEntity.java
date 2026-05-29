@@ -21,6 +21,7 @@ import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.entity.vehicle.Boat;
 import net.minecraft.world.item.BannerItem;
@@ -72,6 +73,8 @@ public class ModBoatEntity extends Boat implements Container {
 
     private NonNullList<ItemStack> inventory = NonNullList.withSize(MAX_SLOTS, ItemStack.EMPTY);
     private final List<SailboatCollisionPartEntity> sailboatCollisionParts = new ArrayList<>();
+
+    private boolean frontPlayerPressingForward;
 
     public ModBoatEntity(EntityType<? extends Boat> entityType, Level level) {
         super(entityType, level);
@@ -338,10 +341,34 @@ public class ModBoatEntity extends Boat implements Container {
     public void tick() {
         super.tick();
 
+        SailboatRowingPhysics.apply(
+                this,
+                this.frontPlayerPressingForward,
+                this.isMediumSailboat(),
+                this.isLargeSailboat()
+        );
+
         if (!this.level().isClientSide) {
             this.updateSailboatCollisionParts();
             this.normalizeSailboatSeatSlots();
         }
+    }
+
+    @Override
+    public void setInput(boolean left, boolean right, boolean forward, boolean back) {
+        super.setInput(left, right, forward, back);
+        this.frontPlayerPressingForward = forward;
+    }
+
+    @Override
+    public LivingEntity getControllingPassenger() {
+        Entity frontPassenger = this.getPassengerInSailboatSeat(0);
+
+        if (frontPassenger instanceof Player player && !player.isSpectator()) {
+            return player;
+        }
+
+        return null;
     }
 
     @Override
@@ -399,6 +426,46 @@ public class ModBoatEntity extends Boat implements Container {
         return Math.max(1, this.getBasePassengerSlots() - this.getChestCount());
     }
 
+    public int getSailboatPassengerLimit() {
+        return this.getMaxPassengers();
+    }
+
+    public boolean hasOpenSailboatSeat() {
+        return this.getPassengers().size() < this.getSailboatPassengerLimit();
+    }
+
+    public boolean addMobToSailboat(Mob mob) {
+        if (this.level().isClientSide) {
+            return false;
+        }
+
+        if (mob == null || !mob.isAlive()) {
+            return false;
+        }
+
+        if (!this.hasOpenSailboatSeat()) {
+            return false;
+        }
+
+        if (mob.getVehicle() != null) {
+            mob.stopRiding();
+        }
+
+        mob.setPos(this.getX(), this.getY() + 0.25D, this.getZ());
+        mob.setYRot(this.getYRot());
+        mob.setXRot(0.0F);
+        mob.setYHeadRot(this.getYRot());
+        mob.setDeltaMovement(Vec3.ZERO);
+
+        boolean mounted = mob.startRiding(this, true);
+
+        if (mounted) {
+            this.normalizeSailboatSeatSlots();
+        }
+
+        return mounted;
+    }
+
     @Override
     protected void positionRider(Entity passenger, Entity.MoveFunction callback) {
         if (!this.hasPassenger(passenger)) {
@@ -449,8 +516,17 @@ public class ModBoatEntity extends Boat implements Container {
     }
 
     private Vec3 applyBoatTypeSeatOffset(Vec3 seatOffset) {
+
         if (this.isBambooSailboat()) {
-            return seatOffset.add(0.0D, -0.12D, 0.0D);
+            if (this.isLargeSailboat()) {
+                return seatOffset.add(0.0D, -0.2D, 0.0D);
+            }
+            if  (this.isMediumSailboat()) {
+                return seatOffset.add(0.0D, -0.2D, 0.0D);
+            }
+            else {
+                return seatOffset.add(0.0D, -0.2D, 0.0D);
+            }
         }
 
         return seatOffset;
@@ -458,43 +534,52 @@ public class ModBoatEntity extends Boat implements Container {
 
     private Vec3 getSmallSailboatSeatOffset(int index, int chestCount) {
         double y = -0.35D;
+        double SmallSailboatFirstPos = 0.25D;
+        double SmallSailboatSecondPos = -0.45D;
 
         if (chestCount > 0) {
-            return new Vec3(0.0D, y, 0.25D);
+            return new Vec3(0.0D, y, SmallSailboatFirstPos);
         }
 
         return switch (index) {
-            case 0 -> new Vec3(0.0D, y, 0.35D);
-            case 1 -> new Vec3(0.0D, y, -0.45D);
+            case 0 -> new Vec3(0.0D, y, SmallSailboatFirstPos);
+            case 1 -> new Vec3(0.0D, y, SmallSailboatSecondPos);
             default -> Vec3.ZERO;
         };
     }
 
     private Vec3 getMediumSailboatSeatOffset(int index, int chestCount) {
         double y = -0.32D;
+        double MediumSailboatFirstPos = 0.95D;
+        double MediumSailboatSecondPos = -1.15D;
+        double MediumSailboatThirdPos = -1.75D;
 
         if (chestCount >= 2) {
-            return new Vec3(0.0D, y, 0.95D);
+            return new Vec3(0.0D, y, MediumSailboatFirstPos);
         }
 
         if (chestCount == 1) {
             return switch (index) {
-                case 0 -> new Vec3(0.0D, y, 0.95D);
-                case 1 -> new Vec3(0.0D, y, -1.35D);
+                case 0 -> new Vec3(0.0D, y, MediumSailboatFirstPos);
+                case 1 -> new Vec3(0.0D, y, MediumSailboatSecondPos);
                 default -> Vec3.ZERO;
             };
         }
 
         return switch (index) {
-            case 0 -> new Vec3(0.0D, y, 0.95D);
-            case 1 -> new Vec3(0.0D, y, -1.35D);
-            case 2 -> new Vec3(0.0D, y, -0.95D);
+            case 0 -> new Vec3(0.0D, y, MediumSailboatFirstPos);
+            case 1 -> new Vec3(0.0D, y, MediumSailboatSecondPos);
+            case 2 -> new Vec3(0.0D, y, MediumSailboatThirdPos);
             default -> Vec3.ZERO;
         };
     }
 
     private Vec3 getLargeSailboatSeatOffset(int index, int chestCount) {
         double y = -0.30D;
+        double LargeSailboatFirstPos = 1.25D;
+        double LargeSailboatSecondPos = -0.15D;
+        double LargeSailboatThirdPos = -1.75D;
+        double LargeSailboatFourthPos = -2.35D;
 
         if (chestCount >= 3) {
             return new Vec3(0.0D, y, 0.85D);
@@ -502,26 +587,26 @@ public class ModBoatEntity extends Boat implements Container {
 
         if (chestCount == 2) {
             return switch (index) {
-                case 0 -> new Vec3(-0.35D, y, 0.85D);
-                case 1 -> new Vec3(0.35D, y, 1.10D);
+                case 0 -> new Vec3(0.0D, y, LargeSailboatFirstPos);
+                case 1 -> new Vec3(0.0D, y, LargeSailboatSecondPos);
                 default -> Vec3.ZERO;
             };
         }
 
         if (chestCount == 1) {
             return switch (index) {
-                case 0 -> new Vec3(0.0D, y, 0.85D);
-                case 1 -> new Vec3(-0.35D, y, 0.25D);
-                case 2 -> new Vec3(0.35D, y, 0.25D);
+                case 0 -> new Vec3(0.0D, y, LargeSailboatFirstPos);
+                case 1 -> new Vec3(0.0D, y, LargeSailboatSecondPos);
+                case 2 -> new Vec3(0.0D, y, LargeSailboatThirdPos);
                 default -> Vec3.ZERO;
             };
         }
 
         return switch (index) {
-            case 0 -> new Vec3(0.0D, y, 0.85D);
-            case 1 -> new Vec3(0.0D, y, 0.45D);
-            case 2 -> new Vec3(0.0D, y, -1.00D);
-            case 3 -> new Vec3(0.0D, y, -1.45D);
+            case 0 -> new Vec3(0.0D, y, LargeSailboatFirstPos);
+            case 1 -> new Vec3(0.0D, y, LargeSailboatSecondPos);
+            case 2 -> new Vec3(0.0D, y, LargeSailboatThirdPos);
+            case 3 -> new Vec3(0.0D, y, LargeSailboatFourthPos);
             default -> Vec3.ZERO;
         };
     }
@@ -624,6 +709,22 @@ public class ModBoatEntity extends Boat implements Container {
                 this.setSeatEntityId(emptySeat, passenger.getId());
             }
         }
+    }
+
+    private Entity getPassengerInSailboatSeat(int seatIndex) {
+        int entityId = this.getSeatEntityId(seatIndex);
+
+        if (entityId == EMPTY_SEAT) {
+            return null;
+        }
+
+        for (Entity passenger : this.getPassengers()) {
+            if (passenger.getId() == entityId) {
+                return passenger;
+            }
+        }
+
+        return null;
     }
 
     private int getPassengerSeatIndex(Entity passenger) {
