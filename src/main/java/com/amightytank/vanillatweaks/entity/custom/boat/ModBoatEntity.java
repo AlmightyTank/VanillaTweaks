@@ -71,10 +71,17 @@ public class ModBoatEntity extends Boat implements Container {
     private static final int MAX_CHESTS = 3;
     private static final int MAX_SLOTS = SLOTS_PER_CHEST * MAX_CHESTS;
 
+    private boolean frontPlayerPressingForward;
+
+    private boolean sailboatInputLeft;
+    private boolean sailboatInputRight;
+    private boolean sailboatInputForward;
+    private boolean sailboatInputBack;
+
+    private float sailboatTurnVelocity;
+
     private NonNullList<ItemStack> inventory = NonNullList.withSize(MAX_SLOTS, ItemStack.EMPTY);
     private final List<SailboatCollisionPartEntity> sailboatCollisionParts = new ArrayList<>();
-
-    private boolean frontPlayerPressingForward;
 
     public ModBoatEntity(EntityType<? extends Boat> entityType, Level level) {
         super(entityType, level);
@@ -341,6 +348,8 @@ public class ModBoatEntity extends Boat implements Container {
     public void tick() {
         super.tick();
 
+        this.applySmoothSailboatTurning();
+
         SailboatRowingPhysics.apply(
                 this,
                 this.frontPlayerPressingForward,
@@ -356,8 +365,104 @@ public class ModBoatEntity extends Boat implements Container {
 
     @Override
     public void setInput(boolean left, boolean right, boolean forward, boolean back) {
-        super.setInput(left, right, forward, back);
+        this.sailboatInputLeft = left;
+        this.sailboatInputRight = right;
+        this.sailboatInputForward = forward;
+        this.sailboatInputBack = back;
+
         this.frontPlayerPressingForward = forward;
+
+        /*
+         * Keep vanilla forward/back movement.
+         * Disable vanilla left/right turning because we handle turning smoothly ourselves.
+         */
+        super.setInput(false, false, forward, back);
+    }
+
+    private void applySmoothSailboatTurning() {
+        if (!this.isVehicle()) {
+            this.sailboatTurnVelocity *= 0.75F;
+            return;
+        }
+
+        if (this.getControllingPassenger() == null) {
+            this.sailboatTurnVelocity *= 0.75F;
+            return;
+        }
+
+        float direction = 0.0F;
+
+        if (this.sailboatInputLeft && !this.sailboatInputRight) {
+            direction = -1.0F;
+        } else if (this.sailboatInputRight && !this.sailboatInputLeft) {
+            direction = 1.0F;
+        }
+
+        float maxTurnSpeed = this.getMaxSmoothTurnSpeed();
+        float turnAcceleration = this.getSmoothTurnAcceleration();
+        float turnDrag = this.getSmoothTurnDrag();
+
+        /*
+         * Standing still should not spin the boat like a top.
+         * Forward/back input gives the rudder more bite.
+         */
+        if (!this.sailboatInputForward && !this.sailboatInputBack) {
+            maxTurnSpeed *= 0.35F;
+            turnAcceleration *= 0.45F;
+        }
+
+        if (direction != 0.0F) {
+            this.sailboatTurnVelocity += direction * turnAcceleration;
+            this.sailboatTurnVelocity = Mth.clamp(
+                    this.sailboatTurnVelocity,
+                    -maxTurnSpeed,
+                    maxTurnSpeed
+            );
+        } else {
+            this.sailboatTurnVelocity *= turnDrag;
+        }
+
+        if (Math.abs(this.sailboatTurnVelocity) < 0.01F) {
+            this.sailboatTurnVelocity = 0.0F;
+        }
+
+        this.setYRot(this.getYRot() + this.sailboatTurnVelocity);
+    }
+
+    private float getMaxSmoothTurnSpeed() {
+        if (this.isLargeSailboat()) {
+            return 2.4F;
+        }
+
+        if (this.isMediumSailboat()) {
+            return 3.8F;
+        }
+
+        return 6.5F;
+    }
+
+    private float getSmoothTurnAcceleration() {
+        if (this.isLargeSailboat()) {
+            return 0.12F;
+        }
+
+        if (this.isMediumSailboat()) {
+            return 0.22F;
+        }
+
+        return 0.38F;
+    }
+
+    private float getSmoothTurnDrag() {
+        if (this.isLargeSailboat()) {
+            return 0.92F;
+        }
+
+        if (this.isMediumSailboat()) {
+            return 0.88F;
+        }
+
+        return 0.82F;
     }
 
     @Override
