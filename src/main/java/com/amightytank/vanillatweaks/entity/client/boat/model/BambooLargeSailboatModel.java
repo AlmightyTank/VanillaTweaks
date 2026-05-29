@@ -91,8 +91,8 @@ public class BambooLargeSailboatModel extends ListModel<ModBoatEntity> implement
 				.texOffs(144, 196).addBox(-1.001F, -3.0F, 8.0F, 1.0F, 6.0F, 7.0F, new CubeDeformation(0.0F)), PartPose.offsetAndRotation(12.6724F, 14.0F, -26.4908F, 2.1642F, 0.8727F, 2.8798F));
 
 		PartDefinition banner_sail_front = partdefinition.addOrReplaceChild("banner_sail_front", CubeListBuilder.create().texOffs(146, 106).addBox(-1.0F, -60.0F, -5.0F, 2.0F, 60.0F, 2.0F, new CubeDeformation(0.0F))
-				.texOffs(158, 230).addBox(-7.0F, -61.0F, -4.0F, 14.0F, 1.0F, 1.0F, new CubeDeformation(0.0F))
-				.texOffs(222, 168).addBox(-7.0F, -36.0F, -4.0F, 14.0F, 1.0F, 1.0F, new CubeDeformation(0.0F)), PartPose.offsetAndRotation(0.6724F, 23.0F, -17.4908F, -3.1416F, 0.0F, -3.1416F));
+				.texOffs(214, 196).addBox(-7.0F, -61.0F, -4.0F, 14.0F, 1.0F, 1.0F, new CubeDeformation(0.0F))
+				.texOffs(214, 196).addBox(-7.0F, -36.0F, -4.0F, 14.0F, 1.0F, 1.0F, new CubeDeformation(0.0F)), PartPose.offsetAndRotation(0.6724F, 23.0F, -17.4908F, -3.1416F, 0.0F, -3.1416F));
 
 		PartDefinition banner_panel_front = partdefinition.addOrReplaceChild("banner_panel_front", CubeListBuilder.create().texOffs(184, 196).addBox(-7.0F, -13.0F, -0.5F, 14.0F, 26.0F, 1.0F, new CubeDeformation(0.0F)), PartPose.offsetAndRotation(0.6724F, -25.0F, -14.9908F, 0.0F, 0.0F, 0.0F));
 
