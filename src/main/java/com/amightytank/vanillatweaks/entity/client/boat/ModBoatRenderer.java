@@ -2,10 +2,7 @@ package com.amightytank.vanillatweaks.entity.client.boat;
 
 import com.amightytank.vanillatweaks.VanillaTweaks;
 import com.amightytank.vanillatweaks.entity.client.ModModelLayers;
-import com.amightytank.vanillatweaks.entity.client.boat.model.BoatBannerModel;
-import com.amightytank.vanillatweaks.entity.client.boat.model.LargeSailboatModel;
-import com.amightytank.vanillatweaks.entity.client.boat.model.MediumSailboatModel;
-import com.amightytank.vanillatweaks.entity.client.boat.model.SmallSailboatModel;
+import com.amightytank.vanillatweaks.entity.client.boat.model.*;
 import com.amightytank.vanillatweaks.entity.custom.boat.ModBoatEntity;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
@@ -48,19 +45,22 @@ public class ModBoatRenderer extends EntityRenderer<ModBoatEntity> {
      *
      * These offsets move the vanilla banner cloth into the banner_panel rectangle.
      */
-    private static final double BANNER_PANEL_X_OFFSET = -0.035D;
-    private static final double BANNER_PANEL_Y_OFFSET = -0.8D;
-    private static final double BANNER_PANEL_Z_OFFSET = -0.004D;
+    private static final double BANNER_PANEL_X_OFFSET = -0.029D;
+    private static final double BANNER_PANEL_Y_OFFSET = -0.813D;
+    private static final double BANNER_PANEL_Z_OFFSET = -0.02D;
 
     // Large sailboat banner offset.
-// Tweak these 3 values until the banner sits perfectly inside the large banner_panel.
     private static final double LARGE_BANNER_PANEL_X_OFFSET = -0.001D;
-    private static final double LARGE_BANNER_PANEL_Y_OFFSET = -0.85D;
+    private static final double LARGE_BANNER_PANEL_Y_OFFSET = -0.815D;
     private static final double LARGE_BANNER_PANEL_Z_OFFSET = -0.05D;
 
     private final EntityModel<ModBoatEntity> smallSailboatModel;
     private final EntityModel<ModBoatEntity> mediumSailboatModel;
     private final EntityModel<ModBoatEntity> largeSailboatModel;
+
+    private final BambooSailboatModel bambooSailboatModel;
+    private final BambooMediumSailboatModel bambooMediumSailboatModel;
+    private final BambooLargeSailboatModel bambooLargeSailboatModel;
 
     private final ModelPart bannerFlag;
     private final ModelPart bannerPole;
@@ -70,9 +70,14 @@ public class ModBoatRenderer extends EntityRenderer<ModBoatEntity> {
         super(context);
         this.shadowRadius = 0.8F;
 
+
         this.smallSailboatModel = new SmallSailboatModel(context.bakeLayer(ModModelLayers.SAILBOAT_LAYER));
         this.mediumSailboatModel = new MediumSailboatModel(context.bakeLayer(ModModelLayers.MEDIUM_SAILBOAT_LAYER));
         this.largeSailboatModel = new LargeSailboatModel(context.bakeLayer(ModModelLayers.LARGE_SAILBOAT_LAYER));
+
+        this.bambooSailboatModel = new BambooSailboatModel(context.bakeLayer(ModModelLayers.BAMBOO_SAILBOAT_LAYER));
+        this.bambooMediumSailboatModel = new BambooMediumSailboatModel(context.bakeLayer(ModModelLayers.BAMBOO_MEDIUM_SAILBOAT_LAYER));
+        this.bambooLargeSailboatModel = new BambooLargeSailboatModel(context.bakeLayer(ModModelLayers.BAMBOO_LARGE_SAILBOAT_LAYER));
 
         ModelPart bannerRoot = context.bakeLayer(ModelLayers.BANNER);
         this.bannerFlag = bannerRoot.getChild("flag");
@@ -218,6 +223,18 @@ public class ModBoatRenderer extends EntityRenderer<ModBoatEntity> {
     }
 
     private EntityModel<ModBoatEntity> getModel(ModBoatEntity boat) {
+        if (boat.isBambooSailboat()) {
+            if (boat.isLargeSailboat()) {
+                return this.bambooLargeSailboatModel;
+            }
+
+            if (boat.isMediumSailboat()) {
+                return this.bambooMediumSailboatModel;
+            }
+
+            return this.bambooSailboatModel;
+        }
+
         if (boat.isLargeSailboat()) {
             return this.largeSailboatModel;
         }
@@ -275,37 +292,50 @@ public class ModBoatRenderer extends EntityRenderer<ModBoatEntity> {
 
     @Override
     public ResourceLocation getTextureLocation(ModBoatEntity boat) {
-        Boat.Type type = boat.getModVariant();
+        if (boat.isBambooSailboat()) {
+            if (boat.isLargeSailboat()) {
+                return BAMBOO_LARGE_SAILBOAT_TEXTURE;
+            }
+
+            if (boat.isMediumSailboat()) {
+                return BAMBOO_MEDIUM_SAILBOAT_TEXTURE;
+            }
+
+            return BAMBOO_SAILBOAT_TEXTURE;
+        }
+
+        return getNormalSailboatTexture(boat);
+    }
+
+    private ResourceLocation getNormalSailboatTexture(ModBoatEntity boat) {
+        String woodName = boat.getModVariant().getName();
 
         if (boat.isLargeSailboat()) {
-            return largeTexture(type);
+            return new ResourceLocation(
+                    VanillaTweaks.MOD_ID,
+                    "textures/entity/boat/large_sailboat/" + woodName + ".png"
+            );
         }
 
         if (boat.isMediumSailboat()) {
-            return mediumTexture(type);
+            return new ResourceLocation(
+                    VanillaTweaks.MOD_ID,
+                    "textures/entity/boat/medium_sailboat/" + woodName + ".png"
+            );
         }
 
-        return smallTexture(type);
-    }
-
-    private static ResourceLocation smallTexture(Boat.Type type) {
         return new ResourceLocation(
                 VanillaTweaks.MOD_ID,
-                "textures/entity/boat/sailboat/" + type.getName() + ".png"
+                "textures/entity/boat/sailboat/" + woodName + ".png"
         );
     }
 
-    private static ResourceLocation mediumTexture(Boat.Type type) {
-        return new ResourceLocation(
-                VanillaTweaks.MOD_ID,
-                "textures/entity/boat/medium_sailboat/" + type.getName() + ".png"
-        );
-    }
+    private static final ResourceLocation BAMBOO_SAILBOAT_TEXTURE =
+            new ResourceLocation(VanillaTweaks.MOD_ID, "textures/entity/boat/sailboat/bamboo.png");
 
-    private static ResourceLocation largeTexture(Boat.Type type) {
-        return new ResourceLocation(
-                VanillaTweaks.MOD_ID,
-                "textures/entity/boat/large_sailboat/" + type.getName() + ".png"
-        );
-    }
+    private static final ResourceLocation BAMBOO_MEDIUM_SAILBOAT_TEXTURE =
+            new ResourceLocation(VanillaTweaks.MOD_ID, "textures/entity/boat/medium_sailboat/bamboo.png");
+
+    private static final ResourceLocation BAMBOO_LARGE_SAILBOAT_TEXTURE =
+            new ResourceLocation(VanillaTweaks.MOD_ID, "textures/entity/boat/large_sailboat/bamboo.png");
 }

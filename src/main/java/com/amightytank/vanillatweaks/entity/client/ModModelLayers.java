@@ -9,6 +9,10 @@ public class ModModelLayers {
     public static final ModelLayerLocation MEDIUM_SAILBOAT_LAYER = create("boat/medium_sailboat");
     public static final ModelLayerLocation LARGE_SAILBOAT_LAYER = create("boat/large_sailboat");
 
+    public static final ModelLayerLocation BAMBOO_SAILBOAT_LAYER = create("boat/bamboo_sailboat");
+    public static final ModelLayerLocation BAMBOO_MEDIUM_SAILBOAT_LAYER = create("boat/bamboo_medium_sailboat");
+    public static final ModelLayerLocation BAMBOO_LARGE_SAILBOAT_LAYER = create("boat/bamboo_large_sailboat");
+
     public static final ModelLayerLocation KRAKEN_TENTACLE_LAYER = create("entity/pirate/kraken_tentacle");
     public static final ModelLayerLocation PIRATE_CAPTAIN_LAYER = create("entity/pirate/pirate_captain");
 

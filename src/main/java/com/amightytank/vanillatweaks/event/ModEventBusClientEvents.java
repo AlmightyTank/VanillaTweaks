@@ -23,6 +23,10 @@ public class ModEventBusClientEvents {
         event.registerLayerDefinition(ModModelLayers.MEDIUM_SAILBOAT_LAYER, MediumSailboatModel::createBodyLayer);
         event.registerLayerDefinition(ModModelLayers.LARGE_SAILBOAT_LAYER, LargeSailboatModel::createBodyLayer);
 
+        event.registerLayerDefinition(ModModelLayers.BAMBOO_SAILBOAT_LAYER, BambooSailboatModel::createBodyLayer);
+        event.registerLayerDefinition(ModModelLayers.BAMBOO_MEDIUM_SAILBOAT_LAYER, BambooMediumSailboatModel::createBodyLayer);
+        event.registerLayerDefinition(ModModelLayers.BAMBOO_LARGE_SAILBOAT_LAYER, BambooLargeSailboatModel::createBodyLayer);
+
         event.registerLayerDefinition(ModModelLayers.KRAKEN_TENTACLE_LAYER, KrakenTentacleModel::createBodyLayer);
         event.registerLayerDefinition(ModModelLayers.PIRATE_CAPTAIN_LAYER, PirateCaptainModel::createBodyLayer);
         event.registerLayerDefinition(ModModelLayers.SHOULDER_PIRATE_PARROT_LAYER, ShoulderPirateParrotModel::createBodyLayer);

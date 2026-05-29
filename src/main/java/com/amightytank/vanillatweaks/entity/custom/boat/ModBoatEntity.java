@@ -51,6 +51,20 @@ public class ModBoatEntity extends Boat implements Container {
     private static final EntityDataAccessor<Integer> DATA_CHEST_COUNT =
             SynchedEntityData.defineId(ModBoatEntity.class, EntityDataSerializers.INT);
 
+    private static final EntityDataAccessor<Integer> DATA_SEAT_0 =
+            SynchedEntityData.defineId(ModBoatEntity.class, EntityDataSerializers.INT);
+
+    private static final EntityDataAccessor<Integer> DATA_SEAT_1 =
+            SynchedEntityData.defineId(ModBoatEntity.class, EntityDataSerializers.INT);
+
+    private static final EntityDataAccessor<Integer> DATA_SEAT_2 =
+            SynchedEntityData.defineId(ModBoatEntity.class, EntityDataSerializers.INT);
+
+    private static final EntityDataAccessor<Integer> DATA_SEAT_3 =
+            SynchedEntityData.defineId(ModBoatEntity.class, EntityDataSerializers.INT);
+
+    private static final int EMPTY_SEAT = -1;
+
     private static final int ROWS_PER_CHEST = 2;
     private static final int SLOTS_PER_CHEST = ROWS_PER_CHEST * 9;
     private static final int MAX_CHESTS = 3;
@@ -79,6 +93,10 @@ public class ModBoatEntity extends Boat implements Container {
         this.entityData.define(DATA_BANNER_STACK, ItemStack.EMPTY);
         this.entityData.define(DATA_SECOND_BANNER_STACK, ItemStack.EMPTY);
         this.entityData.define(DATA_CHEST_COUNT, 0);
+        this.entityData.define(DATA_SEAT_0, EMPTY_SEAT);
+        this.entityData.define(DATA_SEAT_1, EMPTY_SEAT);
+        this.entityData.define(DATA_SEAT_2, EMPTY_SEAT);
+        this.entityData.define(DATA_SEAT_3, EMPTY_SEAT);
     }
 
     public Boat.Type getModVariant() {
@@ -152,6 +170,10 @@ public class ModBoatEntity extends Boat implements Container {
 
     public boolean isLargeSailboat() {
         return this.getBoatSizeTier() >= 3;
+    }
+
+    public boolean isBambooSailboat() {
+        return this.getModVariant() == Boat.Type.BAMBOO;
     }
 
     public int getBannerSlotCount() {
@@ -318,6 +340,7 @@ public class ModBoatEntity extends Boat implements Container {
 
         if (!this.level().isClientSide) {
             this.updateSailboatCollisionParts();
+            this.normalizeSailboatSeatSlots();
         }
     }
 
@@ -374,6 +397,319 @@ public class ModBoatEntity extends Boat implements Container {
     @Override
     protected int getMaxPassengers() {
         return Math.max(1, this.getBasePassengerSlots() - this.getChestCount());
+    }
+
+    @Override
+    protected void positionRider(Entity passenger, Entity.MoveFunction callback) {
+        if (!this.hasPassenger(passenger)) {
+            return;
+        }
+
+        int passengerIndex = this.getPassengerSeatIndex(passenger);
+        Vec3 seatOffset = this.getSailboatSeatOffset(passengerIndex);
+
+        double yawRadians = Math.toRadians(this.getYRot());
+
+        /*
+         * seatOffset.x = left/right
+         * seatOffset.y = up/down
+         * seatOffset.z = front/back
+         */
+        double rotatedX = seatOffset.x * Math.cos(yawRadians) - seatOffset.z * Math.sin(yawRadians);
+        double rotatedZ = seatOffset.x * Math.sin(yawRadians) + seatOffset.z * Math.cos(yawRadians);
+
+        double riderY = this.getY() + this.getPassengersRidingOffset() + seatOffset.y;
+
+        callback.accept(
+                passenger,
+                this.getX() + rotatedX,
+                riderY,
+                this.getZ() + rotatedZ
+        );
+        float yawDelta = Mth.wrapDegrees(this.getYRot() - this.yRotO);
+
+        passenger.setYRot(passenger.getYRot() + yawDelta);
+        passenger.setYHeadRot(passenger.getYHeadRot() + yawDelta);
+    }
+
+    private Vec3 getSailboatSeatOffset(int index) {
+        int chestCount = this.getChestCount();
+
+        Vec3 seatOffset;
+
+        if (this.isLargeSailboat()) {
+            seatOffset = getLargeSailboatSeatOffset(index, chestCount);
+        } else if (this.isMediumSailboat()) {
+            seatOffset = getMediumSailboatSeatOffset(index, chestCount);
+        } else {
+            seatOffset = getSmallSailboatSeatOffset(index, chestCount);
+        }
+
+        return applyBoatTypeSeatOffset(seatOffset);
+    }
+
+    private Vec3 applyBoatTypeSeatOffset(Vec3 seatOffset) {
+        if (this.isBambooSailboat()) {
+            return seatOffset.add(0.0D, -0.12D, 0.0D);
+        }
+
+        return seatOffset;
+    }
+
+    private Vec3 getSmallSailboatSeatOffset(int index, int chestCount) {
+        double y = -0.35D;
+
+        if (chestCount > 0) {
+            return new Vec3(0.0D, y, 0.25D);
+        }
+
+        return switch (index) {
+            case 0 -> new Vec3(0.0D, y, 0.35D);
+            case 1 -> new Vec3(0.0D, y, -0.45D);
+            default -> Vec3.ZERO;
+        };
+    }
+
+    private Vec3 getMediumSailboatSeatOffset(int index, int chestCount) {
+        double y = -0.32D;
+
+        if (chestCount >= 2) {
+            return new Vec3(0.0D, y, 0.95D);
+        }
+
+        if (chestCount == 1) {
+            return switch (index) {
+                case 0 -> new Vec3(0.0D, y, 0.95D);
+                case 1 -> new Vec3(0.0D, y, -1.35D);
+                default -> Vec3.ZERO;
+            };
+        }
+
+        return switch (index) {
+            case 0 -> new Vec3(0.0D, y, 0.95D);
+            case 1 -> new Vec3(0.0D, y, -1.35D);
+            case 2 -> new Vec3(0.0D, y, -0.95D);
+            default -> Vec3.ZERO;
+        };
+    }
+
+    private Vec3 getLargeSailboatSeatOffset(int index, int chestCount) {
+        double y = -0.30D;
+
+        if (chestCount >= 3) {
+            return new Vec3(0.0D, y, 0.85D);
+        }
+
+        if (chestCount == 2) {
+            return switch (index) {
+                case 0 -> new Vec3(-0.35D, y, 0.85D);
+                case 1 -> new Vec3(0.35D, y, 1.10D);
+                default -> Vec3.ZERO;
+            };
+        }
+
+        if (chestCount == 1) {
+            return switch (index) {
+                case 0 -> new Vec3(0.0D, y, 0.85D);
+                case 1 -> new Vec3(-0.35D, y, 0.25D);
+                case 2 -> new Vec3(0.35D, y, 0.25D);
+                default -> Vec3.ZERO;
+            };
+        }
+
+        return switch (index) {
+            case 0 -> new Vec3(0.0D, y, 0.85D);
+            case 1 -> new Vec3(0.0D, y, 0.45D);
+            case 2 -> new Vec3(0.0D, y, -1.00D);
+            case 3 -> new Vec3(0.0D, y, -1.45D);
+            default -> Vec3.ZERO;
+        };
+    }
+
+    private int getSeatEntityId(int seatIndex) {
+        return switch (seatIndex) {
+            case 0 -> this.entityData.get(DATA_SEAT_0);
+            case 1 -> this.entityData.get(DATA_SEAT_1);
+            case 2 -> this.entityData.get(DATA_SEAT_2);
+            case 3 -> this.entityData.get(DATA_SEAT_3);
+            default -> EMPTY_SEAT;
+        };
+    }
+
+    private void setSeatEntityId(int seatIndex, int entityId) {
+        switch (seatIndex) {
+            case 0 -> this.entityData.set(DATA_SEAT_0, entityId);
+            case 1 -> this.entityData.set(DATA_SEAT_1, entityId);
+            case 2 -> this.entityData.set(DATA_SEAT_2, entityId);
+            case 3 -> this.entityData.set(DATA_SEAT_3, entityId);
+        }
+    }
+
+    private int getActiveSeatCount() {
+        return Math.max(1, this.getMaxPassengers());
+    }
+
+    private boolean hasPassengerWithEntityId(int entityId) {
+        for (Entity passenger : this.getPassengers()) {
+            if (passenger.getId() == entityId) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private int findSeatForEntityId(int entityId, int seatCount) {
+        for (int i = 0; i < seatCount; i++) {
+            if (this.getSeatEntityId(i) == entityId) {
+                return i;
+            }
+        }
+
+        return -1;
+    }
+
+    private int findFirstEmptySeat(int seatCount) {
+        for (int i = 0; i < seatCount; i++) {
+            if (this.getSeatEntityId(i) == EMPTY_SEAT) {
+                return i;
+            }
+        }
+
+        return -1;
+    }
+
+    private boolean seatIdWasUsedEarlier(int seatIndex, int entityId) {
+        for (int i = 0; i < seatIndex; i++) {
+            if (this.getSeatEntityId(i) == entityId) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private void normalizeSailboatSeatSlots() {
+        if (this.level().isClientSide) {
+            return;
+        }
+
+        int seatCount = this.getActiveSeatCount();
+
+        for (int i = 0; i < 4; i++) {
+            int entityId = this.getSeatEntityId(i);
+
+            if (i >= seatCount) {
+                this.setSeatEntityId(i, EMPTY_SEAT);
+                continue;
+            }
+
+            if (entityId == EMPTY_SEAT) {
+                continue;
+            }
+
+            if (!this.hasPassengerWithEntityId(entityId) || this.seatIdWasUsedEarlier(i, entityId)) {
+                this.setSeatEntityId(i, EMPTY_SEAT);
+            }
+        }
+
+        for (Entity passenger : this.getPassengers()) {
+            if (this.findSeatForEntityId(passenger.getId(), seatCount) >= 0) {
+                continue;
+            }
+
+            int emptySeat = this.findFirstEmptySeat(seatCount);
+
+            if (emptySeat >= 0) {
+                this.setSeatEntityId(emptySeat, passenger.getId());
+            }
+        }
+    }
+
+    private int getPassengerSeatIndex(Entity passenger) {
+        int seatCount = this.getActiveSeatCount();
+        int syncedSeat = this.findSeatForEntityId(passenger.getId(), seatCount);
+
+        if (syncedSeat >= 0) {
+            return syncedSeat;
+        }
+
+        int fallbackIndex = this.getPassengers().indexOf(passenger);
+
+        if (fallbackIndex >= 0 && fallbackIndex < seatCount) {
+            return fallbackIndex;
+        }
+
+        return 0;
+    }
+
+    public void cycleEmptySeatFor(Entity passenger) {
+        if (this.level().isClientSide) {
+            return;
+        }
+
+        if (passenger.getVehicle() != this) {
+            return;
+        }
+
+        this.normalizeSailboatSeatSlots();
+
+        int seatCount = this.getActiveSeatCount();
+
+        if (seatCount <= 1) {
+            return;
+        }
+
+        int currentSeat = this.findSeatForEntityId(passenger.getId(), seatCount);
+
+        if (currentSeat < 0) {
+            return;
+        }
+
+        for (int i = 1; i < seatCount; i++) {
+            int nextSeat = (currentSeat + i) % seatCount;
+
+            if (this.getSeatEntityId(nextSeat) == EMPTY_SEAT) {
+                this.setSeatEntityId(currentSeat, EMPTY_SEAT);
+                this.setSeatEntityId(nextSeat, passenger.getId());
+                return;
+            }
+        }
+    }
+
+    public void swapSeatFor(Entity passenger) {
+        if (this.level().isClientSide) {
+            return;
+        }
+
+        if (passenger.getVehicle() != this) {
+            return;
+        }
+
+        this.normalizeSailboatSeatSlots();
+
+        int seatCount = this.getActiveSeatCount();
+
+        if (seatCount <= 1) {
+            return;
+        }
+
+        int currentSeat = this.findSeatForEntityId(passenger.getId(), seatCount);
+
+        if (currentSeat < 0) {
+            return;
+        }
+
+        for (int i = 1; i < seatCount; i++) {
+            int nextSeat = (currentSeat + i) % seatCount;
+            int nextSeatEntityId = this.getSeatEntityId(nextSeat);
+
+            if (nextSeatEntityId != EMPTY_SEAT) {
+                this.setSeatEntityId(currentSeat, nextSeatEntityId);
+                this.setSeatEntityId(nextSeat, passenger.getId());
+                return;
+            }
+        }
     }
 
     public static boolean canBoatPassengerAttackTarget(

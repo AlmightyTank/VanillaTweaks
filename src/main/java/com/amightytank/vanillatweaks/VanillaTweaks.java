@@ -4,6 +4,7 @@ import com.amightytank.vanillatweaks.entity.ModEntities;
 import com.amightytank.vanillatweaks.entity.client.boat.ModBoatRenderer;
 import com.amightytank.vanillatweaks.item.ModCreativeModTabs;
 import com.amightytank.vanillatweaks.item.ModItems;
+import com.amightytank.vanillatweaks.network.ModMessages;
 import com.amightytank.vanillatweaks.screen.ModMenuTypes;
 import com.amightytank.vanillatweaks.screen.SailboatChestScreen;
 import com.amightytank.vanillatweaks.world.PiratePatrolSpawner;
@@ -33,6 +34,7 @@ public class VanillaTweaks {
         ModItems.register(modEventBus);
         ModEntities.register(modEventBus);
         ModMenuTypes.register(modEventBus);
+        ModMessages.register();
 
         MinecraftForge.EVENT_BUS.register(this);
         MinecraftForge.EVENT_BUS.register(PiratePatrolSpawner.class);
