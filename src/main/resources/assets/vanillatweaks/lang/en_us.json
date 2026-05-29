@@ -2,6 +2,9 @@
   "itemGroup.vanillatweaks": "Vanilla Tweaks",
   "creativetab.vanillatweaks.vanilla_tweaks_tab": "Vanilla Tweaks",
   "creativetab.vanilla_tweaks_tab": "Vanilla Tweaks",
+  "key.categories.vanillatweaks": "Vanilla Tweaks",
+
+  "key.vanillatweaks.swap_sailboat_seat": "Swap Sailboat Seats",
 
   "entity.vanillatweaks.pirate_captain": "Pirate Captain",
   "entity.vanillatweaks.pirate_parrot": "Pirate Parrot",
