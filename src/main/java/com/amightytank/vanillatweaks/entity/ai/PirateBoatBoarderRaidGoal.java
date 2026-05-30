@@ -8,6 +8,7 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.ai.goal.Goal;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.entity.vehicle.Boat;
 import net.minecraft.world.phys.Vec3;
 
@@ -15,6 +16,9 @@ import java.util.UUID;
 
 public class PirateBoatBoarderRaidGoal extends Goal {
     private static final String RAID_BOAT_UUID_TAG = "PirateRaidBoatUUID";
+
+    private static final double RAID_TARGET_SEARCH_DISTANCE = 96.0D;
+    private static final int TARGET_REFRESH_INTERVAL = 20;
 
     private static final double BOARDER_DISMOUNT_DISTANCE = 11.0D;
     private static final double BOARDER_REMOUNT_DISTANCE = 30.0D;
@@ -25,17 +29,10 @@ public class PirateBoatBoarderRaidGoal extends Goal {
     private static final float BOAT_TURN_SPEED = 8.0F;
 
     private final Mob pirate;
+    private int targetRefreshTicks;
 
     public PirateBoatBoarderRaidGoal(Mob pirate) {
         this.pirate = pirate;
-
-        /*
-         * IMPORTANT:
-         * Do not set MOVE or LOOK flags here.
-         *
-         * This goal steers the BOAT directly.
-         * If we claim MOVE/LOOK, we block MeleeAttackGoal.
-         */
     }
 
     @Override
@@ -48,7 +45,7 @@ public class PirateBoatBoarderRaidGoal extends Goal {
             return false;
         }
 
-        LivingEntity target = this.pirate.getTarget();
+        LivingEntity target = this.getOrFindTarget();
 
         if (target == null || !target.isAlive()) {
             return false;
@@ -71,29 +68,22 @@ public class PirateBoatBoarderRaidGoal extends Goal {
             return false;
         }
 
-        LivingEntity target = this.pirate.getTarget();
+        LivingEntity target = this.getOrFindTarget();
 
         if (target == null || !target.isAlive()) {
             return false;
         }
 
-        /*
-         * Mounted boarders keep using this goal to steer the boat.
-         */
         if (this.pirate.isPassenger() && this.pirate.getVehicle() instanceof Boat) {
             return true;
         }
 
-        /*
-         * Dismounted boarders only use this goal when they are too far
-         * and need to return to their boat.
-         */
         return this.shouldTryToRemount(target);
     }
 
     @Override
     public void tick() {
-        LivingEntity target = this.pirate.getTarget();
+        LivingEntity target = this.getOrFindTarget();
 
         if (target == null || !target.isAlive()) {
             return;
@@ -116,10 +106,6 @@ public class PirateBoatBoarderRaidGoal extends Goal {
                 return;
             }
 
-            /*
-             * Only the first passenger steers.
-             * Other passengers can still attack/use abilities.
-             */
             if (this.isBoatController(boat)) {
                 steerBoatTowardTarget(boat, target);
             }
@@ -127,10 +113,6 @@ public class PirateBoatBoarderRaidGoal extends Goal {
             return;
         }
 
-        /*
-         * Only happens when boarders are far from the player
-         * and trying to return to the saved boat.
-         */
         Boat boat = this.getSavedRaidBoat();
 
         if (boat == null || !boat.isAlive()) {
@@ -138,10 +120,47 @@ public class PirateBoatBoarderRaidGoal extends Goal {
         }
 
         if (this.pirate.distanceTo(boat) <= BOARDER_BOAT_REACH_DISTANCE && this.hasOpenSeat(boat)) {
-            this.pirate.startRiding(boat, true);
+            if (boat instanceof ModBoatEntity modBoat) {
+                modBoat.addMobToSailboat(this.pirate);
+            } else {
+                this.pirate.startRiding(boat, true);
+            }
         } else {
             this.pirate.getNavigation().moveTo(boat, 1.25D);
         }
+    }
+
+    private LivingEntity getOrFindTarget() {
+        LivingEntity target = this.pirate.getTarget();
+
+        if (target != null && target.isAlive()) {
+            return target;
+        }
+
+        if (this.targetRefreshTicks > 0) {
+            this.targetRefreshTicks--;
+            return null;
+        }
+
+        this.targetRefreshTicks = TARGET_REFRESH_INTERVAL;
+
+        Player player = this.pirate.level().getNearestPlayer(
+                this.pirate.getX(),
+                this.pirate.getY(),
+                this.pirate.getZ(),
+                RAID_TARGET_SEARCH_DISTANCE,
+                entity -> entity instanceof Player foundPlayer
+                        && foundPlayer.isAlive()
+                        && !foundPlayer.isSpectator()
+                        && !foundPlayer.isCreative()
+        );
+
+        if (player != null) {
+            this.pirate.setTarget(player);
+            return player;
+        }
+
+        return null;
     }
 
     private void steerBoatTowardTarget(Boat boat, LivingEntity target) {
@@ -169,9 +188,11 @@ public class PirateBoatBoarderRaidGoal extends Goal {
     }
 
     private void rowBoatOars(Boat boat) {
-        /*
-         * Force vanilla boat rowing animation.
-         */
+        if (boat instanceof ModBoatEntity modBoat) {
+            modBoat.setPirateRaidRowing(true);
+            return;
+        }
+
         boat.setInput(true, true, true, false);
     }
 
@@ -237,16 +258,11 @@ public class PirateBoatBoarderRaidGoal extends Goal {
     }
 
     private boolean hasOpenSeat(Boat boat) {
-        int maxPassengers = 2;
-
         if (boat instanceof ModBoatEntity modBoat) {
-            maxPassengers = Math.max(
-                    1,
-                    modBoat.getBasePassengerSlots() - modBoat.getChestCount()
-            );
+            return modBoat.hasOpenSailboatSeat();
         }
 
-        return boat.getPassengers().size() < maxPassengers;
+        return boat.getPassengers().size() < 2;
     }
 
     private boolean isBoarder() {

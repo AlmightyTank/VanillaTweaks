@@ -1,14 +1,19 @@
 package com.amightytank.vanillatweaks.entity.ai;
 
+import com.amightytank.vanillatweaks.entity.custom.boat.ModBoatEntity;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.ai.goal.Goal;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.entity.vehicle.Boat;
 import net.minecraft.world.phys.Vec3;
 
 public class PirateBoatRangedRaidGoal extends Goal {
+    private static final double RAID_TARGET_SEARCH_DISTANCE = 96.0D;
+    private static final int TARGET_REFRESH_INTERVAL = 20;
+
     private static final double RANGED_MIN_DISTANCE = 20.0D;
     private static final double RANGED_MAX_DISTANCE = 36.0D;
 
@@ -17,18 +22,10 @@ public class PirateBoatRangedRaidGoal extends Goal {
     private static final float BOAT_TURN_SPEED = 8.0F;
 
     private final Mob pirate;
+    private int targetRefreshTicks;
 
     public PirateBoatRangedRaidGoal(Mob pirate) {
         this.pirate = pirate;
-
-        /*
-         * IMPORTANT:
-         * Do not set MOVE or LOOK flags here.
-         *
-         * This goal steers the BOAT directly.
-         * If we claim MOVE/LOOK, we block PirateGunnerAttackGoal,
-         * CaptainSummonKrakenGoal, RangedAttackGoal, etc.
-         */
     }
 
     @Override
@@ -41,7 +38,7 @@ public class PirateBoatRangedRaidGoal extends Goal {
             return false;
         }
 
-        LivingEntity target = this.pirate.getTarget();
+        LivingEntity target = this.getOrFindTarget();
 
         if (target == null || !target.isAlive()) {
             return false;
@@ -60,7 +57,7 @@ public class PirateBoatRangedRaidGoal extends Goal {
             return false;
         }
 
-        LivingEntity target = this.pirate.getTarget();
+        LivingEntity target = this.getOrFindTarget();
 
         if (target == null || !target.isAlive()) {
             return false;
@@ -71,7 +68,7 @@ public class PirateBoatRangedRaidGoal extends Goal {
 
     @Override
     public void tick() {
-        LivingEntity target = this.pirate.getTarget();
+        LivingEntity target = this.getOrFindTarget();
 
         if (target == null || !target.isAlive()) {
             return;
@@ -83,13 +80,42 @@ public class PirateBoatRangedRaidGoal extends Goal {
             return;
         }
 
-        /*
-         * Only the first passenger steers.
-         * Other passengers can still attack/use abilities.
-         */
         if (this.isBoatController(boat)) {
             steerBoat(boat, target);
         }
+    }
+
+    private LivingEntity getOrFindTarget() {
+        LivingEntity target = this.pirate.getTarget();
+
+        if (target != null && target.isAlive()) {
+            return target;
+        }
+
+        if (this.targetRefreshTicks > 0) {
+            this.targetRefreshTicks--;
+            return null;
+        }
+
+        this.targetRefreshTicks = TARGET_REFRESH_INTERVAL;
+
+        Player player = this.pirate.level().getNearestPlayer(
+                this.pirate.getX(),
+                this.pirate.getY(),
+                this.pirate.getZ(),
+                RAID_TARGET_SEARCH_DISTANCE,
+                entity -> entity instanceof Player foundPlayer
+                        && foundPlayer.isAlive()
+                        && !foundPlayer.isSpectator()
+                        && !foundPlayer.isCreative()
+        );
+
+        if (player != null) {
+            this.pirate.setTarget(player);
+            return player;
+        }
+
+        return null;
     }
 
     private void steerBoat(Boat boat, LivingEntity target) {
@@ -114,9 +140,13 @@ public class PirateBoatRangedRaidGoal extends Goal {
     }
 
     private void moveBoatAwayFromTarget(Boat boat, Vec3 targetPos) {
-        Vec3 awayTarget = boat.position()
-                .subtract(targetPos)
-                .normalize()
+        Vec3 awayDirection = boat.position().subtract(targetPos);
+
+        if (awayDirection.lengthSqr() < 0.001D) {
+            awayDirection = new Vec3(boat.getLookAngle().x, 0.0D, boat.getLookAngle().z);
+        }
+
+        Vec3 awayTarget = awayDirection.normalize()
                 .scale(8.0D)
                 .add(boat.position());
 
@@ -140,9 +170,11 @@ public class PirateBoatRangedRaidGoal extends Goal {
     }
 
     private void rowBoatOars(Boat boat) {
-        /*
-         * Force vanilla boat rowing animation.
-         */
+        if (boat instanceof ModBoatEntity modBoat) {
+            modBoat.setPirateRaidRowing(true);
+            return;
+        }
+
         boat.setInput(true, true, true, false);
     }
 
@@ -169,7 +201,11 @@ public class PirateBoatRangedRaidGoal extends Goal {
     }
 
     private void slowBoat(Boat boat) {
-        boat.setInput(false, false, false, false);
+        if (boat instanceof ModBoatEntity modBoat) {
+            modBoat.setPirateRaidRowing(false);
+        } else {
+            boat.setInput(false, false, false, false);
+        }
 
         Vec3 motion = boat.getDeltaMovement();
 

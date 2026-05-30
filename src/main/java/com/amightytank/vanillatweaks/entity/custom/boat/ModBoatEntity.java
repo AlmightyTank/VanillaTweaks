@@ -410,6 +410,22 @@ public class ModBoatEntity extends Boat implements Container {
         super.setInput(false, false, forward, back);
     }
 
+    public void setPirateRaidRowing(boolean rowing) {
+        this.sailboatInputLeft = rowing;
+        this.sailboatInputRight = rowing;
+        this.sailboatInputForward = rowing;
+        this.sailboatInputBack = false;
+
+        this.frontPlayerPressingForward = rowing;
+
+        /*
+         * Force vanilla paddle animation.
+         * This also keeps your SailboatRowingPhysics active because
+         * frontPlayerPressingForward becomes true.
+         */
+        super.setInput(rowing, rowing, rowing, false);
+    }
+
     private void applySmoothSailboatTurning() {
         if (!this.isVehicle()) {
             this.sailboatTurnVelocity *= 0.75F;
@@ -655,13 +671,13 @@ public class ModBoatEntity extends Boat implements Container {
 
         if (this.isBambooSailboat()) {
             if (this.isLargeSailboat()) {
-                return seatOffset.add(0.0D, -0.2D, 0.0D);
+                return seatOffset.add(0.0D, -0.0D, 0.0D);
             }
             if  (this.isMediumSailboat()) {
-                return seatOffset.add(0.0D, -0.2D, 0.0D);
+                return seatOffset.add(0.0D, -0.0D, 0.0D);
             }
             else {
-                return seatOffset.add(0.0D, -0.2D, 0.0D);
+                return seatOffset.add(0.0D, -0.0D, 0.0D);
             }
         }
 

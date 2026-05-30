@@ -64,9 +64,7 @@ public class PirateParrotPeckGoal extends Goal {
 
         moveTowardTarget(target);
 
-        double distance = this.parrot.distanceToSqr(target);
-
-        if (distance <= 2.25D && this.attackCooldown <= 0) {
+        if (isInPeckRange(target) && this.attackCooldown <= 0) {
             peckTarget(target);
         }
     }
@@ -105,6 +103,22 @@ public class PirateParrotPeckGoal extends Goal {
         );
     }
 
+    private boolean isInPeckRange(LivingEntity target) {
+        // Best check: parrot hitbox touches/inflates into target hitbox.
+        if (this.parrot.getBoundingBox().inflate(0.45D).intersects(target.getBoundingBox())) {
+            return true;
+        }
+
+        // Backup check: parrot is close to the target's eye/chest area, not the feet.
+        Vec3 targetPeckPoint = new Vec3(
+                target.getX(),
+                target.getEyeY(),
+                target.getZ()
+        );
+
+        return this.parrot.position().distanceToSqr(targetPeckPoint) <= 2.25D;
+    }
+
     private void peckTarget(LivingEntity target) {
         if (!AbstractPirateEntity.canPirateAttack(target)) {
             this.parrot.setTarget(null);
@@ -112,11 +126,16 @@ public class PirateParrotPeckGoal extends Goal {
         }
 
         if (!this.parrot.level().isClientSide) {
-            target.hurt(this.parrot.damageSources().mobAttack(this.parrot), 2.0F);
+            boolean didDamage = target.hurt(
+                    this.parrot.damageSources().mobAttack(this.parrot),
+                    2.0F
+            );
 
-            double knockX = this.parrot.getX() - target.getX();
-            double knockZ = this.parrot.getZ() - target.getZ();
-            target.knockback(0.12D, knockX, knockZ);
+            if (didDamage) {
+                double knockX = this.parrot.getX() - target.getX();
+                double knockZ = this.parrot.getZ() - target.getZ();
+                target.knockback(0.12D, knockX, knockZ);
+            }
         }
 
         Vec3 bounce = this.parrot.position().subtract(target.position());
@@ -133,7 +152,8 @@ public class PirateParrotPeckGoal extends Goal {
             this.parrot.hasImpulse = true;
         }
 
-        this.attackCooldown = 14;
+        // 20 ticks lines up better with player invulnerability frames.
+        this.attackCooldown = 20;
         this.retreatTicks = 8;
     }
 }

@@ -51,9 +51,6 @@ public class PirateDeckhandEntity extends AbstractPirateEntity {
 
         this.goalSelector.addGoal(1, new PirateBoatBoarderRaidGoal(this));
         this.goalSelector.addGoal(2, new MeleeAttackGoal(this, 1.15D, false));
-
-        this.targetSelector.addGoal(3, new NearestAttackableTargetGoal<>(this, AbstractVillager.class, false));
-        this.targetSelector.addGoal(4, new NearestAttackableTargetGoal<>(this, IronGolem.class, true));
     }
 
     @Override

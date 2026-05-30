@@ -46,10 +46,7 @@ public class PirateMarauderEntity extends AbstractPirateEntity implements Ranged
 
     @Override
     protected void registerGoals() {
-        // DO NOT call super.registerGoals()
-        // The brute has its own full goal setup.
-
-        this.goalSelector.addGoal(0, new FloatGoal(this));
+        super.registerGoals();
         this.goalSelector.addGoal(1, new PirateBoatBoarderRaidGoal(this));
 
         // Melee only when close.
@@ -68,17 +65,6 @@ public class PirateMarauderEntity extends AbstractPirateEntity implements Ranged
                 45,
                 15.0F,
                 4.0F
-        ));
-
-        this.goalSelector.addGoal(7, new LookAtPlayerGoal(this, Player.class, 8.0F));
-        this.goalSelector.addGoal(8, new RandomLookAroundGoal(this));
-
-        this.targetSelector.addGoal(1, new HurtByTargetGoal(this));
-        this.targetSelector.addGoal(2, new NearestAttackableTargetGoal<>(
-                this,
-                Player.class,
-                true,
-                this::isValidBruteTarget
         ));
     }
 
