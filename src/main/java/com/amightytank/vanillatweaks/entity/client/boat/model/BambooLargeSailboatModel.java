@@ -73,36 +73,36 @@ public class BambooLargeSailboatModel extends ListModel<ModBoatEntity> implement
 		PartDefinition partdefinition = meshdefinition.getRoot();
 
 		PartDefinition left_paddle_back = partdefinition.addOrReplaceChild("left_paddle_back", CubeListBuilder.create().texOffs(144, 196).addBox(-1.0F, 0.0F, -5.0F, 2.0F, 2.0F, 18.0F, new CubeDeformation(0.0F))
-				.texOffs(144, 196).addBox(-1.001F, -3.0F, 8.0F, 1.0F, 6.0F, 7.0F, new CubeDeformation(0.0F)), PartPose.offsetAndRotation(12.6724F, 14.0F, 23.5092F, 2.1642F, 0.8727F, 2.8798F));
+				.texOffs(144, 196).addBox(-1.001F, -3.0F, 8.0F, 1.0F, 6.0F, 7.0F, new CubeDeformation(0.0F)), PartPose.offsetAndRotation(11.6724F, 14.0F, 23.5092F, 2.1642F, 0.8727F, 2.8798F));
 
 		PartDefinition right_paddle_back = partdefinition.addOrReplaceChild("right_paddle_back", CubeListBuilder.create().texOffs(104, 196).addBox(-1.0F, 0.0F, -5.0F, 2.0F, 2.0F, 18.0F, new CubeDeformation(0.0F))
-				.texOffs(104, 196).addBox(0.001F, -3.0F, 8.0F, 1.0F, 6.0F, 7.0F, new CubeDeformation(0.0F)), PartPose.offsetAndRotation(-11.3276F, 14.0F, 23.5092F, 2.1642F, -0.8727F, -2.8798F));
+				.texOffs(104, 196).addBox(0.001F, -3.0F, 8.0F, 1.0F, 6.0F, 7.0F, new CubeDeformation(0.0F)), PartPose.offsetAndRotation(-12.3276F, 14.0F, 23.5092F, 2.1642F, -0.8727F, -2.8798F));
 
 		PartDefinition left_paddle_middle = partdefinition.addOrReplaceChild("left_paddle_middle", CubeListBuilder.create().texOffs(144, 196).addBox(-1.0F, 0.0F, -5.0F, 2.0F, 2.0F, 18.0F, new CubeDeformation(0.0F))
-				.texOffs(144, 196).addBox(-1.001F, -3.0F, 8.0F, 1.0F, 6.0F, 7.0F, new CubeDeformation(0.0F)), PartPose.offsetAndRotation(12.6724F, 14.0F, -1.4908F, 2.1642F, 0.8727F, 2.8798F));
+				.texOffs(144, 196).addBox(-1.001F, -3.0F, 8.0F, 1.0F, 6.0F, 7.0F, new CubeDeformation(0.0F)), PartPose.offsetAndRotation(11.6724F, 14.0F, -1.4908F, 2.1642F, 0.8727F, 2.8798F));
 
 		PartDefinition right_paddle_middle = partdefinition.addOrReplaceChild("right_paddle_middle", CubeListBuilder.create().texOffs(104, 196).addBox(-1.0F, 0.0F, -5.0F, 2.0F, 2.0F, 18.0F, new CubeDeformation(0.0F))
-				.texOffs(104, 196).addBox(0.001F, -3.0F, 8.0F, 1.0F, 6.0F, 7.0F, new CubeDeformation(0.0F)), PartPose.offsetAndRotation(-11.3276F, 14.0F, -1.4908F, 2.1642F, -0.8727F, -2.8798F));
+				.texOffs(104, 196).addBox(0.001F, -3.0F, 8.0F, 1.0F, 6.0F, 7.0F, new CubeDeformation(0.0F)), PartPose.offsetAndRotation(-12.3276F, 14.0F, -1.4908F, 2.1642F, -0.8727F, -2.8798F));
 
 		PartDefinition right_paddle_front = partdefinition.addOrReplaceChild("right_paddle_front", CubeListBuilder.create().texOffs(104, 196).addBox(-1.0F, 0.0F, -5.0F, 2.0F, 2.0F, 18.0F, new CubeDeformation(0.0F))
-				.texOffs(104, 196).addBox(0.001F, -3.0F, 8.0F, 1.0F, 6.0F, 7.0F, new CubeDeformation(0.0F)), PartPose.offsetAndRotation(-11.3276F, 14.0F, -26.4908F, 2.1642F, -0.8727F, -2.8798F));
+				.texOffs(104, 196).addBox(0.001F, -3.0F, 8.0F, 1.0F, 6.0F, 7.0F, new CubeDeformation(0.0F)), PartPose.offsetAndRotation(-12.3276F, 14.0F, -26.4908F, 2.1642F, -0.8727F, -2.8798F));
 
 		PartDefinition left_paddle_front = partdefinition.addOrReplaceChild("left_paddle_front", CubeListBuilder.create().texOffs(144, 196).addBox(-1.0F, 0.0F, -5.0F, 2.0F, 2.0F, 18.0F, new CubeDeformation(0.0F))
-				.texOffs(144, 196).addBox(-1.001F, -3.0F, 8.0F, 1.0F, 6.0F, 7.0F, new CubeDeformation(0.0F)), PartPose.offsetAndRotation(12.6724F, 14.0F, -26.4908F, 2.1642F, 0.8727F, 2.8798F));
+				.texOffs(144, 196).addBox(-1.001F, -3.0F, 8.0F, 1.0F, 6.0F, 7.0F, new CubeDeformation(0.0F)), PartPose.offsetAndRotation(11.6724F, 14.0F, -26.4908F, 2.1642F, 0.8727F, 2.8798F));
 
 		PartDefinition banner_sail_front = partdefinition.addOrReplaceChild("banner_sail_front", CubeListBuilder.create().texOffs(146, 106).addBox(-1.0F, -61.0F, -5.0F, 2.0F, 60.0F, 2.0F, new CubeDeformation(0.0F))
 				.texOffs(214, 196).addBox(-7.0F, -61.0F, -4.0F, 14.0F, 1.0F, 1.0F, new CubeDeformation(0.0F))
-				.texOffs(214, 196).addBox(-7.0F, -36.0F, -4.0F, 14.0F, 1.0F, 1.0F, new CubeDeformation(0.0F)), PartPose.offsetAndRotation(0.6724F, 23.0F, -17.4908F, -3.1416F, 0.0F, -3.1416F));
+				.texOffs(214, 196).addBox(-7.0F, -36.0F, -4.0F, 14.0F, 1.0F, 1.0F, new CubeDeformation(0.0F)), PartPose.offsetAndRotation(-0.3276F, 23.0F, -17.4908F, -3.1416F, 0.0F, -3.1416F));
 
-		PartDefinition banner_panel_front = partdefinition.addOrReplaceChild("banner_panel_front", CubeListBuilder.create().texOffs(184, 196).addBox(-7.0F, -13.0F, -0.5F, 14.0F, 26.0F, 1.0F, new CubeDeformation(0.0F)), PartPose.offsetAndRotation(0.6724F, -25.0F, -14.9908F, 0.0F, 0.0F, 0.0F));
+		PartDefinition banner_panel_front = partdefinition.addOrReplaceChild("banner_panel_front", CubeListBuilder.create().texOffs(184, 196).addBox(-7.0F, -13.0F, -0.5F, 14.0F, 26.0F, 1.0F, new CubeDeformation(0.0F)), PartPose.offsetAndRotation(-0.3276F, -25.0F, -14.9908F, 0.0F, 0.0F, 0.0F));
 
 		PartDefinition banner_sail_rear = partdefinition.addOrReplaceChild("banner_sail_rear", CubeListBuilder.create().texOffs(146, 106).addBox(-1.0F, -79.0F, -5.0F, 2.0F, 78.0F, 2.0F, new CubeDeformation(0.0F))
 				.texOffs(56, 213).addBox(-7.0F, -79.0F, -4.0F, 14.0F, 1.0F, 1.0F, new CubeDeformation(0.0F))
-				.texOffs(214, 196).addBox(-7.0F, -54.0F, -4.0F, 14.0F, 1.0F, 1.0F, new CubeDeformation(0.0F)), PartPose.offsetAndRotation(0.6724F, 23.0F, 7.5092F, -3.1416F, 0.0F, -3.1416F));
+				.texOffs(214, 196).addBox(-7.0F, -54.0F, -4.0F, 14.0F, 1.0F, 1.0F, new CubeDeformation(0.0F)), PartPose.offsetAndRotation(-0.3276F, 23.0F, 7.5092F, -3.1416F, 0.0F, -3.1416F));
 
-		PartDefinition banner_panel_rear = partdefinition.addOrReplaceChild("banner_panel_rear", CubeListBuilder.create().texOffs(184, 196).addBox(-7.0F, -13.0F, -0.5F, 14.0F, 26.0F, 1.0F, new CubeDeformation(0.0F)), PartPose.offsetAndRotation(0.6724F, -43.0F, 10.0092F, 0.0F, 0.0F, 0.0F));
+		PartDefinition banner_panel_rear = partdefinition.addOrReplaceChild("banner_panel_rear", CubeListBuilder.create().texOffs(184, 196).addBox(-7.0F, -13.0F, -0.5F, 14.0F, 26.0F, 1.0F, new CubeDeformation(0.0F)), PartPose.offsetAndRotation(-0.3276F, -43.0F, 10.0092F, 0.0F, 0.0F, 0.0F));
 
-		PartDefinition chest = partdefinition.addOrReplaceChild("chest", CubeListBuilder.create(), PartPose.offsetAndRotation(-5.3276F, 8.0F, 30.5092F, 0.0F, 0.0F, 0.0F));
+		PartDefinition chest = partdefinition.addOrReplaceChild("chest", CubeListBuilder.create(), PartPose.offsetAndRotation(-6.3276F, 8.0F, 30.5092F, 0.0F, 0.0F, 0.0F));
 
 		PartDefinition chest_base = chest.addOrReplaceChild("chest_base", CubeListBuilder.create().texOffs(8, 196).addBox(0.0F, 0.0F, 0.0F, 12.0F, 8.0F, 12.0F, new CubeDeformation(0.0F)), PartPose.offset(0.0F, 0.0F, 0.0F));
 
@@ -110,7 +110,7 @@ public class BambooLargeSailboatModel extends ListModel<ModBoatEntity> implement
 
 		PartDefinition chest_lid = chest.addOrReplaceChild("chest_lid", CubeListBuilder.create().texOffs(56, 196).addBox(0.0F, 0.0F, 0.0F, 12.0F, 5.0F, 12.0F, new CubeDeformation(0.0F)), PartPose.offset(0.0F, -4.0F, 0.0F));
 
-		PartDefinition chest2 = partdefinition.addOrReplaceChild("chest2", CubeListBuilder.create(), PartPose.offsetAndRotation(-5.3276F, 8.0F, 14.5092F, 0.0F, 0.0F, 0.0F));
+		PartDefinition chest2 = partdefinition.addOrReplaceChild("chest2", CubeListBuilder.create(), PartPose.offsetAndRotation(-6.3276F, 8.0F, 14.5092F, 0.0F, 0.0F, 0.0F));
 
 		PartDefinition chest_base2 = chest2.addOrReplaceChild("chest_base2", CubeListBuilder.create().texOffs(8, 196).addBox(0.0F, 0.0F, 0.0F, 12.0F, 8.0F, 12.0F, new CubeDeformation(0.0F)), PartPose.offset(0.0F, 0.0F, 0.0F));
 
@@ -118,7 +118,7 @@ public class BambooLargeSailboatModel extends ListModel<ModBoatEntity> implement
 
 		PartDefinition chest_lid2 = chest2.addOrReplaceChild("chest_lid2", CubeListBuilder.create().texOffs(56, 196).addBox(0.0F, 0.0F, 0.0F, 12.0F, 5.0F, 12.0F, new CubeDeformation(0.0F)), PartPose.offset(0.0F, -4.0F, 0.0F));
 
-		PartDefinition chest3 = partdefinition.addOrReplaceChild("chest3", CubeListBuilder.create(), PartPose.offsetAndRotation(-5.3276F, 8.0F, -6.4908F, 0.0F, 0.0F, 0.0F));
+		PartDefinition chest3 = partdefinition.addOrReplaceChild("chest3", CubeListBuilder.create(), PartPose.offsetAndRotation(-6.3276F, 8.0F, -6.4908F, 0.0F, 0.0F, 0.0F));
 
 		PartDefinition chest_base3 = chest3.addOrReplaceChild("chest_base3", CubeListBuilder.create().texOffs(8, 196).addBox(0.0F, 0.0F, 0.0F, 12.0F, 8.0F, 12.0F, new CubeDeformation(0.0F)), PartPose.offset(0.0F, 0.0F, 0.0F));
 
@@ -127,7 +127,7 @@ public class BambooLargeSailboatModel extends ListModel<ModBoatEntity> implement
 		PartDefinition chest_lid3 = chest3.addOrReplaceChild("chest_lid3", CubeListBuilder.create().texOffs(56, 196).addBox(0.0F, 0.0F, 0.0F, 12.0F, 5.0F, 12.0F, new CubeDeformation(0.0F)), PartPose.offset(0.0F, -4.0F, 0.0F));
 
 		PartDefinition body = partdefinition.addOrReplaceChild("body", CubeListBuilder.create().texOffs(0, 0).addBox(-16.5F, -7.0F, -50.0F, 28.0F, 4.0F, 97.0F, new CubeDeformation(0.0F))
-				.texOffs(0, 101).addBox(-14.5F, -3.0F, -47.0F, 24.0F, 4.0F, 91.0F, new CubeDeformation(0.0F)), PartPose.offset(3.0F, 23.0F, 0.0F));
+				.texOffs(0, 101).addBox(-14.5F, -3.0F, -47.0F, 24.0F, 4.0F, 91.0F, new CubeDeformation(0.0F)), PartPose.offset(2.0F, 23.0F, 0.0F));
 
 		return LayerDefinition.create(meshdefinition, 256, 256);
 	}
