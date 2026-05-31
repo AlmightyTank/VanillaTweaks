@@ -35,7 +35,12 @@ public class PirateGunnerAttackGoal extends Goal {
         this.attackRadius = attackRadius;
         this.attackRadiusSqr = attackRadius * attackRadius;
 
-        this.setFlags(EnumSet.of(Goal.Flag.MOVE, Goal.Flag.LOOK));
+        /*
+         * Important:
+         * Only LOOK, not MOVE.
+         * This allows PirateBoatPilotGoal to keep controlling the boat.
+         */
+        this.setFlags(EnumSet.of(Goal.Flag.LOOK));
     }
 
     @Override
@@ -74,7 +79,10 @@ public class PirateGunnerAttackGoal extends Goal {
 
         this.gunner.setAggressive(false);
         this.gunner.setChargingCrossbow(false);
-        this.gunner.getNavigation().stop();
+
+        if (!this.gunner.isPassenger()) {
+            this.gunner.getNavigation().stop();
+        }
     }
 
     @Override
@@ -82,7 +90,6 @@ public class PirateGunnerAttackGoal extends Goal {
         LivingEntity target = this.gunner.getTarget();
 
         if (!AbstractPirateEntity.canPirateAttack(target)) {
-            this.gunner.setTarget(null);
             this.gunner.setChargingCrossbow(false);
             return;
         }
@@ -94,6 +101,7 @@ public class PirateGunnerAttackGoal extends Goal {
         );
 
         boolean canSeeTarget = this.gunner.getSensing().hasLineOfSight(target);
+        boolean inAttackRange = distanceToTarget <= this.attackRadiusSqr;
 
         if (canSeeTarget) {
             this.seeTime++;
@@ -101,10 +109,18 @@ public class PirateGunnerAttackGoal extends Goal {
             this.seeTime = 0;
         }
 
-        if (distanceToTarget <= this.attackRadiusSqr && this.seeTime >= 5) {
+        /*
+         * If mounted, the boat pilot handles movement.
+         * If on foot, the gunner can move like a normal ranged mob.
+         */
+        if (this.gunner.isPassenger()) {
             this.gunner.getNavigation().stop();
         } else {
-            this.gunner.getNavigation().moveTo(target, this.speedModifier);
+            if (inAttackRange && this.seeTime >= 5) {
+                this.gunner.getNavigation().stop();
+            } else {
+                this.gunner.getNavigation().moveTo(target, this.speedModifier);
+            }
         }
 
         this.gunner.getLookControl().setLookAt(target, 30.0F, 30.0F);
@@ -115,7 +131,7 @@ public class PirateGunnerAttackGoal extends Goal {
             this.gunner.setChargingCrossbow(true);
 
             if (this.chargeTime <= 0) {
-                if (canSeeTarget && AbstractPirateEntity.canPirateAttack(target)) {
+                if (canSeeTarget && inAttackRange && AbstractPirateEntity.canPirateAttack(target)) {
                     float distanceFactor = (float) Math.sqrt(distanceToTarget) / this.attackRadius;
                     float clampedDistanceFactor = Math.min(Math.max(distanceFactor, 0.1F), 1.0F);
 
@@ -135,7 +151,7 @@ public class PirateGunnerAttackGoal extends Goal {
             return;
         }
 
-        if (!canSeeTarget) {
+        if (!canSeeTarget || !inAttackRange) {
             this.attackTime = 5;
             return;
         }

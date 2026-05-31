@@ -13,12 +13,17 @@ import java.util.EnumSet;
 public class CaptainParrotSwarmGoal extends Goal {
     private final PirateCaptainEntity captain;
 
+    private static final int CAST_TIME = 30;
+    private static final int EXTRA_SHARED_COOLDOWN_TICKS = 20 * 5;
+
     private int castTime;
     private int cooldown;
 
+    private static final double PARROT_SWARM_RANGE = 48.0D;
+
     public CaptainParrotSwarmGoal(PirateCaptainEntity captain) {
         this.captain = captain;
-        this.setFlags(EnumSet.of(Goal.Flag.MOVE, Goal.Flag.LOOK));
+        this.setFlags(EnumSet.of(Goal.Flag.LOOK));
     }
 
     @Override
@@ -29,12 +34,16 @@ public class CaptainParrotSwarmGoal extends Goal {
             return false;
         }
 
+        if (this.captain.isCaptainSpellOnCooldown()) {
+            return false;
+        }
+
         if (this.cooldown > 0) {
             this.cooldown--;
             return false;
         }
 
-        return this.captain.distanceToSqr(target) <= 32.0D * 32.0D;
+        return this.captain.distanceToSqr(target) <= PARROT_SWARM_RANGE * PARROT_SWARM_RANGE;
     }
 
     @Override
@@ -45,7 +54,12 @@ public class CaptainParrotSwarmGoal extends Goal {
 
     @Override
     public void start() {
-        this.castTime = 30;
+        this.castTime = CAST_TIME;
+
+        if (!this.captain.level().isClientSide) {
+            this.captain.setCaptainSpellCooldown(CAST_TIME + EXTRA_SHARED_COOLDOWN_TICKS);
+        }
+
         this.captain.getNavigation().stop();
         this.captain.setAggressive(true);
     }

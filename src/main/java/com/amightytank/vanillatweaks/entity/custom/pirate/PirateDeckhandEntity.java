@@ -1,6 +1,6 @@
 package com.amightytank.vanillatweaks.entity.custom.pirate;
 
-import com.amightytank.vanillatweaks.entity.ai.PirateBoatBoarderRaidGoal;
+import com.amightytank.vanillatweaks.entity.ai.*;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.sounds.SoundEvent;
 import net.minecraft.sounds.SoundEvents;
@@ -15,10 +15,8 @@ import net.minecraft.world.entity.SpawnGroupData;
 import net.minecraft.world.entity.ai.attributes.AttributeSupplier;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.ai.goal.MeleeAttackGoal;
-import net.minecraft.world.entity.ai.goal.target.NearestAttackableTargetGoal;
+import net.minecraft.world.entity.ai.goal.MoveTowardsTargetGoal;
 import net.minecraft.world.entity.monster.Monster;
-import net.minecraft.world.entity.npc.AbstractVillager;
-import net.minecraft.world.entity.animal.IronGolem;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.Level;
@@ -42,15 +40,17 @@ public class PirateDeckhandEntity extends AbstractPirateEntity {
                 .add(Attributes.ATTACK_DAMAGE, 4.0D)
                 .add(Attributes.ARMOR, 2.0D)
                 .add(Attributes.KNOCKBACK_RESISTANCE, 0.05D)
-                .add(Attributes.FOLLOW_RANGE, 24.0D);
+                .add(Attributes.FOLLOW_RANGE, 40.0D);
     }
 
     @Override
     protected void registerGoals() {
         super.registerGoals();
 
-        this.goalSelector.addGoal(1, new PirateBoatBoarderRaidGoal(this));
-        this.goalSelector.addGoal(2, new MeleeAttackGoal(this, 1.15D, false));
+        this.goalSelector.addGoal(3, new PirateBoatPilotGoal(this));
+        this.goalSelector.addGoal(4, new PirateBoatBoarderRemountGoal(this));
+        this.goalSelector.addGoal(5, new PirateBoatBoarderDismountGoal(this));
+        this.goalSelector.addGoal(6, new PirateBoarderChargeGoal(this));
     }
 
     @Override
@@ -132,5 +132,15 @@ public class PirateDeckhandEntity extends AbstractPirateEntity {
     @Override
     public SoundEvent getCelebrateSound() {
         return SoundEvents.PILLAGER_CELEBRATE;
+    }
+
+    @Override
+    public double getBoatPilotStopRange() {
+        return 6.0D;
+    }
+
+    @Override
+    public double getBoatPilotStartRange() {
+        return 12.0D;
     }
 }

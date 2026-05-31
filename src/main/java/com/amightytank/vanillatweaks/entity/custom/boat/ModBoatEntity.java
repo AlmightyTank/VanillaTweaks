@@ -68,6 +68,11 @@ public class ModBoatEntity extends Boat implements Container {
 
     private static final double SPEED_PER_BANNER = 0.08D;
 
+    private static final int PIRATE_RAID_ROWING_TICKS = 5;
+    private static final double PIRATE_RAID_BOAT_SPEED = 0.035D;
+    private static final double PIRATE_RAID_BOAT_MAX_SPEED = 0.42D;
+
+
     private static final int ROWS_PER_CHEST = 2;
     private static final int SLOTS_PER_CHEST = ROWS_PER_CHEST * 9;
     private static final int MAX_CHESTS = 3;
@@ -79,6 +84,8 @@ public class ModBoatEntity extends Boat implements Container {
     private boolean sailboatInputRight;
     private boolean sailboatInputForward;
     private boolean sailboatInputBack;
+
+    private int pirateRaidRowingTicks;
 
     private float sailboatTurnVelocity;
 
@@ -379,6 +386,8 @@ public class ModBoatEntity extends Boat implements Container {
     public void tick() {
         super.tick();
 
+        this.keepPirateRaidRowingAlive();
+
         this.applySmoothSailboatTurning();
 
         SailboatRowingPhysics.apply(
@@ -387,6 +396,8 @@ public class ModBoatEntity extends Boat implements Container {
                 this.isMediumSailboat(),
                 this.isLargeSailboat()
         );
+
+        this.applyPirateRaidRowingMotion();
 
         if (!this.level().isClientSide) {
             this.updateSailboatCollisionParts();
@@ -411,6 +422,12 @@ public class ModBoatEntity extends Boat implements Container {
     }
 
     public void setPirateRaidRowing(boolean rowing) {
+        if (rowing) {
+            this.pirateRaidRowingTicks = PIRATE_RAID_ROWING_TICKS;
+        } else {
+            this.pirateRaidRowingTicks = 0;
+        }
+
         this.sailboatInputLeft = rowing;
         this.sailboatInputRight = rowing;
         this.sailboatInputForward = rowing;
@@ -420,10 +437,51 @@ public class ModBoatEntity extends Boat implements Container {
 
         /*
          * Force vanilla paddle animation.
-         * This also keeps your SailboatRowingPhysics active because
-         * frontPlayerPressingForward becomes true.
+         * This also keeps SailboatRowingPhysics active.
          */
         super.setInput(rowing, rowing, rowing, false);
+    }
+
+    private void keepPirateRaidRowingAlive() {
+        if (this.pirateRaidRowingTicks <= 0) {
+            return;
+        }
+
+        this.pirateRaidRowingTicks--;
+
+        this.sailboatInputForward = true;
+        this.sailboatInputBack = false;
+        this.frontPlayerPressingForward = true;
+
+        super.setInput(true, true, true, false);
+    }
+
+    private void applyPirateRaidRowingMotion() {
+        if (this.pirateRaidRowingTicks <= 0) {
+            return;
+        }
+
+        if (!this.hasPirateRaidPassenger()) {
+            return;
+        }
+
+        float yaw = this.getYRot() * Mth.DEG_TO_RAD;
+
+        Vec3 motion = this.getDeltaMovement().add(
+                Mth.sin(-yaw) * PIRATE_RAID_BOAT_SPEED,
+                0.0D,
+                Mth.cos(yaw) * PIRATE_RAID_BOAT_SPEED
+        );
+
+        double horizontalSpeed = Math.sqrt(motion.x * motion.x + motion.z * motion.z);
+
+        if (horizontalSpeed > PIRATE_RAID_BOAT_MAX_SPEED) {
+            double scale = PIRATE_RAID_BOAT_MAX_SPEED / horizontalSpeed;
+            motion = new Vec3(motion.x * scale, motion.y, motion.z * scale);
+        }
+
+        this.setDeltaMovement(motion);
+        this.hasImpulse = true;
     }
 
     private void applySmoothSailboatTurning() {
@@ -520,7 +578,36 @@ public class ModBoatEntity extends Boat implements Container {
             return player;
         }
 
+        if (frontPassenger instanceof Mob mob && this.isPirateRaidPassenger(mob)) {
+            return mob;
+        }
+
+        /*
+         * Fallback for pirate raid boats:
+         * If seat syncing puts the pirate somewhere other than seat 0,
+         * still let one pirate count as the controller.
+         */
+        for (Entity passenger : this.getPassengers()) {
+            if (passenger instanceof Mob mob && this.isPirateRaidPassenger(mob)) {
+                return mob;
+            }
+        }
+
         return null;
+    }
+
+    private boolean hasPirateRaidPassenger() {
+        for (Entity passenger : this.getPassengers()) {
+            if (passenger instanceof Mob mob && this.isPirateRaidPassenger(mob)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private boolean isPirateRaidPassenger(Mob mob) {
+        return mob.isAlive() && mob.getTags().contains("PirateTreasureRaid");
     }
 
     @Override
@@ -1306,5 +1393,9 @@ public class ModBoatEntity extends Boat implements Container {
         for (int i = 0; i < this.getContainerSize(); i++) {
             this.inventory.set(i, ItemStack.EMPTY);
         }
+    }
+
+    public boolean isFrontSailboatPassenger(Entity passenger) {
+        return passenger != null && this.getPassengerSeatIndex(passenger) == 0;
     }
 }

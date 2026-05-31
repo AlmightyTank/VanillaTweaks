@@ -4,7 +4,6 @@ import com.amightytank.vanillatweaks.VanillaTweaks;
 import com.amightytank.vanillatweaks.entity.ModEntities;
 import com.amightytank.vanillatweaks.item.custom.ModBoatItem;
 import com.amightytank.vanillatweaks.item.custom.PirateDynamiteArrowItem;
-import com.amightytank.vanillatweaks.item.custom.PiratePatrolSpawnEggItem;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.vehicle.Boat;
@@ -121,14 +120,6 @@ public class ModItems {
                     ModEntities.PIRATE_GUNNER,
                     0x1B1B1B,
                     0x8B2E2E,
-                    new Item.Properties()
-            ));
-
-    public static final RegistryObject<Item> PIRATE_PATROL_SPAWN_EGG = ITEMS.register("pirate_patrol_spawn_egg",
-            () -> new PiratePatrolSpawnEggItem(
-                    ModEntities.PIRATE_CAPTAIN,
-                    0x0B1F33,
-                    0xD4AF37,
                     new Item.Properties()
             ));
 

@@ -1,6 +1,6 @@
 package com.amightytank.vanillatweaks.entity.custom.pirate;
 
-import com.amightytank.vanillatweaks.entity.ai.PirateBoatRangedRaidGoal;
+import com.amightytank.vanillatweaks.entity.ai.PirateBoatPilotGoal;
 import com.amightytank.vanillatweaks.entity.ai.PirateGunnerAttackGoal;
 import net.minecraft.network.syncher.EntityDataAccessor;
 import net.minecraft.network.syncher.EntityDataSerializers;
@@ -54,14 +54,8 @@ public class PirateGunnerEntity extends AbstractPirateEntity implements RangedAt
     protected void registerGoals() {
         super.registerGoals();
 
-        this.goalSelector.addGoal(1, new PirateBoatRangedRaidGoal(this));
-
-        this.goalSelector.addGoal(2, new PirateGunnerAttackGoal(
-                this,
-                1.0D,
-                35,
-                18.0F
-        ));
+        this.goalSelector.addGoal(3, new PirateBoatPilotGoal(this));
+        this.goalSelector.addGoal(4, new PirateGunnerAttackGoal(this, 1.0D, 40, 32.0F));
     }
 
     @Override
@@ -89,7 +83,7 @@ public class PirateGunnerEntity extends AbstractPirateEntity implements RangedAt
         return Monster.createMonsterAttributes()
                 .add(Attributes.MAX_HEALTH, 24.0D)
                 .add(Attributes.MOVEMENT_SPEED, 0.30D)
-                .add(Attributes.FOLLOW_RANGE, 36.0D)
+                .add(Attributes.FOLLOW_RANGE, 64.0D)
                 .add(Attributes.ATTACK_DAMAGE, 3.0D)
                 .add(Attributes.KNOCKBACK_RESISTANCE, 0.10D);
     }
@@ -245,5 +239,15 @@ public class PirateGunnerEntity extends AbstractPirateEntity implements RangedAt
         POISON,
         SLOWNESS,
         DYNAMITE
+    }
+
+    @Override
+    public double getBoatPilotStopRange() {
+        return 22.0D;
+    }
+
+    @Override
+    public double getBoatPilotStartRange() {
+        return 28.0D;
     }
 }

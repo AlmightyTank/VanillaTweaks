@@ -1,296 +1,300 @@
 package com.amightytank.vanillatweaks.world;
 
 import com.amightytank.vanillatweaks.entity.ModEntities;
+import com.amightytank.vanillatweaks.entity.ai.PirateRaidAiUtil;
 import com.amightytank.vanillatweaks.entity.custom.boat.ModBoatEntity;
-import com.amightytank.vanillatweaks.entity.custom.pirate.PirateCaptainEntity;
-import com.amightytank.vanillatweaks.entity.custom.pirate.PirateDeckhandEntity;
-import com.amightytank.vanillatweaks.entity.custom.pirate.PirateGunnerEntity;
-import com.amightytank.vanillatweaks.entity.custom.pirate.PirateMarauderEntity;
 import com.amightytank.vanillatweaks.util.PirateLootHelper;
 import net.minecraft.core.BlockPos;
+import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.util.Mth;
+import net.minecraft.tags.FluidTags;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.MobSpawnType;
 import net.minecraft.world.entity.raid.Raid;
 import net.minecraft.world.entity.vehicle.Boat;
 import net.minecraft.world.phys.Vec3;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
-public class PiratePatrolFormation {
+public final class PiratePatrolFormation {
+    private static final String PATROL_TAG = "PiratePatrol";
+    private static final String PATROL_BOAT_TAG = "PiratePatrolBoat";
 
-    private enum SailboatSize {
-        SMALL,
-        MEDIUM,
-        LARGE
+    private PiratePatrolFormation() {
     }
 
-    public static void spawn(ServerLevel level, BlockPos centerPos, ServerPlayer target, PiratePatrolSize size) {
-        Boat.Type fleetWoodType = getRandomWoodType(level);
+    public static List<Mob> spawnPatrol(ServerLevel level, ServerPlayer target) {
         UUID patrolId = UUID.randomUUID();
+        List<PatrolShipEntry> plan = createRandomPatrolPlan(level);
+        List<Mob> spawnedPirates = new ArrayList<>();
 
-        switch (size) {
-            case SMALL -> spawnSmallPatrol(level, centerPos, target, fleetWoodType, patrolId);
-            case MEDIUM -> spawnMediumPatrol(level, centerPos, target, fleetWoodType, patrolId);
-            case LARGE -> spawnLargePatrol(level, centerPos, target, fleetWoodType, patrolId);
+        if (plan.isEmpty()) {
+            return spawnedPirates;
         }
+
+        double attackAngle = Math.toRadians(level.random.nextInt(360));
+        Boat.Type patrolWoodType = getRandomBoatType(level);
+
+        for (int i = 0; i < plan.size(); i++) {
+            PatrolShipEntry entry = plan.get(i);
+
+            BlockPos formationPos = getVFormationPosition(
+                    level,
+                    target.blockPosition(),
+                    plan.size(),
+                    i,
+                    attackAngle
+            );
+
+            if (formationPos == null) {
+                continue;
+            }
+
+            spawnedPirates.addAll(spawnShipEntryAtPosition(
+                    level,
+                    target,
+                    formationPos,
+                    patrolId,
+                    entry,
+                    patrolWoodType
+            ));
+        }
+
+        if (!spawnedPirates.isEmpty()) {
+            target.displayClientMessage(
+                    Component.literal("A pirate patrol has spotted you!"),
+                    false
+            );
+        }
+
+        return spawnedPirates;
     }
 
-    private static void spawnSmallPatrol(
-            ServerLevel level,
-            BlockPos pos,
-            ServerPlayer target,
-            Boat.Type fleetWoodType,
-            UUID patrolId
-    ) {
-        /*
-         * Small patrol:
-         * - 1 large captain loot ship
-         * - 2 small combat sailboats
-         */
+    private static List<PatrolShipEntry> createRandomPatrolPlan(ServerLevel level) {
+        int roll = level.random.nextInt(100);
+        List<PatrolShipEntry> plan = new ArrayList<>();
 
-        spawnCaptainShip(level, pos.offset(0, 0, 0), true, target, fleetWoodType, patrolId);
+        if (roll < 35) {
+            /*
+             * Small patrol:
+             * 1 large captain loot ship + 2 small combat boats.
+             */
+            plan.add(new PatrolShipEntry(PatrolShipSize.LARGE, PatrolShipRole.CAPTAIN_LOOT));
+            plan.add(new PatrolShipEntry(PatrolShipSize.SMALL, PatrolShipRole.COMBAT));
+            plan.add(new PatrolShipEntry(PatrolShipSize.SMALL, PatrolShipRole.COMBAT));
+            return plan;
+        }
 
-        spawnCombatShip(level, pos.offset(8, 0, 8), SailboatSize.SMALL, target, fleetWoodType, patrolId);
-        spawnCombatShip(level, pos.offset(-8, 0, 8), SailboatSize.SMALL, target, fleetWoodType, patrolId);
-    }
+        if (roll < 75) {
+            /*
+             * Medium patrol:
+             * 1 large captain ship + 2 medium combat boats + 1 small loot boat.
+             */
+            plan.add(new PatrolShipEntry(PatrolShipSize.LARGE, PatrolShipRole.CAPTAIN));
+            plan.add(new PatrolShipEntry(PatrolShipSize.MEDIUM, PatrolShipRole.COMBAT));
+            plan.add(new PatrolShipEntry(PatrolShipSize.MEDIUM, PatrolShipRole.COMBAT));
+            plan.add(new PatrolShipEntry(PatrolShipSize.SMALL, PatrolShipRole.LOOT));
+            return plan;
+        }
 
-    private static void spawnMediumPatrol(
-            ServerLevel level,
-            BlockPos pos,
-            ServerPlayer target,
-            Boat.Type fleetWoodType,
-            UUID patrolId
-    ) {
-        /*
-         * Medium patrol:
-         * - 1 large captain ship
-         * - 2 medium combat sailboats
-         * - 1 small loot sailboat
-         */
-
-        spawnCaptainShip(level, pos.offset(0, 0, 0), false, target, fleetWoodType, patrolId);
-
-        spawnCombatShip(level, pos.offset(9, 0, 9), SailboatSize.MEDIUM, target, fleetWoodType, patrolId);
-        spawnCombatShip(level, pos.offset(-9, 0, 9), SailboatSize.MEDIUM, target, fleetWoodType, patrolId);
-
-        spawnLootShip(level, pos.offset(0, 0, -10), SailboatSize.SMALL, target, fleetWoodType, patrolId);
-    }
-
-    private static void spawnLargePatrol(
-            ServerLevel level,
-            BlockPos pos,
-            ServerPlayer target,
-            Boat.Type fleetWoodType,
-            UUID patrolId
-    ) {
         /*
          * Large patrol:
-         * - 1 large captain ship
-         * - 3 large combat sailboats
-         * - 2 medium loot sailboats
+         * 1 large captain ship + 3 large combat boats + 2 medium loot boats.
          */
+        plan.add(new PatrolShipEntry(PatrolShipSize.LARGE, PatrolShipRole.CAPTAIN));
+        plan.add(new PatrolShipEntry(PatrolShipSize.LARGE, PatrolShipRole.COMBAT));
+        plan.add(new PatrolShipEntry(PatrolShipSize.LARGE, PatrolShipRole.COMBAT));
+        plan.add(new PatrolShipEntry(PatrolShipSize.LARGE, PatrolShipRole.COMBAT));
+        plan.add(new PatrolShipEntry(PatrolShipSize.MEDIUM, PatrolShipRole.LOOT));
+        plan.add(new PatrolShipEntry(PatrolShipSize.MEDIUM, PatrolShipRole.LOOT));
 
-        spawnCaptainShip(level, pos.offset(0, 0, 0), false, target, fleetWoodType, patrolId);
-
-        spawnCombatShip(level, pos.offset(10, 0, 10), SailboatSize.LARGE, target, fleetWoodType, patrolId);
-        spawnCombatShip(level, pos.offset(-10, 0, 10), SailboatSize.LARGE, target, fleetWoodType, patrolId);
-        spawnCombatShip(level, pos.offset(0, 0, 18), SailboatSize.LARGE, target, fleetWoodType, patrolId);
-
-        spawnLootShip(level, pos.offset(9, 0, -10), SailboatSize.MEDIUM, target, fleetWoodType, patrolId);
-        spawnLootShip(level, pos.offset(-9, 0, -10), SailboatSize.MEDIUM, target, fleetWoodType, patrolId);
+        return plan;
     }
 
-    private static void spawnCaptainShip(
+    private static List<Mob> spawnShipEntryAtPosition(
             ServerLevel level,
-            BlockPos pos,
-            boolean lootShip,
             ServerPlayer target,
-            Boat.Type fleetWoodType,
-            UUID patrolId
+            BlockPos spawnPos,
+            UUID patrolId,
+            PatrolShipEntry entry,
+            Boat.Type woodType
     ) {
-        SailboatSize size = SailboatSize.LARGE;
+        List<Mob> spawnedPirates = new ArrayList<>();
 
-        /*
-         * Keep loot ships at 1 chest.
-         * Your ModBoatEntity subtracts chest count from passenger slots.
-         * Large boat = 4 base passengers.
-         * 1 chest leaves 3 seats: captain + 2 guards.
-         */
-        int chestCount = lootShip ? 1 : 0;
-
-        ModBoatEntity boat = createBoat(level, pos, size, fleetWoodType, chestCount, target, patrolId);
+        Entity boat = spawnPatrolBoat(level, spawnPos, entry, woodType);
 
         if (boat == null) {
-            return;
+            return spawnedPirates;
         }
 
-        level.addFreshEntity(boat);
+        setupPatrolBoat(boat, target, patrolId);
 
-        if (lootShip) {
-            fillLootShip(level, boat);
+        if (boat instanceof ModBoatEntity modBoat && isLootShip(entry)) {
+            fillLootShip(level, modBoat);
         }
 
-        Mob captain = createPirateCaptain(level, pos, target, patrolId);
-
-        if (captain != null) {
-            placeMobInBoat(level, captain, boat, pos);
+        switch (entry.role()) {
+            case CAPTAIN_LOOT -> spawnedPirates.addAll(spawnCaptainLootShipPirates(level, target, spawnPos, patrolId));
+            case CAPTAIN -> spawnedPirates.addAll(spawnCaptainShipPirates(level, target, spawnPos, patrolId));
+            case LOOT -> spawnedPirates.addAll(spawnLootShipPirates(level, target, spawnPos, patrolId, entry.size()));
+            case COMBAT -> spawnedPirates.addAll(spawnCombatShipPirates(level, target, spawnPos, patrolId, entry.size()));
         }
 
-        int extraPirates = lootShip ? 2 : 3;
+        mountCrewToBoat(boat, spawnedPirates);
 
-        for (int i = 0; i < extraPirates; i++) {
-            Mob guard = createRandomPirateRaider(level, pos, target, patrolId);
-
-            if (guard != null) {
-                placeMobInBoat(level, guard, boat, pos);
-            }
-        }
+        return spawnedPirates;
     }
 
-    private static void spawnCombatShip(
-            ServerLevel level,
-            BlockPos pos,
-            SailboatSize size,
-            ServerPlayer target,
-            Boat.Type fleetWoodType,
-            UUID patrolId
-    ) {
-        ModBoatEntity boat = createBoat(level, pos, size, fleetWoodType, 0, target, patrolId);
-
-        if (boat == null) {
-            return;
-        }
-
-        level.addFreshEntity(boat);
-
-        int passengerSlots = getCombatPassengerSlots(size);
-
-        for (int i = 0; i < passengerSlots; i++) {
-            Mob pirate = createRandomPirateRaider(level, pos, target, patrolId);
-
-            if (pirate != null) {
-                placeMobInBoat(level, pirate, boat, pos);
-            }
-        }
-    }
-
-    private static void spawnLootShip(
-            ServerLevel level,
-            BlockPos pos,
-            SailboatSize size,
-            ServerPlayer target,
-            Boat.Type fleetWoodType,
-            UUID patrolId
-    ) {
-        /*
-         * Always use 1 chest for pirate patrol loot boats.
-         * More chests remove too many passenger slots.
-         */
-        int chestCount = 1;
-
-        ModBoatEntity boat = createBoat(level, pos, size, fleetWoodType, chestCount, target, patrolId);
-
-        if (boat == null) {
-            return;
-        }
-
-        level.addFreshEntity(boat);
-        fillLootShip(level, boat);
-
-        int passengerSlots = getLootPassengerSlots(size);
-
-        for (int i = 0; i < passengerSlots; i++) {
-            Mob guard = createRandomPirateRaider(level, pos, target, patrolId);
-
-            if (guard != null) {
-                placeMobInBoat(level, guard, boat, pos);
-            }
-        }
-    }
-
-    private static int getCombatPassengerSlots(SailboatSize size) {
-        return switch (size) {
-            case SMALL -> 1;
-            case MEDIUM -> 2;
-            case LARGE -> 4;
-        };
-    }
-
-    private static int getLootPassengerSlots(SailboatSize size) {
-        return switch (size) {
-            case SMALL -> 1;
-            case MEDIUM -> 2;
-            case LARGE -> 3;
-        };
+    private static boolean isLootShip(PatrolShipEntry entry) {
+        return entry.role() == PatrolShipRole.LOOT
+                || entry.role() == PatrolShipRole.CAPTAIN_LOOT;
     }
 
     private static void fillLootShip(ServerLevel level, ModBoatEntity boat) {
-        PirateLootHelper.fillLootShipChest(level, boat, boat);
+        PirateLootHelper.fillPirateLootShip(level, boat);
     }
 
-    private static void placeMobInBoat(ServerLevel level, Mob mob, ModBoatEntity boat, BlockPos pos) {
-        if (mob == null || boat == null) {
-            return;
+    private static BlockPos getVFormationPosition(
+            ServerLevel level,
+            BlockPos targetPos,
+            int shipCount,
+            int shipIndex,
+            double attackAngle
+    ) {
+        Vec3 forwardToPlayer = new Vec3(
+                Math.cos(attackAngle),
+                0.0D,
+                Math.sin(attackAngle)
+        ).normalize();
+
+        Vec3 right = new Vec3(
+                -forwardToPlayer.z,
+                0.0D,
+                forwardToPlayer.x
+        ).normalize();
+
+        int row = getVRow(shipIndex);
+        int side = getVSide(shipIndex);
+
+        double baseDistance = 48.0D;
+        double rowDepth = 11.0D;
+        double sideSpacing = 11.0D;
+
+        Vec3 targetCenter = Vec3.atBottomCenterOf(targetPos);
+
+        Vec3 spawn = targetCenter
+                .subtract(forwardToPlayer.scale(baseDistance + row * rowDepth))
+                .add(right.scale(side * sideSpacing * Math.max(1, row)));
+
+        BlockPos wantedPos = BlockPos.containing(spawn);
+
+        return findNearbySurfaceWater(level, wantedPos, 18);
+    }
+
+    private static int getVRow(int index) {
+        return switch (index) {
+            case 0 -> 0;
+            case 1, 2 -> 1;
+            case 3, 4 -> 2;
+            default -> 3;
+        };
+    }
+
+    private static int getVSide(int index) {
+        return switch (index) {
+            case 0 -> 0;
+            case 1 -> -1;
+            case 2 -> 1;
+            case 3 -> -2;
+            case 4 -> 2;
+            case 5 -> 0;
+            default -> 0;
+        };
+    }
+
+    private static BlockPos findNearbySurfaceWater(ServerLevel level, BlockPos center, int radius) {
+        for (int r = 0; r <= radius; r++) {
+            for (int x = -r; x <= r; x++) {
+                for (int z = -r; z <= r; z++) {
+                    if (Math.abs(x) != r && Math.abs(z) != r) {
+                        continue;
+                    }
+
+                    BlockPos surface = findWaterSurfaceAt(level, center.getX() + x, center.getZ() + z);
+
+                    if (surface != null) {
+                        return surface;
+                    }
+                }
+            }
         }
 
-        mob.moveTo(
-                pos.getX() + 0.5D,
-                pos.getY() + 1.0D,
-                pos.getZ() + 0.5D,
-                boat.getYRot(),
-                0.0F
-        );
-
-        mob.setYHeadRot(boat.getYRot());
-        mob.setPersistenceRequired();
-
-        level.addFreshEntity(mob);
-
-        mob.getPersistentData().putUUID("PirateRaidBoatUUID", boat.getUUID());
-
-        boat.addMobToSailboat(mob);
+        return null;
     }
 
-    private static ModBoatEntity createBoat(
+    private static BlockPos findWaterSurfaceAt(ServerLevel level, int x, int z) {
+        BlockPos.MutableBlockPos mutable = new BlockPos.MutableBlockPos();
+
+        int topY = level.getMaxBuildHeight() - 1;
+        int bottomY = level.getMinBuildHeight();
+
+        for (int y = topY; y >= bottomY; y--) {
+            mutable.set(x, y, z);
+
+            boolean isWater = level.getFluidState(mutable).is(FluidTags.WATER);
+            boolean aboveIsAir = level.getBlockState(mutable.above()).isAir();
+            boolean twoAboveIsAir = level.getBlockState(mutable.above(2)).isAir();
+
+            if (isWater && aboveIsAir && twoAboveIsAir) {
+                return mutable.immutable().above();
+            }
+        }
+
+        return null;
+    }
+
+    private static Entity spawnPatrolBoat(
             ServerLevel level,
-            BlockPos pos,
-            SailboatSize size,
-            Boat.Type woodType,
-            int chestCount,
-            ServerPlayer target,
-            UUID patrolId
+            BlockPos spawnPos,
+            PatrolShipEntry entry,
+            Boat.Type woodType
     ) {
-        ModBoatEntity boat = createBoatEntityForSize(level, size);
+        boolean lootBoat = isLootShip(entry);
+        int chestCount = lootBoat ? 1 : 0;
+
+        ModBoatEntity boat = createBoatForSize(level, entry.size());
 
         if (boat == null) {
             return null;
         }
 
-        boat.moveTo(
-                pos.getX() + 0.5D,
-                pos.getY(),
-                pos.getZ() + 0.5D,
-                getYawFacingTarget(pos, target),
-                0.0F
-        );
-
-        boat.setDeltaMovement(Vec3.ZERO);
         boat.setModVariant(woodType);
-        boat.setBoatSizeTier(getBoatSizeTier(size));
+        boat.setBoatSizeTier(getBoatSizeTier(entry.size()));
         boat.setChestCount(chestCount);
         boat.setBannerStack(Raid.getLeaderBannerInstance());
 
-        boat.addTag("PirateTreasureRaidBoat");
-        boat.addTag("PiratePatrolBoat");
-        boat.addTag("PirateTreasureRaid_" + patrolId);
+        if (boat.isLargeSailboat()) {
+            boat.setSecondBannerStack(Raid.getLeaderBannerInstance());
+        }
+
+        boat.moveTo(
+                spawnPos.getX() + 0.5D,
+                spawnPos.getY(),
+                spawnPos.getZ() + 0.5D,
+                level.random.nextFloat() * 360.0F,
+                0.0F
+        );
+
+        level.addFreshEntity(boat);
 
         return boat;
     }
 
-    private static ModBoatEntity createBoatEntityForSize(ServerLevel level, SailboatSize size) {
+    private static ModBoatEntity createBoatForSize(ServerLevel level, PatrolShipSize size) {
         return switch (size) {
             case SMALL -> ModEntities.MOD_BOAT.get().create(level);
             case MEDIUM -> ModEntities.MEDIUM_MOD_BOAT.get().create(level);
@@ -298,7 +302,7 @@ public class PiratePatrolFormation {
         };
     }
 
-    private static int getBoatSizeTier(SailboatSize size) {
+    private static int getBoatSizeTier(PatrolShipSize size) {
         return switch (size) {
             case SMALL -> 1;
             case MEDIUM -> 2;
@@ -306,154 +310,303 @@ public class PiratePatrolFormation {
         };
     }
 
-    private static float getYawFacingTarget(BlockPos pos, ServerPlayer target) {
-        Vec3 boatPos = Vec3.atBottomCenterOf(pos);
-        Vec3 targetPos = target.position();
-
-        Vec3 direction = targetPos.subtract(boatPos);
-
-        if (direction.lengthSqr() < 0.001D) {
-            return 0.0F;
-        }
-
-        return (float) (Mth.atan2(direction.z, direction.x) * Mth.RAD_TO_DEG) - 90.0F;
-    }
-
-    private static Boat.Type getRandomWoodType(ServerLevel level) {
+    private static Boat.Type getRandomBoatType(ServerLevel level) {
         Boat.Type[] types = Boat.Type.values();
         return types[level.random.nextInt(types.length)];
     }
 
-    private static Mob createRandomPirateRaider(
+    private static void setupPatrolBoat(Entity boat, ServerPlayer target, UUID patrolId) {
+        /*
+         * Important:
+         * This MUST use PirateRaidAiUtil.RAID_BOAT_TAG.
+         * The pilot/remount goals look for this tag.
+         */
+        boat.addTag(PirateRaidAiUtil.RAID_BOAT_TAG);
+        boat.addTag(PATROL_BOAT_TAG);
+        boat.addTag(getPatrolGroupTag(patrolId));
+        boat.getPersistentData().putUUID(PirateRaidAiUtil.TARGET_UUID_TAG, target.getUUID());
+
+        Vec3 lookDirection = target.position().subtract(boat.position());
+
+        if (lookDirection.lengthSqr() > 0.01D) {
+            float yaw = (float) (Math.atan2(lookDirection.z, lookDirection.x) * (180.0D / Math.PI)) - 90.0F;
+            boat.setYRot(yaw);
+            boat.setYHeadRot(yaw);
+        }
+    }
+
+    private static void mountCrewToBoat(Entity boat, List<Mob> crew) {
+        for (Mob pirate : crew) {
+            if (pirate == null || !pirate.isAlive()) {
+                continue;
+            }
+
+            pirate.getPersistentData().putUUID(PirateRaidAiUtil.RAID_BOAT_UUID_TAG, boat.getUUID());
+
+            if (boat instanceof ModBoatEntity modBoat) {
+                modBoat.addMobToSailboat(pirate);
+            } else {
+                pirate.startRiding(boat, true);
+            }
+        }
+    }
+
+    private static List<Mob> spawnCombatShipPirates(
             ServerLevel level,
-            BlockPos pos,
             ServerPlayer target,
+            BlockPos spawnPos,
+            UUID patrolId,
+            PatrolShipSize size
+    ) {
+        List<Mob> spawnedPirates = new ArrayList<>();
+
+        spawnRandomPirates(
+                spawnedPirates,
+                level,
+                target,
+                spawnPos,
+                patrolId,
+                getCombatCrewCount(size)
+        );
+
+        return spawnedPirates;
+    }
+
+    private static List<Mob> spawnLootShipPirates(
+            ServerLevel level,
+            ServerPlayer target,
+            BlockPos spawnPos,
+            UUID patrolId,
+            PatrolShipSize size
+    ) {
+        List<Mob> spawnedPirates = new ArrayList<>();
+
+        spawnRandomPirates(
+                spawnedPirates,
+                level,
+                target,
+                spawnPos,
+                patrolId,
+                getLootCrewCount(size)
+        );
+
+        return spawnedPirates;
+    }
+
+    private static List<Mob> spawnCaptainLootShipPirates(
+            ServerLevel level,
+            ServerPlayer target,
+            BlockPos spawnPos,
             UUID patrolId
     ) {
+        List<Mob> spawnedPirates = new ArrayList<>();
+
+        addIfNotNull(
+                spawnedPirates,
+                spawnPirateCaptain(level, target, spawnPos, patrolId)
+        );
+
+        spawnRandomPirates(
+                spawnedPirates,
+                level,
+                target,
+                spawnPos.offset(1, 0, 0),
+                patrolId,
+                2
+        );
+
+        return spawnedPirates;
+    }
+
+    private static List<Mob> spawnCaptainShipPirates(
+            ServerLevel level,
+            ServerPlayer target,
+            BlockPos spawnPos,
+            UUID patrolId
+    ) {
+        List<Mob> spawnedPirates = new ArrayList<>();
+
+        addIfNotNull(
+                spawnedPirates,
+                spawnPirateCaptain(level, target, spawnPos, patrolId)
+        );
+
+        spawnRandomPirates(
+                spawnedPirates,
+                level,
+                target,
+                spawnPos.offset(1, 0, 0),
+                patrolId,
+                3
+        );
+
+        return spawnedPirates;
+    }
+
+    private static int getCombatCrewCount(PatrolShipSize size) {
+        return switch (size) {
+            case SMALL -> 1;
+            case MEDIUM -> 2;
+            case LARGE -> 4;
+        };
+    }
+
+    private static int getLootCrewCount(PatrolShipSize size) {
+        return switch (size) {
+            case SMALL -> 1;
+            case MEDIUM -> 2;
+            case LARGE -> 3;
+        };
+    }
+
+    private static void spawnRandomPirates(
+            List<Mob> spawnedPirates,
+            ServerLevel level,
+            ServerPlayer target,
+            BlockPos spawnPos,
+            UUID patrolId,
+            int count
+    ) {
+        for (int i = 0; i < count; i++) {
+            BlockPos offsetPos = spawnPos.offset(getCrewOffsetX(i), 0, getCrewOffsetZ(i));
+
+            addIfNotNull(
+                    spawnedPirates,
+                    spawnRandomPirate(level, target, offsetPos, patrolId)
+            );
+        }
+    }
+
+    private static Mob spawnRandomPirate(ServerLevel level, ServerPlayer target, BlockPos pos, UUID patrolId) {
         int roll = level.random.nextInt(100);
 
         if (roll < 50) {
-            return createPirateDeckhand(level, pos, target, patrolId);
+            return spawnPirateDeckhand(level, target, pos, patrolId);
         }
 
         if (roll < 80) {
-            return createPirateGunner(level, pos, target, patrolId);
+            return spawnPirateGunner(level, target, pos, patrolId);
         }
 
-        return createPirateMarauder(level, pos, target, patrolId);
+        /*
+         * This is the marauder.
+         * It is a boarder hybrid, so it gets BOARDER_TAG later.
+         */
+        return spawnPirateMarauder(level, target, pos, patrolId);
     }
 
-    private static void finalizePirateSpawn(ServerLevel level, Mob pirate, BlockPos pos) {
-        if (pirate == null) {
-            return;
-        }
+    private static int getCrewOffsetX(int index) {
+        return switch (index) {
+            case 1 -> 1;
+            case 2 -> -1;
+            default -> 0;
+        };
+    }
 
-        pirate.finalizeSpawn(
+    private static int getCrewOffsetZ(int index) {
+        return switch (index) {
+            case 3 -> 1;
+            case 4 -> -1;
+            default -> 0;
+        };
+    }
+
+    private static Mob spawnPirateCaptain(ServerLevel level, ServerPlayer target, BlockPos pos, UUID patrolId) {
+        Mob pirate = ModEntities.PIRATE_CAPTAIN.get().spawn(
                 level,
-                level.getCurrentDifficultyAt(pos),
-                MobSpawnType.EVENT,
-                null,
-                null
+                pos,
+                MobSpawnType.EVENT
         );
-    }
 
-    private static Mob createPirateCaptain(
-            ServerLevel level,
-            BlockPos pos,
-            ServerPlayer target,
-            UUID patrolId
-    ) {
-        PirateCaptainEntity captain = ModEntities.PIRATE_CAPTAIN.get().create(level);
+        Mob result = setupPirate(pirate, target, pos, patrolId, PirateRaidAiUtil.RANGED_TAG);
 
-        if (captain == null) {
-            return null;
+        if (result != null) {
+            result.addTag(PirateRaidAiUtil.CAPTAIN_TAG);
         }
 
-        finalizePirateSpawn(level, captain, pos);
-
-        captain.setPersistenceRequired();
-        captain.setTarget(target);
-
-        captain.addTag("PirateTreasureRaid");
-        captain.addTag("PiratePatrol");
-        captain.addTag("PirateRaidRanged");
-        captain.addTag("PirateTreasureRaid_" + patrolId);
-
-        return captain;
+        return result;
     }
 
-    private static Mob createPirateDeckhand(
-            ServerLevel level,
-            BlockPos pos,
-            ServerPlayer target,
-            UUID patrolId
-    ) {
-        PirateDeckhandEntity pirate = ModEntities.PIRATE_DECKHAND.get().create(level);
+    private static Mob spawnPirateDeckhand(ServerLevel level, ServerPlayer target, BlockPos pos, UUID patrolId) {
+        Mob pirate = ModEntities.PIRATE_DECKHAND.get().spawn(
+                level,
+                pos,
+                MobSpawnType.EVENT
+        );
 
+        return setupPirate(pirate, target, pos, patrolId, PirateRaidAiUtil.BOARDER_TAG);
+    }
+
+    private static Mob spawnPirateGunner(ServerLevel level, ServerPlayer target, BlockPos pos, UUID patrolId) {
+        Mob pirate = ModEntities.PIRATE_GUNNER.get().spawn(
+                level,
+                pos,
+                MobSpawnType.EVENT
+        );
+
+        return setupPirate(pirate, target, pos, patrolId, PirateRaidAiUtil.RANGED_TAG);
+    }
+
+    private static Mob spawnPirateMarauder(ServerLevel level, ServerPlayer target, BlockPos pos, UUID patrolId) {
+        Mob pirate = ModEntities.PIRATE_MARAUDER.get().spawn(
+                level,
+                pos,
+                MobSpawnType.EVENT
+        );
+
+        /*
+         * Marauder is a boarder hybrid.
+         * Do NOT give it RANGED_TAG.
+         */
+        return setupPirate(pirate, target, pos, patrolId, PirateRaidAiUtil.BOARDER_TAG);
+    }
+
+    private static Mob setupPirate(
+            Mob pirate,
+            ServerPlayer target,
+            BlockPos pos,
+            UUID patrolId,
+            String roleTag
+    ) {
         if (pirate == null) {
             return null;
         }
 
-        finalizePirateSpawn(level, pirate, pos);
-
-        pirate.setPersistenceRequired();
+        pirate.moveTo(Vec3.atBottomCenterOf(pos));
         pirate.setTarget(target);
+        pirate.setPersistenceRequired();
 
-        pirate.addTag("PirateTreasureRaid");
-        pirate.addTag("PiratePatrol");
-        pirate.addTag("PirateRaidBoarder");
-        pirate.addTag("PirateTreasureRaid_" + patrolId);
+        pirate.addTag(PirateRaidAiUtil.RAID_PIRATE_TAG);
+        pirate.addTag(PATROL_TAG);
+        pirate.addTag(getPatrolGroupTag(patrolId));
+        pirate.addTag(roleTag);
 
         return pirate;
     }
 
-    private static Mob createPirateGunner(
-            ServerLevel level,
-            BlockPos pos,
-            ServerPlayer target,
-            UUID patrolId
-    ) {
-        PirateGunnerEntity pirate = ModEntities.PIRATE_GUNNER.get().create(level);
-
-        if (pirate == null) {
-            return null;
-        }
-
-        finalizePirateSpawn(level, pirate, pos);
-
-        pirate.setPersistenceRequired();
-        pirate.setTarget(target);
-
-        pirate.addTag("PirateTreasureRaid");
-        pirate.addTag("PiratePatrol");
-        pirate.addTag("PirateRaidRanged");
-        pirate.addTag("PirateTreasureRaid_" + patrolId);
-
-        return pirate;
+    private static String getPatrolGroupTag(UUID patrolId) {
+        return PirateRaidAiUtil.RAID_PIRATE_TAG + "_" + patrolId;
     }
 
-    private static Mob createPirateMarauder(
-            ServerLevel level,
-            BlockPos pos,
-            ServerPlayer target,
-            UUID patrolId
-    ) {
-        PirateMarauderEntity pirate = ModEntities.PIRATE_MARAUDER.get().create(level);
-
-        if (pirate == null) {
-            return null;
+    private static void addIfNotNull(List<Mob> list, Mob mob) {
+        if (mob != null) {
+            list.add(mob);
         }
+    }
 
-        finalizePirateSpawn(level, pirate, pos);
+    private enum PatrolShipRole {
+        CAPTAIN,
+        CAPTAIN_LOOT,
+        COMBAT,
+        LOOT
+    }
 
-        pirate.setPersistenceRequired();
-        pirate.setTarget(target);
+    private enum PatrolShipSize {
+        SMALL,
+        MEDIUM,
+        LARGE
+    }
 
-        pirate.addTag("PirateTreasureRaid");
-        pirate.addTag("PiratePatrol");
-        pirate.addTag("PirateRaidBoarder");
-        pirate.addTag("PirateTreasureRaid_" + patrolId);
-
-        return pirate;
+    private record PatrolShipEntry(PatrolShipSize size, PatrolShipRole role) {
     }
 }

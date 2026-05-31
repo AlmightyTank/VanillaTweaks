@@ -1,6 +1,7 @@
 package com.amightytank.vanillatweaks.world.pirate_raid;
 
 import com.amightytank.vanillatweaks.entity.ModEntities;
+import com.amightytank.vanillatweaks.entity.ai.PirateRaidAiUtil;
 import com.amightytank.vanillatweaks.entity.custom.boat.ModBoatEntity;
 import com.amightytank.vanillatweaks.util.PirateLootHelper;
 import net.minecraft.core.BlockPos;
@@ -20,11 +21,12 @@ import java.util.List;
 import java.util.UUID;
 
 public class PirateShipSpawner {
-    private static final String RAID_TAG = "PirateTreasureRaid";
-    private static final String RAID_BOAT_TAG = "PirateTreasureRaidBoat";
-    private static final String RAID_BOARDER_TAG = "PirateRaidBoarder";
-    private static final String RAID_RANGED_TAG = "PirateRaidRanged";
-    private static final String RAID_BOAT_UUID_TAG = "PirateRaidBoatUUID";
+    /*
+     * Optional legacy tag.
+     * Keep this only so older treasure-raid cleanup/tracking code can still find these boats.
+     * AI goals use PirateRaidAiUtil.RAID_BOAT_TAG.
+     */
+    private static final String LEGACY_TREASURE_RAID_BOAT_TAG = "PirateTreasureRaidBoat";
 
     public static List<Mob> spawnWave(
             ServerLevel level,
@@ -50,6 +52,7 @@ public class PirateShipSpawner {
         );
 
         double attackAngle = Math.toRadians(level.random.nextInt(360));
+        Boat.Type fleetWoodType = getRandomBoatType(level);
 
         for (int i = 0; i < wavePlan.size(); i++) {
             PirateShipSpawnEntry entry = wavePlan.get(i);
@@ -67,7 +70,8 @@ public class PirateShipSpawner {
                     target,
                     formationPos,
                     raidId,
-                    entry
+                    entry,
+                    fleetWoodType
             ));
         }
 
@@ -84,7 +88,8 @@ public class PirateShipSpawner {
             ServerPlayer target,
             BlockPos spawnPos,
             UUID raidId,
-            PirateShipSpawnEntry entry
+            PirateShipSpawnEntry entry,
+            Boat.Type woodType
     ) {
         List<Mob> spawnedPirates = new ArrayList<>();
 
@@ -98,7 +103,13 @@ public class PirateShipSpawner {
 
         announceDebugShip(target, entry);
 
-        Entity boat = spawnRaidBoat(level, spawnPos, entry);
+        Entity boat = spawnRaidBoat(level, spawnPos, entry, woodType);
+
+        if (boat == null) {
+            return spawnedPirates;
+        }
+
+        setupRaidBoat(boat, target, raidId);
 
         if (boat instanceof ModBoatEntity modBoat && isLootShip(entry)) {
             fillLootShip(level, modBoat);
@@ -114,10 +125,7 @@ public class PirateShipSpawner {
             spawnedPirates.addAll(spawnCombatShipPirates(level, target, spawnPos, raidId, entry.size()));
         }
 
-        if (boat != null) {
-            setupRaidBoat(boat, target, raidId);
-            mountCrewToBoat(boat, spawnedPirates);
-        }
+        mountCrewToBoat(boat, spawnedPirates);
 
         return spawnedPirates;
     }
@@ -128,7 +136,7 @@ public class PirateShipSpawner {
     }
 
     private static void fillLootShip(ServerLevel level, ModBoatEntity boat) {
-        PirateLootHelper.fillLootShipChest(level, boat, boat);
+        PirateLootHelper.fillPirateLootShip(level, boat);
     }
 
     private static BlockPos getVFormationPosition(
@@ -165,9 +173,7 @@ public class PirateShipSpawner {
 
         BlockPos wantedPos = BlockPos.containing(spawn);
 
-        BlockPos surface = findNearbySurfaceWater(level, wantedPos, 10);
-
-        return surface != null ? surface : null;
+        return findNearbySurfaceWater(level, wantedPos, 10);
     }
 
     private static int getVRow(int index) {
@@ -209,9 +215,13 @@ public class PirateShipSpawner {
         return null;
     }
 
-    private static Entity spawnRaidBoat(ServerLevel level, BlockPos spawnPos, PirateShipSpawnEntry entry) {
-        boolean lootBoat = entry.role() == PirateShipRole.LOOT
-                || entry.role() == PirateShipRole.CAPTAIN_LOOT;
+    private static Entity spawnRaidBoat(
+            ServerLevel level,
+            BlockPos spawnPos,
+            PirateShipSpawnEntry entry,
+            Boat.Type woodType
+    ) {
+        boolean lootBoat = isLootShip(entry);
 
         PirateShipSize finalSize = entry.role() == PirateShipRole.CAPTAIN_LOOT
                 ? PirateShipSize.LARGE
@@ -219,14 +229,15 @@ public class PirateShipSpawner {
 
         int chestCount = lootBoat ? 1 : 0;
 
-        return spawnSailboat(level, spawnPos, finalSize, chestCount);
+        return spawnSailboat(level, spawnPos, finalSize, chestCount, woodType);
     }
 
     private static Entity spawnSailboat(
             ServerLevel level,
             BlockPos spawnPos,
             PirateShipSize size,
-            int chestCount
+            int chestCount,
+            Boat.Type woodType
     ) {
         ModBoatEntity boat = createBoatForSize(level, size);
 
@@ -234,12 +245,17 @@ public class PirateShipSpawner {
             return null;
         }
 
-        Boat.Type woodType = getRandomBoatType(level);
-
         boat.setModVariant(woodType);
         boat.setBoatSizeTier(getBoatSizeTier(size));
         boat.setChestCount(chestCount);
         boat.setBannerStack(Raid.getLeaderBannerInstance());
+
+        /*
+         * Large sailboats support two banners.
+         */
+        if (boat.isLargeSailboat()) {
+            boat.setSecondBannerStack(Raid.getLeaderBannerInstance());
+        }
 
         boat.moveTo(
                 spawnPos.getX() + 0.5D,
@@ -276,8 +292,20 @@ public class PirateShipSpawner {
     }
 
     private static void setupRaidBoat(Entity boat, ServerPlayer target, UUID raidId) {
-        boat.addTag(RAID_BOAT_TAG);
+        /*
+         * Important:
+         * AI goals look for PirateRaidAiUtil.RAID_BOAT_TAG.
+         */
+        boat.addTag(PirateRaidAiUtil.RAID_BOAT_TAG);
+
+        /*
+         * Optional old treasure raid boat tag.
+         * Safe to keep for compatibility with older cleanup/tracking code.
+         */
+        boat.addTag(LEGACY_TREASURE_RAID_BOAT_TAG);
+
         boat.addTag(getRaidGroupTag(raidId));
+        boat.getPersistentData().putUUID(PirateRaidAiUtil.TARGET_UUID_TAG, target.getUUID());
 
         Vec3 lookDirection = target.position().subtract(boat.position());
 
@@ -294,7 +322,7 @@ public class PirateShipSpawner {
                 continue;
             }
 
-            pirate.getPersistentData().putUUID(RAID_BOAT_UUID_TAG, boat.getUUID());
+            pirate.getPersistentData().putUUID(PirateRaidAiUtil.RAID_BOAT_UUID_TAG, boat.getUUID());
 
             if (boat instanceof ModBoatEntity modBoat) {
                 modBoat.addMobToSailboat(pirate);
@@ -441,7 +469,10 @@ public class PirateShipSpawner {
             return spawnPirateGunner(level, target, pos, raidId);
         }
 
-        return spawnPirateBrute(level, target, pos, raidId);
+        /*
+         * Marauder is the heavy boarder hybrid.
+         */
+        return spawnPirateMarauder(level, target, pos, raidId);
     }
 
     private static int getCrewOffsetX(int index) {
@@ -488,7 +519,13 @@ public class PirateShipSpawner {
                 MobSpawnType.EVENT
         );
 
-        return setupPirate(pirate, target, pos, raidId, RAID_RANGED_TAG);
+        Mob result = setupPirate(pirate, target, pos, raidId, PirateRaidAiUtil.RANGED_TAG);
+
+        if (result != null) {
+            result.addTag(PirateRaidAiUtil.CAPTAIN_TAG);
+        }
+
+        return result;
     }
 
     private static Mob spawnPirateDeckhand(ServerLevel level, ServerPlayer target, BlockPos pos, UUID raidId) {
@@ -498,7 +535,7 @@ public class PirateShipSpawner {
                 MobSpawnType.EVENT
         );
 
-        return setupPirate(pirate, target, pos, raidId, RAID_BOARDER_TAG);
+        return setupPirate(pirate, target, pos, raidId, PirateRaidAiUtil.BOARDER_TAG);
     }
 
     private static Mob spawnPirateGunner(ServerLevel level, ServerPlayer target, BlockPos pos, UUID raidId) {
@@ -508,17 +545,21 @@ public class PirateShipSpawner {
                 MobSpawnType.EVENT
         );
 
-        return setupPirate(pirate, target, pos, raidId, RAID_RANGED_TAG);
+        return setupPirate(pirate, target, pos, raidId, PirateRaidAiUtil.RANGED_TAG);
     }
 
-    private static Mob spawnPirateBrute(ServerLevel level, ServerPlayer target, BlockPos pos, UUID raidId) {
+    private static Mob spawnPirateMarauder(ServerLevel level, ServerPlayer target, BlockPos pos, UUID raidId) {
         Mob pirate = ModEntities.PIRATE_MARAUDER.get().spawn(
                 level,
                 pos,
                 MobSpawnType.EVENT
         );
 
-        return setupPirate(pirate, target, pos, raidId, RAID_BOARDER_TAG);
+        /*
+         * Marauder is a boarder hybrid.
+         * Do NOT give it RANGED_TAG.
+         */
+        return setupPirate(pirate, target, pos, raidId, PirateRaidAiUtil.BOARDER_TAG);
     }
 
     private static Mob setupPirate(
@@ -533,20 +574,10 @@ public class PirateShipSpawner {
         }
 
         pirate.moveTo(Vec3.atBottomCenterOf(pos));
-
-        /*
-         * This gives the boat goals an initial target immediately.
-         * The updated boat goals should still re-find the player later
-         * if vanilla AI clears the target at distance.
-         */
         pirate.setTarget(target);
-
-        /*
-         * Keep raid pirates from despawning while the wave is active.
-         */
         pirate.setPersistenceRequired();
 
-        pirate.addTag(RAID_TAG);
+        pirate.addTag(PirateRaidAiUtil.RAID_PIRATE_TAG);
         pirate.addTag(getRaidGroupTag(raidId));
         pirate.addTag(raidRoleTag);
 
@@ -554,7 +585,7 @@ public class PirateShipSpawner {
     }
 
     private static String getRaidGroupTag(UUID raidId) {
-        return "PirateTreasureRaid_" + raidId;
+        return PirateRaidAiUtil.RAID_PIRATE_TAG + "_" + raidId;
     }
 
     private static void addIfNotNull(List<Mob> list, Mob mob) {

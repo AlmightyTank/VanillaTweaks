@@ -6,14 +6,15 @@ import com.amightytank.vanillatweaks.world.PiratePatrolSize;
 import com.mojang.brigadier.Command;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
-import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.world.phys.Vec3;
+import net.minecraft.world.entity.Mob;
 import net.minecraftforge.event.RegisterCommandsEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
+
+import java.util.List;
 
 @Mod.EventBusSubscriber(modid = VanillaTweaks.MOD_ID)
 public class ModCommands {
@@ -24,13 +25,25 @@ public class ModCommands {
                 Commands.literal("piratepatrol")
                         .requires(source -> source.hasPermission(2))
                         .then(Commands.literal("spawn")
-                                .executes(context -> spawnPatrol(context.getSource(), getRandomSize(context.getSource().getLevel())))
+                                .executes(context -> spawnPatrol(
+                                        context.getSource(),
+                                        getRandomSize(context.getSource().getLevel())
+                                ))
                                 .then(Commands.literal("small")
-                                        .executes(context -> spawnPatrol(context.getSource(), PiratePatrolSize.SMALL)))
+                                        .executes(context -> spawnPatrol(
+                                                context.getSource(),
+                                                PiratePatrolSize.SMALL
+                                        )))
                                 .then(Commands.literal("medium")
-                                        .executes(context -> spawnPatrol(context.getSource(), PiratePatrolSize.MEDIUM)))
+                                        .executes(context -> spawnPatrol(
+                                                context.getSource(),
+                                                PiratePatrolSize.MEDIUM
+                                        )))
                                 .then(Commands.literal("large")
-                                        .executes(context -> spawnPatrol(context.getSource(), PiratePatrolSize.LARGE)))
+                                        .executes(context -> spawnPatrol(
+                                                context.getSource(),
+                                                PiratePatrolSize.LARGE
+                                        )))
                         )
         );
     }
@@ -46,12 +59,25 @@ public class ModCommands {
         }
 
         ServerLevel level = player.serverLevel();
-        BlockPos spawnPos = getSpawnPosInFrontOfPlayer(player);
 
-        PiratePatrolFormation.spawn(level, spawnPos, player, size);
+        List<Mob> spawnedPirates = PiratePatrolFormation.spawnPatrol(
+                level,
+                player
+        );
+
+        if (spawnedPirates.isEmpty()) {
+            source.sendFailure(Component.literal("Could not find nearby surface water for the pirate patrol."));
+            return 0;
+        }
 
         source.sendSuccess(
-                () -> Component.literal("Spawned " + size.name().toLowerCase() + " pirate patrol."),
+                () -> Component.literal(
+                        "Spawned "
+                                + size.name().toLowerCase()
+                                + " pirate patrol with "
+                                + spawnedPirates.size()
+                                + " pirates."
+                ),
                 true
         );
 
@@ -70,17 +96,5 @@ public class ModCommands {
         }
 
         return PiratePatrolSize.LARGE;
-    }
-
-    private static BlockPos getSpawnPosInFrontOfPlayer(ServerPlayer player) {
-        Vec3 look = player.getLookAngle();
-
-        Vec3 spawnVec = player.position().add(
-                look.x * 24.0D,
-                0.0D,
-                look.z * 24.0D
-        );
-
-        return BlockPos.containing(spawnVec);
     }
 }

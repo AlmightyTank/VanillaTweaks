@@ -1,9 +1,7 @@
 package com.amightytank.vanillatweaks.entity.custom.pirate;
 
 import com.amightytank.vanillatweaks.entity.ModEntities;
-import com.amightytank.vanillatweaks.entity.ai.PirateBoatBoarderRaidGoal;
-import com.amightytank.vanillatweaks.entity.ai.PirateMarauderCloseMeleeGoal;
-import com.amightytank.vanillatweaks.entity.ai.PirateMarauderRangedAttackGoal;
+import com.amightytank.vanillatweaks.entity.ai.*;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.sounds.SoundEvent;
 import net.minecraft.sounds.SoundEvents;
@@ -18,15 +16,9 @@ import net.minecraft.world.entity.MobSpawnType;
 import net.minecraft.world.entity.SpawnGroupData;
 import net.minecraft.world.entity.ai.attributes.AttributeSupplier;
 import net.minecraft.world.entity.ai.attributes.Attributes;
-import net.minecraft.world.entity.ai.goal.FloatGoal;
-import net.minecraft.world.entity.ai.goal.LookAtPlayerGoal;
-import net.minecraft.world.entity.ai.goal.RandomLookAroundGoal;
-import net.minecraft.world.entity.ai.goal.target.HurtByTargetGoal;
-import net.minecraft.world.entity.ai.goal.target.NearestAttackableTargetGoal;
 import net.minecraft.world.entity.monster.AbstractIllager;
 import net.minecraft.world.entity.monster.Monster;
 import net.minecraft.world.entity.monster.RangedAttackMob;
-import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.Level;
@@ -47,25 +39,12 @@ public class PirateMarauderEntity extends AbstractPirateEntity implements Ranged
     @Override
     protected void registerGoals() {
         super.registerGoals();
-        this.goalSelector.addGoal(1, new PirateBoatBoarderRaidGoal(this));
 
-        // Melee only when close.
-        this.goalSelector.addGoal(2, new PirateMarauderCloseMeleeGoal(
-                this,
-                1.05D,
-                false,
-                3.0D,
-                4.0D
-        ));
-
-        // Throw only when farther away.
-        this.goalSelector.addGoal(3, new PirateMarauderRangedAttackGoal(
-                this,
-                1.0D,
-                45,
-                15.0F,
-                4.0F
-        ));
+        this.goalSelector.addGoal(3, new PirateBoatPilotGoal(this));
+        this.goalSelector.addGoal(4, new PirateBoatBoarderRemountGoal(this));
+        this.goalSelector.addGoal(5, new PirateBoatBoarderDismountGoal(this));
+        this.goalSelector.addGoal(6, new PirateBoarderChargeGoal(this));
+        this.goalSelector.addGoal(7, new PirateMarauderThrowWhileChargingGoal(this, 30, 24.0F, 3.5F));
     }
 
     @Override
@@ -93,7 +72,7 @@ public class PirateMarauderEntity extends AbstractPirateEntity implements Ranged
                 .add(Attributes.ATTACK_DAMAGE, 8.0D)
                 .add(Attributes.ARMOR, 5.0D)
                 .add(Attributes.MOVEMENT_SPEED, 0.32D)
-                .add(Attributes.FOLLOW_RANGE, 32.0D)
+                .add(Attributes.FOLLOW_RANGE, 64.0D)
                 .add(Attributes.KNOCKBACK_RESISTANCE, 0.4D);
     }
 
@@ -113,9 +92,7 @@ public class PirateMarauderEntity extends AbstractPirateEntity implements Ranged
                                         @Nullable CompoundTag tag) {
         SpawnGroupData data = super.finalizeSpawn(level, difficulty, spawnType, spawnData, tag);
 
-        if (this.getMainHandItem().isEmpty()) {
-            this.equipRandomBruteWeapon(level.getRandom());
-        }
+        this.equipRandomBruteWeapon(level.getRandom());
 
         return data;
     }
@@ -155,11 +132,11 @@ public class PirateMarauderEntity extends AbstractPirateEntity implements Ranged
 
     @Override
     public void performRangedAttack(LivingEntity target, float distanceFactor) {
-        if (!this.canBoatRangedAttackTarget(target)) {
+        if (!AbstractPirateEntity.canPirateAttack(target)) {
             return;
         }
 
-        if (!AbstractPirateEntity.canPirateAttack(target)) {
+        if (!this.hasLineOfSight(target)) {
             return;
         }
 
@@ -245,5 +222,15 @@ public class PirateMarauderEntity extends AbstractPirateEntity implements Ranged
     @Override
     public SoundEvent getCelebrateSound() {
         return SoundEvents.PILLAGER_CELEBRATE;
+    }
+
+    @Override
+    public double getBoatPilotStopRange() {
+        return 12.0D;
+    }
+
+    @Override
+    public double getBoatPilotStartRange() {
+        return 18.0D;
     }
 }
