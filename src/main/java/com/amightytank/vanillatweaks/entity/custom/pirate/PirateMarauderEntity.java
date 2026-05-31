@@ -44,7 +44,7 @@ public class PirateMarauderEntity extends AbstractPirateEntity implements Ranged
         this.goalSelector.addGoal(4, new PirateBoatBoarderRemountGoal(this));
         this.goalSelector.addGoal(5, new PirateBoatBoarderDismountGoal(this));
         this.goalSelector.addGoal(6, new PirateBoarderChargeGoal(this));
-        this.goalSelector.addGoal(7, new PirateMarauderThrowWhileChargingGoal(this, 30, 24.0F, 3.5F));
+        this.goalSelector.addGoal(7, new PirateMarauderThrowWhileChargingGoal(this));
     }
 
     @Override

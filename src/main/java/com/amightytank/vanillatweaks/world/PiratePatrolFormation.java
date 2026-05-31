@@ -1,7 +1,7 @@
 package com.amightytank.vanillatweaks.world;
 
 import com.amightytank.vanillatweaks.entity.ModEntities;
-import com.amightytank.vanillatweaks.entity.ai.PirateRaidAiUtil;
+import com.amightytank.vanillatweaks.entity.ai.util.PirateRaidAiUtil;
 import com.amightytank.vanillatweaks.entity.custom.boat.ModBoatEntity;
 import com.amightytank.vanillatweaks.util.PirateLootHelper;
 import net.minecraft.core.BlockPos;

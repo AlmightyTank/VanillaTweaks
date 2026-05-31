@@ -1,5 +1,6 @@
 package com.amightytank.vanillatweaks.entity.ai;
 
+import com.amightytank.vanillatweaks.entity.ai.util.PirateRaidAiUtil;
 import com.amightytank.vanillatweaks.entity.custom.boat.ModBoatEntity;
 import com.amightytank.vanillatweaks.entity.custom.pirate.AbstractPirateEntity;
 import net.minecraft.nbt.CompoundTag;

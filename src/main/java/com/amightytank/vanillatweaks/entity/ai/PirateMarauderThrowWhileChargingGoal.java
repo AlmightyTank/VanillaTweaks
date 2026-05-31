@@ -1,161 +1,124 @@
 package com.amightytank.vanillatweaks.entity.ai;
 
-import com.amightytank.vanillatweaks.entity.custom.pirate.PirateMarauderEntity;
+import com.amightytank.vanillatweaks.entity.ai.util.PirateLookHelper;
+import com.amightytank.vanillatweaks.entity.custom.pirate.AbstractPirateEntity;
+import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.ai.goal.Goal;
 import net.minecraft.world.entity.monster.RangedAttackMob;
 
 import java.util.EnumSet;
 
 public class PirateMarauderThrowWhileChargingGoal extends Goal {
-    private final PirateMarauderEntity marauder;
-    private final RangedAttackMob rangedAttackMob;
+    private static final double MAX_CHASE_DISTANCE = 34.0D;
+    private static final double THROW_RANGE = 18.0D;
+    private static final double MELEE_REACH_DISTANCE = 2.4D;
 
-    private final int attackInterval;
-    private final float maxAttackRange;
-    private final float maxAttackRangeSqr;
-    private final float minThrowRange;
-    private final float minThrowRangeSqr;
+    private static final int THROW_COOLDOWN_TICKS = 45;
+    private static final int MELEE_COOLDOWN_TICKS = 20;
 
-    private int attackCooldown;
-    private int seeTime;
+    private final Mob pirate;
 
-    public PirateMarauderThrowWhileChargingGoal(
-            PirateMarauderEntity marauder,
-            int attackInterval,
-            float maxAttackRange,
-            float minThrowRange
-    ) {
-        this.marauder = marauder;
-        this.rangedAttackMob = marauder;
+    private int throwCooldown;
+    private int meleeCooldown;
+    private int repathCooldown;
 
-        this.attackInterval = attackInterval;
-        this.maxAttackRange = maxAttackRange;
-        this.maxAttackRangeSqr = maxAttackRange * maxAttackRange;
-        this.minThrowRange = minThrowRange;
-        this.minThrowRangeSqr = minThrowRange * minThrowRange;
+    public PirateMarauderThrowWhileChargingGoal(Mob pirate) {
+        this.pirate = pirate;
 
         /*
-         * Important:
-         * Only LOOK.
-         * PirateBoarderChargeGoal keeps MOVE and makes the marauder run in.
+         * MOVE = charge target.
+         * LOOK = face target while throwing/chasing.
          */
-        this.setFlags(EnumSet.of(Goal.Flag.LOOK));
+        this.setFlags(EnumSet.of(Goal.Flag.MOVE, Goal.Flag.LOOK));
     }
 
     @Override
     public boolean canUse() {
-        if (this.marauder.isPassenger()) {
+        if (this.pirate.isPassenger()) {
             return false;
         }
 
-        LivingEntity target = this.marauder.getTarget();
+        LivingEntity target = this.pirate.getTarget();
 
-        if (!this.isAllowedTarget(target)) {
-            return false;
-        }
-
-        double distanceSqr = this.marauder.distanceToSqr(target);
-
-        return distanceSqr <= this.maxAttackRangeSqr
-                && distanceSqr >= this.minThrowRangeSqr;
+        return AbstractPirateEntity.canPirateAttack(target)
+                && this.pirate instanceof RangedAttackMob
+                && this.pirate.distanceToSqr(target) <= MAX_CHASE_DISTANCE * MAX_CHASE_DISTANCE;
     }
 
     @Override
     public boolean canContinueToUse() {
-        if (this.marauder.isPassenger()) {
+        if (this.pirate.isPassenger()) {
             return false;
         }
 
-        LivingEntity target = this.marauder.getTarget();
+        LivingEntity target = this.pirate.getTarget();
 
-        if (!this.isAllowedTarget(target)) {
-            return false;
-        }
-
-        double distanceSqr = this.marauder.distanceToSqr(target);
-
-        /*
-         * Stop throwing once close enough for melee.
-         */
-        return distanceSqr <= this.maxAttackRangeSqr
-                && distanceSqr >= this.minThrowRangeSqr * 0.75D;
+        return AbstractPirateEntity.canPirateAttack(target)
+                && this.pirate.distanceToSqr(target) <= MAX_CHASE_DISTANCE * MAX_CHASE_DISTANCE;
     }
 
     @Override
     public void start() {
-        this.attackCooldown = 10;
-        this.seeTime = 0;
+        this.throwCooldown = 10;
+        this.meleeCooldown = 0;
+        this.repathCooldown = 0;
     }
 
     @Override
     public void stop() {
-        this.attackCooldown = 0;
-        this.seeTime = 0;
+        this.pirate.getNavigation().stop();
     }
 
     @Override
     public void tick() {
-        LivingEntity target = this.marauder.getTarget();
+        LivingEntity target = this.pirate.getTarget();
 
-        if (!this.isAllowedTarget(target)) {
+        if (!AbstractPirateEntity.canPirateAttack(target)) {
             return;
         }
 
-        double distanceSqr = this.marauder.distanceToSqr(target);
+        PirateLookHelper.lookAtEntity(this.pirate, target);
 
-        if (distanceSqr < this.minThrowRangeSqr) {
+        if (this.throwCooldown > 0) {
+            this.throwCooldown--;
+        }
+
+        if (this.meleeCooldown > 0) {
+            this.meleeCooldown--;
+        }
+
+        if (this.repathCooldown > 0) {
+            this.repathCooldown--;
+        }
+
+        double distanceSqr = this.pirate.distanceToSqr(target);
+
+        if (distanceSqr <= MELEE_REACH_DISTANCE * MELEE_REACH_DISTANCE) {
+            this.pirate.getNavigation().stop();
+
+            if (this.meleeCooldown <= 0) {
+                this.pirate.swing(InteractionHand.MAIN_HAND);
+                this.pirate.doHurtTarget(target);
+                this.meleeCooldown = MELEE_COOLDOWN_TICKS;
+            }
+
             return;
         }
 
-        if (distanceSqr > this.maxAttackRangeSqr) {
-            return;
+        if (distanceSqr <= THROW_RANGE * THROW_RANGE
+                && this.throwCooldown <= 0
+                && this.pirate.getSensing().hasLineOfSight(target)
+                && this.pirate instanceof RangedAttackMob rangedAttackMob) {
+            PirateLookHelper.lookAtEntity(this.pirate, target);
+            rangedAttackMob.performRangedAttack(target, 1.0F);
+            this.throwCooldown = THROW_COOLDOWN_TICKS;
         }
 
-        boolean canSeeTarget = this.marauder.getSensing().hasLineOfSight(target);
-
-        if (canSeeTarget) {
-            this.seeTime++;
-        } else {
-            this.seeTime = 0;
+        if (this.repathCooldown <= 0) {
+            this.pirate.getNavigation().moveTo(target, 1.2D);
+            this.repathCooldown = 10;
         }
-
-        this.marauder.getLookControl().setLookAt(target, 30.0F, 30.0F);
-
-        if (this.attackCooldown > 0) {
-            this.attackCooldown--;
-            return;
-        }
-
-        if (!canSeeTarget || this.seeTime < 5) {
-            this.attackCooldown = 5;
-            return;
-        }
-
-        float distanceFactor = (float) Math.sqrt(distanceSqr) / this.maxAttackRange;
-        float clampedDistanceFactor = Math.min(Math.max(distanceFactor, 0.1F), 1.0F);
-
-        this.rangedAttackMob.performRangedAttack(target, clampedDistanceFactor);
-
-        this.attackCooldown = this.attackInterval;
-    }
-
-    private boolean isAllowedTarget(LivingEntity target) {
-        if (!this.marauder.isValidBruteTarget(target)) {
-            return false;
-        }
-
-        /*
-         * Marauder is a boarder hybrid.
-         * If player escaped safely inland, stop throwing and go remount.
-         */
-        if (PirateRaidAiUtil.isTargetSafeOnLandForBoarder(this.marauder, target)) {
-            this.marauder.setTarget(null);
-            this.marauder.getNavigation().stop();
-            PirateRaidAiUtil.markNeedsRemount(this.marauder);
-            return false;
-        }
-
-        return true;
     }
 }

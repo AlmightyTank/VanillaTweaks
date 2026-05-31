@@ -19,6 +19,8 @@ public class CaptainSummonKrakenGoal extends Goal {
     private int castTime;
     private int cooldown;
 
+    private static final int SHARED_SPELL_COOLDOWN_TIME = 100;
+
     private static final int CIRCLE_STRIKE_COUNT = 3;
     private static final double CIRCLE_RADIUS = 2.0D;
     private static final float TENTACLE_YAW_OFFSET = 0.0F;
@@ -49,12 +51,16 @@ public class CaptainSummonKrakenGoal extends Goal {
             return false;
         }
 
+        if (this.cooldown > 0) {
+            this.cooldown--;
+            return false;
+        }
+
         if (this.captain.isCaptainSpellOnCooldown()) {
             return false;
         }
 
-        if (this.cooldown > 0) {
-            this.cooldown--;
+        if (this.captain.hasActiveParrotSwarm()) {
             return false;
         }
 
@@ -83,6 +89,11 @@ public class CaptainSummonKrakenGoal extends Goal {
     public void stop() {
         this.castTime = 0;
         this.cooldown = COOLDOWN_TIME;
+
+        if (!this.captain.level().isClientSide) {
+            this.captain.setCaptainSpellCooldown(SHARED_SPELL_COOLDOWN_TIME);
+        }
+
         this.captain.setAggressive(false);
     }
 

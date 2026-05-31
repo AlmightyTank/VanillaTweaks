@@ -1,107 +1,70 @@
 package com.amightytank.vanillatweaks.entity.ai;
 
+import com.amightytank.vanillatweaks.entity.ai.util.PirateLookHelper;
 import com.amightytank.vanillatweaks.entity.custom.pirate.AbstractPirateEntity;
-import com.amightytank.vanillatweaks.entity.custom.pirate.PirateGunnerEntity;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.ai.goal.Goal;
 import net.minecraft.world.entity.monster.RangedAttackMob;
-import net.minecraft.world.item.Items;
 
 import java.util.EnumSet;
 
 public class PirateGunnerAttackGoal extends Goal {
-    private final PirateGunnerEntity gunner;
-    private final RangedAttackMob rangedAttackMob;
-    private final double speedModifier;
-    private final int attackInterval;
-    private final float attackRadius;
-    private final float attackRadiusSqr;
+    private static final double ATTACK_RANGE = 32.0D;
+    private static final int ATTACK_COOLDOWN_TICKS = 40;
 
-    private int attackTime = -1;
+    private final Mob pirate;
+
+    private int attackCooldown;
     private int seeTime;
-    private int chargeTime = 0;
-    private boolean chargingShot = false;
 
-    public PirateGunnerAttackGoal(
-            PirateGunnerEntity gunner,
-            double speedModifier,
-            int attackInterval,
-            float attackRadius
-    ) {
-        this.gunner = gunner;
-        this.rangedAttackMob = gunner;
-        this.speedModifier = speedModifier;
-        this.attackInterval = attackInterval;
-        this.attackRadius = attackRadius;
-        this.attackRadiusSqr = attackRadius * attackRadius;
+    public PirateGunnerAttackGoal(Mob pirate) {
+        this.pirate = pirate;
 
         /*
-         * Important:
-         * Only LOOK, not MOVE.
-         * This allows PirateBoatPilotGoal to keep controlling the boat.
+         * Gunner should own LOOK so it faces the target while aiming/shooting.
+         * No MOVE flag here so boat pilot / other movement goals can still move.
          */
         this.setFlags(EnumSet.of(Goal.Flag.LOOK));
     }
 
     @Override
     public boolean canUse() {
-        LivingEntity target = this.gunner.getTarget();
-
+        LivingEntity target = this.pirate.getTarget();
         return AbstractPirateEntity.canPirateAttack(target)
-                && this.gunner.getMainHandItem().is(Items.CROSSBOW);
+                && this.pirate instanceof RangedAttackMob;
     }
 
     @Override
     public boolean canContinueToUse() {
-        LivingEntity target = this.gunner.getTarget();
-
+        LivingEntity target = this.pirate.getTarget();
         return AbstractPirateEntity.canPirateAttack(target)
-                && this.gunner.getMainHandItem().is(Items.CROSSBOW);
+                && this.pirate instanceof RangedAttackMob;
     }
 
     @Override
     public void start() {
-        this.attackTime = 10;
+        this.attackCooldown = 10;
         this.seeTime = 0;
-        this.chargeTime = 0;
-        this.chargingShot = false;
-
-        this.gunner.setAggressive(true);
-        this.gunner.setChargingCrossbow(false);
     }
 
     @Override
     public void stop() {
         this.seeTime = 0;
-        this.attackTime = -1;
-        this.chargeTime = 0;
-        this.chargingShot = false;
-
-        this.gunner.setAggressive(false);
-        this.gunner.setChargingCrossbow(false);
-
-        if (!this.gunner.isPassenger()) {
-            this.gunner.getNavigation().stop();
-        }
     }
 
     @Override
     public void tick() {
-        LivingEntity target = this.gunner.getTarget();
+        LivingEntity target = this.pirate.getTarget();
 
         if (!AbstractPirateEntity.canPirateAttack(target)) {
-            this.gunner.setChargingCrossbow(false);
             return;
         }
 
-        double distanceToTarget = this.gunner.distanceToSqr(
-                target.getX(),
-                target.getY(),
-                target.getZ()
-        );
+        PirateLookHelper.lookAtEntity(this.pirate, target);
 
-        boolean canSeeTarget = this.gunner.getSensing().hasLineOfSight(target);
-        boolean inAttackRange = distanceToTarget <= this.attackRadiusSqr;
+        double distanceSqr = this.pirate.distanceToSqr(target);
+        boolean canSeeTarget = this.pirate.getSensing().hasLineOfSight(target);
 
         if (canSeeTarget) {
             this.seeTime++;
@@ -109,55 +72,22 @@ public class PirateGunnerAttackGoal extends Goal {
             this.seeTime = 0;
         }
 
-        /*
-         * If mounted, the boat pilot handles movement.
-         * If on foot, the gunner can move like a normal ranged mob.
-         */
-        if (this.gunner.isPassenger()) {
-            this.gunner.getNavigation().stop();
-        } else {
-            if (inAttackRange && this.seeTime >= 5) {
-                this.gunner.getNavigation().stop();
-            } else {
-                this.gunner.getNavigation().moveTo(target, this.speedModifier);
-            }
+        if (this.attackCooldown > 0) {
+            this.attackCooldown--;
         }
 
-        this.gunner.getLookControl().setLookAt(target, 30.0F, 30.0F);
-        this.gunner.setAggressive(true);
-
-        if (this.chargingShot) {
-            this.chargeTime--;
-            this.gunner.setChargingCrossbow(true);
-
-            if (this.chargeTime <= 0) {
-                if (canSeeTarget && inAttackRange && AbstractPirateEntity.canPirateAttack(target)) {
-                    float distanceFactor = (float) Math.sqrt(distanceToTarget) / this.attackRadius;
-                    float clampedDistanceFactor = Math.min(Math.max(distanceFactor, 0.1F), 1.0F);
-
-                    this.rangedAttackMob.performRangedAttack(target, clampedDistanceFactor);
-                }
-
-                this.gunner.setChargingCrossbow(false);
-                this.chargingShot = false;
-                this.attackTime = this.attackInterval;
-            }
-
+        if (distanceSqr > ATTACK_RANGE * ATTACK_RANGE) {
             return;
         }
 
-        if (this.attackTime > 0) {
-            this.attackTime--;
+        if (this.seeTime < 5) {
             return;
         }
 
-        if (!canSeeTarget || !inAttackRange) {
-            this.attackTime = 5;
-            return;
+        if (this.attackCooldown <= 0 && this.pirate instanceof RangedAttackMob rangedAttackMob) {
+            PirateLookHelper.lookAtEntity(this.pirate, target);
+            rangedAttackMob.performRangedAttack(target, 1.0F);
+            this.attackCooldown = ATTACK_COOLDOWN_TICKS;
         }
-
-        this.chargingShot = true;
-        this.chargeTime = 15;
-        this.gunner.setChargingCrossbow(true);
     }
 }

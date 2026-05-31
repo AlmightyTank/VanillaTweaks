@@ -55,7 +55,7 @@ public class PirateGunnerEntity extends AbstractPirateEntity implements RangedAt
         super.registerGoals();
 
         this.goalSelector.addGoal(3, new PirateBoatPilotGoal(this));
-        this.goalSelector.addGoal(4, new PirateGunnerAttackGoal(this, 1.0D, 40, 32.0F));
+        this.goalSelector.addGoal(4, new PirateGunnerAttackGoal(this));
     }
 
     @Override

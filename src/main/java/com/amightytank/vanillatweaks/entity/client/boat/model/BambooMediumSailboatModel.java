@@ -99,11 +99,11 @@ public class BambooMediumSailboatModel extends ListModel<ModBoatEntity> implemen
 
     @Override
     public void setupAnim(ModBoatEntity boat, float limbSwing, float limbSwingAmount, float ageInTicks, float netHeadYaw, float headPitch) {
-        SailboatPaddleAnimator.animatePaddle(boat, 0, this.paddleLeft, limbSwing, this.paddleLeftBase);
-        SailboatPaddleAnimator.animatePaddle(boat, 1, this.paddleRight, limbSwing, this.paddleRightBase);
-
-        SailboatPaddleAnimator.animatePaddle(boat, 0, this.paddleLeftBack, limbSwing, this.paddleLeftBackBase);
-        SailboatPaddleAnimator.animatePaddle(boat, 1, this.paddleRightBack, limbSwing, this.paddleRightBackBase);
+        SailboatPaddleAnimator.animateOarSetsByPassengerCount(
+                boat,
+                this.getPaddleSets(),
+                limbSwing
+        );
 
         this.chest1.visible = boat.getChestCount() >= 1;
         this.chest2.visible = boat.getChestCount() >= 2;

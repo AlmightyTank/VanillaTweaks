@@ -1,5 +1,6 @@
 package com.amightytank.vanillatweaks.entity.ai;
 
+import com.amightytank.vanillatweaks.entity.ai.util.PirateRaidAiUtil;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.PathfinderMob;
 import net.minecraft.world.entity.ai.goal.MeleeAttackGoal;

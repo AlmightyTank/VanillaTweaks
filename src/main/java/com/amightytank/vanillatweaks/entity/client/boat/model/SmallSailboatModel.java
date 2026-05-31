@@ -98,8 +98,11 @@ public class SmallSailboatModel extends ListModel<ModBoatEntity> implements Wate
 
     @Override
     public void setupAnim(ModBoatEntity boat, float limbSwing, float limbSwingAmount, float ageInTicks, float netHeadYaw, float headPitch) {
-        SailboatPaddleAnimator.animatePaddle(boat, 0, this.paddleLeft, limbSwing, this.paddleLeftBase);
-        SailboatPaddleAnimator.animatePaddle(boat, 1, this.paddleRight, limbSwing, this.paddleRightBase);
+        SailboatPaddleAnimator.animateOarSetsByPassengerCount(
+                boat,
+                this.getPaddleSets(),
+                limbSwing
+        );
 
         this.chest.visible = boat.getChestCount() >= 1;
     }

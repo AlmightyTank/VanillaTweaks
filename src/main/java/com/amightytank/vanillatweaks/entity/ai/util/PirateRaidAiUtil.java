@@ -1,4 +1,4 @@
-package com.amightytank.vanillatweaks.entity.ai;
+package com.amightytank.vanillatweaks.entity.ai.util;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.tags.FluidTags;

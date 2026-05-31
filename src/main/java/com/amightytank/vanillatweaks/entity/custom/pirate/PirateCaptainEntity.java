@@ -4,7 +4,7 @@ import com.amightytank.vanillatweaks.entity.ai.CaptainParrotSwarmGoal;
 import com.amightytank.vanillatweaks.entity.ai.CaptainSummonKrakenGoal;
 import com.amightytank.vanillatweaks.entity.ai.PirateBoatPilotGoal;
 import com.amightytank.vanillatweaks.entity.ai.PirateMountedAwareMeleeAttackGoal;
-import com.amightytank.vanillatweaks.entity.ai.PirateRaidAiUtil;
+import com.amightytank.vanillatweaks.entity.ai.util.PirateRaidAiUtil;
 import net.minecraft.network.syncher.EntityDataAccessor;
 import net.minecraft.network.syncher.EntityDataSerializers;
 import net.minecraft.network.syncher.SynchedEntityData;
@@ -88,8 +88,18 @@ public class PirateCaptainEntity extends AbstractPirateEntity {
         return this.entityData.get(HAS_SHOULDER_PARROT);
     }
 
-    public void setShoulderParrot(boolean value) {
-        this.entityData.set(HAS_SHOULDER_PARROT, value);
+    public boolean hasActiveParrotSwarm() {
+        if (this.level().isClientSide) {
+            return false;
+        }
+
+        return !this.level().getEntitiesOfClass(
+                PirateParrotEntity.class,
+                this.getBoundingBox().inflate(96.0D),
+                parrot -> parrot.isAlive()
+                        && !parrot.isFromShoulder()
+                        && this.getUUID().equals(parrot.getOwnerUUID())
+        ).isEmpty();
     }
 
     @Override

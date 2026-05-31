@@ -3,6 +3,7 @@ package com.amightytank.vanillatweaks.entity.custom.pirate;
 import com.amightytank.vanillatweaks.entity.ai.PirateBoatBoarderRemountGoal;
 import com.amightytank.vanillatweaks.entity.ai.PirateBoatPilotGoal;
 import com.amightytank.vanillatweaks.entity.custom.boat.ModBoatEntity;
+import com.amightytank.vanillatweaks.event.PirateFriendlyFireEvents;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
@@ -32,8 +33,8 @@ public abstract class AbstractPirateEntity extends AbstractIllager {
         this.goalSelector.addGoal(0, new FloatGoal(this));
 
         this.goalSelector.addGoal(1, new WaterAvoidingRandomStrollGoal(this, 0.8D));
-        this.goalSelector.addGoal(2, new LookAtPlayerGoal(this, Player.class, 8.0F));
-        //this.goalSelector.addGoal(9, new RandomLookAroundGoal(this));
+        //this.goalSelector.addGoal(2, new LookAtPlayerGoal(this, Player.class, 8.0F));
+        this.goalSelector.addGoal(9, new RandomLookAroundGoal(this));
 
         // Pirates can still fight back, but NOT against other pirates.
         this.targetSelector.addGoal(1, new HurtByTargetGoal(this));
@@ -48,8 +49,16 @@ public abstract class AbstractPirateEntity extends AbstractIllager {
                 || entity instanceof KrakenTentacleEntity;
     }
 
-    public static boolean canPirateAttack(@Nullable LivingEntity target) {
-        return target != null && target.isAlive() && !isPirateAlly(target);
+    public static boolean canPirateAttack(LivingEntity target) {
+        if (target == null || !target.isAlive()) {
+            return false;
+        }
+
+        if (PirateFriendlyFireEvents.isPirateAlly(target)) {
+            return false;
+        }
+
+        return true;
     }
 
     @Override
@@ -74,11 +83,11 @@ public abstract class AbstractPirateEntity extends AbstractIllager {
 
     @Override
     public boolean isAlliedTo(Entity entity) {
-        if (isPirateAlly(entity)) {
+        if (super.isAlliedTo(entity)) {
             return true;
         }
 
-        return super.isAlliedTo(entity);
+        return PirateFriendlyFireEvents.isPirateAlly(entity);
     }
 
     @Override
