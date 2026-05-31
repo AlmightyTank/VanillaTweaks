@@ -2,6 +2,7 @@ package com.amightytank.vanillatweaks.entity.custom.pirate;
 
 import com.amightytank.vanillatweaks.entity.ModEntities;
 import com.amightytank.vanillatweaks.item.ModItems;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.projectile.AbstractArrow;
@@ -34,6 +35,33 @@ public class PirateDynamiteArrowEntity extends AbstractArrow {
     protected void onHit(HitResult hitResult) {
         super.onHit(hitResult);
         this.explode();
+    }
+
+    @Override
+    protected boolean canHitEntity(Entity entity) {
+        Entity owner = this.getOwner();
+
+        if (owner != null) {
+            if (entity == owner) {
+                return false;
+            }
+
+            Entity ownerVehicle = owner.getVehicle();
+
+            if (ownerVehicle != null && entity == ownerVehicle) {
+                return false;
+            }
+
+            if (entity.isPassengerOfSameVehicle(owner)) {
+                return false;
+            }
+
+            if (entity instanceof AbstractPirateEntity) {
+                return false;
+            }
+        }
+
+        return super.canHitEntity(entity);
     }
 
     private void explode() {
