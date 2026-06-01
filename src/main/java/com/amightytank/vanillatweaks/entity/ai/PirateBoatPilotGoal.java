@@ -1,5 +1,6 @@
 package com.amightytank.vanillatweaks.entity.ai;
 
+import com.amightytank.vanillatweaks.entity.ai.util.PirateBoatPassengerHelper;
 import com.amightytank.vanillatweaks.entity.ai.util.PirateRaidAiUtil;
 import com.amightytank.vanillatweaks.entity.custom.boat.ModBoatEntity;
 import com.amightytank.vanillatweaks.entity.custom.pirate.AbstractPirateEntity;
@@ -28,6 +29,11 @@ public class PirateBoatPilotGoal extends Goal {
     private static final double RANGED_STOP_RANGE = 20.0D;
     private static final double SAFE_LAND_HOLD_RANGE = 28.0D;
 
+    /*
+     * How far a boat looks for its own missing boarders.
+     * This does NOT mean it accepts any nearby boarder.
+     * The boarder must be assigned to this exact boat UUID.
+     */
     private static final double CREW_WAIT_SEARCH_RANGE = 52.0D;
     private static final double CREW_PICKUP_MOVE_RANGE = 7.0D;
 
@@ -138,8 +144,12 @@ public class PirateBoatPilotGoal extends Goal {
         }
 
         /*
-         * Before chasing the player, check if this boat has mates still on foot.
-         * This keeps the boat from abandoning boarders after they jump out.
+         * Before chasing the player, check if THIS boat has one of ITS OWN assigned
+         * boarders still on foot.
+         *
+         * Important:
+         * This no longer uses nearest-boarder fallback.
+         * A boat only waits for pirates whose saved boat UUID equals this boat UUID.
          */
         AbstractPirateEntity dismountedMate = this.findDismountedMateForBoat(boat);
 
@@ -299,12 +309,21 @@ public class PirateBoatPilotGoal extends Goal {
     }
 
     private AbstractPirateEntity findDismountedMateForBoat(ModBoatEntity boat) {
+        /*
+         * If this boat has no open seat, it should not wait for anyone.
+         * This prevents full boats from stopping because another boat's boarder is nearby.
+         */
+        if (PirateBoatPassengerHelper.isFull(boat)) {
+            return null;
+        }
+
         AABB searchBox = boat.getBoundingBox().inflate(CREW_WAIT_SEARCH_RANGE);
 
         List<AbstractPirateEntity> pirates = boat.level().getEntitiesOfClass(
                 AbstractPirateEntity.class,
                 searchBox,
                 pirateEntity -> pirateEntity.isAlive()
+                        && !pirateEntity.isRemoved()
                         && !pirateEntity.isPassenger()
                         && this.isRaidBoarder(pirateEntity)
                         && this.belongsToBoat(pirateEntity, boat)
@@ -326,17 +345,44 @@ public class PirateBoatPilotGoal extends Goal {
     }
 
     private boolean belongsToBoat(AbstractPirateEntity pirateEntity, ModBoatEntity boat) {
+        /*
+         * New permanent assignment tag.
+         * This is the preferred check.
+         */
+        if (pirateEntity.getPersistentData().hasUUID(PirateBoatPassengerHelper.HOME_BOAT_UUID_TAG)) {
+            UUID homeBoatUuid = pirateEntity.getPersistentData().getUUID(PirateBoatPassengerHelper.HOME_BOAT_UUID_TAG);
+            return homeBoatUuid.equals(boat.getUUID());
+        }
+
+        /*
+         * Older temporary return tag.
+         * Kept so existing spawned pirates can still return correctly.
+         */
         if (pirateEntity.getPersistentData().hasUUID(RETURN_BOAT_UUID_TAG)) {
             UUID returnBoatUuid = pirateEntity.getPersistentData().getUUID(RETURN_BOAT_UUID_TAG);
             return returnBoatUuid.equals(boat.getUUID());
         }
 
-        return pirateEntity.distanceToSqr(boat) <= CREW_WAIT_SEARCH_RANGE * CREW_WAIT_SEARCH_RANGE;
+        /*
+         * Existing raid boat assignment tag.
+         */
+        if (pirateEntity.getPersistentData().hasUUID(PirateRaidAiUtil.RAID_BOAT_UUID_TAG)) {
+            UUID raidBoatUuid = pirateEntity.getPersistentData().getUUID(PirateRaidAiUtil.RAID_BOAT_UUID_TAG);
+            return raidBoatUuid.equals(boat.getUUID());
+        }
+
+        /*
+         * Important:
+         * Do NOT fall back to distance.
+         * Distance fallback lets one boat think another boat's boarder belongs to it.
+         */
+        return false;
     }
 
     private boolean isRaidBoarder(Entity entity) {
         return entity.getTags().contains(RAID_PIRATE_TAG)
-                || entity.getTags().contains(BOARDER_TAG);
+                || entity.getTags().contains(BOARDER_TAG)
+                || PirateRaidAiUtil.isBoarder(entity);
     }
 
     private boolean isSelectedDriver(ModBoatEntity boat) {
