@@ -86,7 +86,7 @@ public class CaptainParrotSwarmGoal extends Goal {
             return;
         }
 
-        this.captain.getLookControl().setLookAt(target, 30.0F, 30.0F);
+        this.captain.getLookControl().setLookAt(target);
         this.castTime--;
 
         if (this.castTime == SUMMON_TIME && !this.captain.level().isClientSide) {

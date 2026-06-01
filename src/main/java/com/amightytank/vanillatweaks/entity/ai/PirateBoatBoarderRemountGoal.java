@@ -24,7 +24,6 @@ public class PirateBoatBoarderRemountGoal extends Goal {
 
     public PirateBoatBoarderRemountGoal(Mob pirate) {
         this.pirate = pirate;
-
         this.setFlags(EnumSet.of(Goal.Flag.MOVE, Goal.Flag.LOOK));
     }
 
@@ -35,47 +34,26 @@ public class PirateBoatBoarderRemountGoal extends Goal {
         }
 
         /*
-         * Captain rescue ignores normal boarder rules.
-         * If the captain lost his ship, he must get another fleet boat.
+         * Captains are allowed to reboard too.
+         * No special rescue logic. They just find an open fleet boat.
          */
-        if (this.pirate instanceof PirateCaptainEntity && PirateBoatPassengerHelper.isCaptainNeedingRescue(this.pirate)) {
-            this.targetBoat = PirateBoatPassengerHelper.findBestCaptainRescueBoat(this.pirate, TARGET_BOAT_SEARCH_RANGE);
-
-            if (this.targetBoat != null) {
-                PirateBoatPassengerHelper.requestCaptainRescue(this.pirate, this.targetBoat);
-                return true;
-            }
-
+        if (!(this.pirate instanceof PirateCaptainEntity) && !isRaidBoarder()) {
             return false;
         }
 
         /*
-         * Normal remounting only applies to raid boarders or displaced drivers.
-         */
-        if (!isRaidBoarder() && !PirateBoatPassengerHelper.isDisplacedDriver(this.pirate)) {
-            return false;
-        }
-
-        /*
-         * If the target is still close, keep fighting on foot.
-         * If the target ran away, reboard and let the fleet chase again.
+         * Boarders stay on foot while the target is close.
          */
         LivingEntity target = this.pirate.getTarget();
 
-        if (AbstractPirateEntity.canPirateAttack(target)
-                && this.pirate.distanceToSqr(target) <= MAX_FOOT_CHASE_DISTANCE * MAX_FOOT_CHASE_DISTANCE
-                && !PirateBoatPassengerHelper.isDisplacedDriver(this.pirate)) {
+        if (!(this.pirate instanceof PirateCaptainEntity)
+                && AbstractPirateEntity.canPirateAttack(target)
+                && this.pirate.distanceToSqr(target) <= MAX_FOOT_CHASE_DISTANCE * MAX_FOOT_CHASE_DISTANCE) {
             return false;
         }
 
         this.targetBoat = PirateBoatPassengerHelper.findBestReturnBoat(this.pirate, TARGET_BOAT_SEARCH_RANGE);
-
-        if (this.targetBoat == null) {
-            return false;
-        }
-
-        PirateBoatPassengerHelper.queueBoard(this.pirate, this.targetBoat, false);
-        return true;
+        return this.targetBoat != null;
     }
 
     @Override
@@ -84,15 +62,10 @@ public class PirateBoatBoarderRemountGoal extends Goal {
             return false;
         }
 
-        if (this.targetBoat == null || !this.targetBoat.isAlive() || this.targetBoat.isRemoved()) {
-            return false;
-        }
-
-        if (this.pirate instanceof PirateCaptainEntity) {
-            return true;
-        }
-
-        return PirateBoatPassengerHelper.hasAvailableReturnSeatFor(this.pirate, this.targetBoat);
+        return this.targetBoat != null
+                && this.targetBoat.isAlive()
+                && !this.targetBoat.isRemoved()
+                && PirateBoatPassengerHelper.hasAvailableReturnSeatFor(this.pirate, this.targetBoat);
     }
 
     @Override
@@ -109,7 +82,12 @@ public class PirateBoatBoarderRemountGoal extends Goal {
     @Override
     public void tick() {
         if (this.targetBoat == null || !this.targetBoat.isAlive() || this.targetBoat.isRemoved()) {
-            findNewTargetBoat();
+            this.targetBoat = PirateBoatPassengerHelper.findBestReturnBoat(this.pirate, TARGET_BOAT_SEARCH_RANGE);
+            return;
+        }
+
+        if (!PirateBoatPassengerHelper.hasAvailableReturnSeatFor(this.pirate, this.targetBoat)) {
+            this.targetBoat = PirateBoatPassengerHelper.findBestReturnBoat(this.pirate, TARGET_BOAT_SEARCH_RANGE);
             return;
         }
 
@@ -118,11 +96,7 @@ public class PirateBoatBoarderRemountGoal extends Goal {
         double distanceSqr = this.pirate.distanceToSqr(this.targetBoat);
 
         if (distanceSqr <= BOARD_DISTANCE * BOARD_DISTANCE) {
-            boolean priorityCaptain = this.pirate instanceof PirateCaptainEntity;
-
-            PirateBoatPassengerHelper.queueBoard(this.pirate, this.targetBoat, priorityCaptain);
-
-            if (PirateBoatPassengerHelper.tryBoardQueuedNow(this.pirate)) {
+            if (PirateBoatPassengerHelper.attemptBoard(this.pirate, this.targetBoat, false)) {
                 this.pirate.getNavigation().stop();
             }
 
@@ -137,8 +111,7 @@ public class PirateBoatBoarderRemountGoal extends Goal {
         }
 
         /*
-         * Helps pirates swim toward the rescue boat instead of just spinning
-         * if normal ground navigation cannot path through water.
+         * Simple water push so they do not spin in the water forever.
          */
         if (this.pirate.isInWater()) {
             Vec3 direction = this.targetBoat.position().subtract(this.pirate.position());
@@ -147,24 +120,6 @@ public class PirateBoatBoarderRemountGoal extends Goal {
                 Vec3 push = direction.normalize().scale(0.045D);
                 this.pirate.setDeltaMovement(this.pirate.getDeltaMovement().add(push));
             }
-        }
-    }
-
-    private void findNewTargetBoat() {
-        if (this.pirate instanceof PirateCaptainEntity) {
-            this.targetBoat = PirateBoatPassengerHelper.findBestCaptainRescueBoat(this.pirate, TARGET_BOAT_SEARCH_RANGE);
-
-            if (this.targetBoat != null) {
-                PirateBoatPassengerHelper.requestCaptainRescue(this.pirate, this.targetBoat);
-            }
-
-            return;
-        }
-
-        this.targetBoat = PirateBoatPassengerHelper.findBestReturnBoat(this.pirate, TARGET_BOAT_SEARCH_RANGE);
-
-        if (this.targetBoat != null) {
-            PirateBoatPassengerHelper.queueBoard(this.pirate, this.targetBoat, false);
         }
     }
 

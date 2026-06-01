@@ -42,10 +42,35 @@ public class PirateMarauderEntity extends AbstractPirateEntity implements Ranged
     protected void registerGoals() {
         super.registerGoals();
 
-        this.goalSelector.addGoal(2, new LookAtPlayerGoal(this, Player.class, 8.0F));
-        this.goalSelector.addGoal(3, new PirateBoatPilotGoal(this));
-        this.goalSelector.addGoal(4, new PirateBoatBoarderRemountGoal(this));
-        this.goalSelector.addGoal(5, new PirateBoatBoarderDismountGoal(this));
+        /*
+         * Boat movement.
+         * MOVE only.
+         */
+        this.goalSelector.addGoal(2, new PirateBoatPilotGoal(this));
+
+        /*
+         * Throw while mounted.
+         * LOOK only.
+         */
+        this.goalSelector.addGoal(3, new PirateMountedThrowAttackGoal(this));
+
+        /*
+         * Dismount when close enough.
+         * This goal should have NO flags.
+         */
+        this.goalSelector.addGoal(4, new PirateBoatBoarderDismountGoal(this));
+
+        /*
+         * Return to boat if player gets too far.
+         * MOVE only.
+         */
+        this.goalSelector.addGoal(5, new PirateBoatBoarderRemountGoal(this));
+
+        /*
+         * Chase / throw / melee while on foot.
+         * MOVE only.
+         * Must refuse to run while mounted.
+         */
         this.goalSelector.addGoal(6, new PirateMarauderThrowWhileChargingGoal(this));
     }
 
