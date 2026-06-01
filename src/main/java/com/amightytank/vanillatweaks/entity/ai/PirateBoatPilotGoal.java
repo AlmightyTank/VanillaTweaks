@@ -4,8 +4,9 @@ import com.amightytank.vanillatweaks.entity.ai.util.PirateBoatPassengerHelper;
 import com.amightytank.vanillatweaks.entity.ai.util.PirateRaidAiUtil;
 import com.amightytank.vanillatweaks.entity.custom.boat.ModBoatEntity;
 import com.amightytank.vanillatweaks.entity.custom.pirate.AbstractPirateEntity;
-import net.minecraft.nbt.CompoundTag;
+import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.tags.FluidTags;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
@@ -20,22 +21,21 @@ import java.util.List;
 import java.util.UUID;
 
 public class PirateBoatPilotGoal extends Goal {
-    private static final String RAID_PIRATE_TAG = "PirateTreasureRaid";
-    private static final String BOARDER_TAG = "PirateRaidBoarder";
-
-    public static final String RETURN_BOAT_UUID_TAG = "PirateReturnBoatUUID";
+    /*
+     * This must match PirateBoatPassengerHelper.
+     * Returning boarders use this so boats do not all wait for / chase the same pirate.
+     */
+    private static final String RESERVED_RETURN_BOAT_UUID_TAG = "PirateReservedReturnBoatUUID";
 
     private static final double BOARDING_STOP_RANGE = 9.0D;
     private static final double RANGED_STOP_RANGE = 20.0D;
     private static final double SAFE_LAND_HOLD_RANGE = 28.0D;
 
     /*
-     * How far a boat looks for its own missing boarders.
-     * This does NOT mean it accepts any nearby boarder.
-     * The boarder must be assigned to this exact boat UUID.
+     * A boat with open seats will hold position if loose boarders from the same raid/patrol
+     * are nearby and could still fill those seats.
      */
-    private static final double CREW_WAIT_SEARCH_RANGE = 52.0D;
-    private static final double CREW_PICKUP_MOVE_RANGE = 7.0D;
+    private static final double CREW_WAIT_SEARCH_RANGE = 32.0D;
 
     private static final double TARGET_SEARCH_DISTANCE = 80.0D;
 
@@ -45,6 +45,7 @@ public class PirateBoatPilotGoal extends Goal {
     private static final float STEER_DEAD_ZONE_DEGREES = 4.0F;
     private static final float FORWARD_MAX_TURN_DEGREES = 145.0F;
 
+    private static final double MAX_BOAT_SPEED = 0.34D;
     private static final double BRAKE_SPEED_SQR = 0.0009D;
 
     private final AbstractPirateEntity pirate;
@@ -56,56 +57,49 @@ public class PirateBoatPilotGoal extends Goal {
         this.pirate = pirate;
 
         /*
-         * Only claim MOVE.
-         * Ranged/casting goals still need LOOK so they can aim.
+         * Do NOT claim LOOK.
+         * Gunners/captains/marauders need LOOK for aiming and casting.
          */
         this.setFlags(EnumSet.of(Goal.Flag.MOVE));
     }
 
     @Override
     public boolean canUse() {
+        if (this.pirate.level().isClientSide) {
+            return false;
+        }
+
         if (!(this.pirate.getVehicle() instanceof ModBoatEntity boat)) {
             return false;
         }
 
-        if (!this.isSelectedDriver(boat)) {
+        if (!this.isPilotForBoat(boat)) {
             return false;
         }
 
-        LivingEntity foundTarget = this.getOrFindBoatTarget(boat);
-
-        if (!AbstractPirateEntity.canPirateAttack(foundTarget)) {
-            return false;
-        }
-
-        this.target = foundTarget;
-        this.shareTargetWithCrew(boat, foundTarget);
-
-        return true;
+        this.target = this.findTarget(boat);
+        return this.target != null;
     }
 
     @Override
     public boolean canContinueToUse() {
+        if (this.pirate.level().isClientSide) {
+            return false;
+        }
+
         if (!(this.pirate.getVehicle() instanceof ModBoatEntity boat)) {
             return false;
         }
 
-        if (!this.isSelectedDriver(boat)) {
+        if (!this.isPilotForBoat(boat)) {
             return false;
         }
 
-        if (!AbstractPirateEntity.canPirateAttack(this.target)) {
-            LivingEntity foundTarget = this.getOrFindBoatTarget(boat);
-
-            if (!AbstractPirateEntity.canPirateAttack(foundTarget)) {
-                return false;
-            }
-
-            this.target = foundTarget;
-            this.shareTargetWithCrew(boat, foundTarget);
+        if (!this.isValidTarget(this.target)) {
+            this.target = this.findTarget(boat);
         }
 
-        return true;
+        return this.target != null;
     }
 
     @Override
@@ -120,7 +114,6 @@ public class PirateBoatPilotGoal extends Goal {
         }
 
         this.target = null;
-        this.retargetCooldown = 0;
     }
 
     @Override
@@ -129,398 +122,446 @@ public class PirateBoatPilotGoal extends Goal {
             return;
         }
 
-        if (!this.isSelectedDriver(boat)) {
+        if (!this.isPilotForBoat(boat)) {
             boat.clearPirateRaidInput();
             return;
         }
 
-        if (!AbstractPirateEntity.canPirateAttack(this.target)) {
-            this.target = this.getOrFindBoatTarget(boat);
-
-            if (!AbstractPirateEntity.canPirateAttack(this.target)) {
-                this.brakeBoatLikePlayer(boat);
-                return;
-            }
+        if (this.retargetCooldown > 0) {
+            this.retargetCooldown--;
         }
 
+        if (this.retargetCooldown <= 0 || !this.isValidTarget(this.target)) {
+            this.target = this.findTarget(boat);
+            this.retargetCooldown = 20;
+        }
+
+        if (this.target == null) {
+            boat.clearPirateRaidInput();
+            this.slowBoat(boat);
+            return;
+        }
+
+        this.shareTargetWithBoatCrew(boat, this.target);
+
         /*
-         * Before chasing the player, check if THIS boat has one of ITS OWN assigned
-         * boarders still on foot.
+         * Important fleet behavior:
          *
-         * Important:
-         * This no longer uses nearest-boarder fallback.
-         * A boat only waits for pirates whose saved boat UUID equals this boat UUID.
+         * If this boat has an open seat, and there is a loose boarder from the same raid/patrol
+         * nearby that is not reserved for a different boat, this boat waits.
+         *
+         * This prevents one open boat from trying to collect every loose boarder while the other
+         * boats sail away missing crew.
          */
-        AbstractPirateEntity dismountedMate = this.findDismountedMateForBoat(boat);
-
-        if (dismountedMate != null) {
-            double mateDistanceSqr = boat.distanceToSqr(dismountedMate);
-
-            if (mateDistanceSqr > CREW_PICKUP_MOVE_RANGE * CREW_PICKUP_MOVE_RANGE) {
-                Vec3 moveDirection = PirateRaidAiUtil.horizontalDirection(
-                        boat.position(),
-                        dismountedMate.position()
-                );
-
-                this.steerBoatLikePlayer(boat, moveDirection, true);
-            } else {
-                this.brakeBoatLikePlayer(boat);
-            }
-
-            return;
-        }
-
-        boolean targetSafeOnLand = PirateRaidAiUtil.isTargetSafeOnLandForBoarder(this.pirate, this.target);
-        double stopRange = this.getBoatStopRange(boat, targetSafeOnLand);
-
-        Vec3 boatPos = boat.position();
-        Vec3 targetPos = this.target.position();
-
-        double distanceSqr = boat.distanceToSqr(this.target);
-        double stopRangeSqr = stopRange * stopRange;
-
-        Vec3 moveDirection;
-
-        if (targetSafeOnLand) {
-            /*
-             * Player escaped inland:
-             * - do not beach the boat
-             * - hold offshore
-             * - circle instead of driving directly into land
-             */
-            if (distanceSqr < stopRangeSqr) {
-                moveDirection = PirateRaidAiUtil.horizontalAwayFrom(targetPos, boatPos);
-                this.steerBoatLikePlayer(boat, moveDirection, true);
-            } else if (distanceSqr > (stopRange + 8.0D) * (stopRange + 8.0D)) {
-                moveDirection = PirateRaidAiUtil.horizontalDirection(boatPos, targetPos);
-                this.steerBoatLikePlayer(boat, moveDirection, true);
-            } else {
-                moveDirection = this.getCircleDirection(boatPos, targetPos);
-                this.steerBoatLikePlayer(boat, moveDirection, true);
-            }
-
-            return;
-        }
-
-        /*
-         * Normal chase while the player is in water, on a boat, or near shore.
-         */
-        if (distanceSqr > stopRangeSqr) {
-            moveDirection = PirateRaidAiUtil.horizontalDirection(boatPos, targetPos);
-            this.steerBoatLikePlayer(boat, moveDirection, true);
-        } else {
-            this.brakeBoatLikePlayer(boat);
-        }
-    }
-
-    private void steerBoatLikePlayer(ModBoatEntity boat, Vec3 direction, boolean allowForward) {
-        if (direction.lengthSqr() < 0.0001D) {
-            this.brakeBoatLikePlayer(boat);
-            return;
-        }
-
-        Vec3 wantedDirection = this.getWaterSafeDirection(boat, direction.normalize());
-
-        if (wantedDirection.lengthSqr() < 0.0001D) {
-            this.brakeBoatLikePlayer(boat);
-            return;
-        }
-
-        float turnDegrees = this.getYawDifferenceTo(boat, wantedDirection);
-        float absTurnDegrees = Math.abs(turnDegrees);
-
-        boolean left = turnDegrees < -STEER_DEAD_ZONE_DEGREES;
-        boolean right = turnDegrees > STEER_DEAD_ZONE_DEGREES;
-
-        Vec3 forward = this.getBoatForwardDirection(boat);
-
-        boolean facingCloseEnoughToRowForward = absTurnDegrees <= FORWARD_MAX_TURN_DEGREES;
-        boolean waterInFront = PirateRaidAiUtil.isWaterAhead(
-                boat.level(),
-                boat.position(),
-                forward,
-                FORWARD_WATER_CHECK_DISTANCE
-        );
-
-        boolean forwardInput = allowForward && facingCloseEnoughToRowForward && waterInFront;
-
-        boat.setPirateRaidInput(left, right, forwardInput, false);
-    }
-
-    private Vec3 getWaterSafeDirection(ModBoatEntity boat, Vec3 wantedDirection) {
-        if (PirateRaidAiUtil.isWaterAhead(boat.level(), boat.position(), wantedDirection, WATER_CHECK_DISTANCE)) {
-            return wantedDirection;
-        }
-
-        Vec3 left = PirateRaidAiUtil.leftOf(wantedDirection).normalize();
-        Vec3 right = PirateRaidAiUtil.rightOf(wantedDirection).normalize();
-
-        boolean leftWater = PirateRaidAiUtil.isWaterAhead(boat.level(), boat.position(), left, WATER_CHECK_DISTANCE);
-        boolean rightWater = PirateRaidAiUtil.isWaterAhead(boat.level(), boat.position(), right, WATER_CHECK_DISTANCE);
-
-        if (leftWater && rightWater) {
-            float leftTurn = Math.abs(this.getYawDifferenceTo(boat, left));
-            float rightTurn = Math.abs(this.getYawDifferenceTo(boat, right));
-
-            return leftTurn <= rightTurn ? left : right;
-        }
-
-        if (leftWater) {
-            return left;
-        }
-
-        if (rightWater) {
-            return right;
-        }
-
-        return Vec3.ZERO;
-    }
-
-    private void brakeBoatLikePlayer(ModBoatEntity boat) {
-        if (boat.getDeltaMovement().horizontalDistanceSqr() > BRAKE_SPEED_SQR) {
-            boat.setPirateRaidInput(false, false, false, true);
-        } else {
+        if (this.shouldWaitForReturningCrew(boat)) {
             boat.clearPirateRaidInput();
-        }
-    }
-
-    private float getYawDifferenceTo(ModBoatEntity boat, Vec3 direction) {
-        if (direction.lengthSqr() < 0.0001D) {
-            return 0.0F;
+            this.slowBoat(boat);
+            return;
         }
 
-        float wantedYaw = (float) (Mth.atan2(direction.z, direction.x) * Mth.RAD_TO_DEG) - 90.0F;
-        return Mth.wrapDegrees(wantedYaw - boat.getYRot());
+        this.driveBoatTowardTarget(boat, this.target);
+        this.capBoatSpeed(boat);
     }
 
-    private Vec3 getBoatForwardDirection(ModBoatEntity boat) {
-        double radians = Math.toRadians(boat.getYRot() + 90.0F);
-        return new Vec3(Math.cos(radians), 0.0D, Math.sin(radians)).normalize();
-    }
+    private boolean isPilotForBoat(ModBoatEntity boat) {
+        LivingEntity controllingPassenger = boat.getControllingPassenger();
 
-    private Vec3 getCircleDirection(Vec3 boatPos, Vec3 targetPos) {
-        Vec3 towardTarget = PirateRaidAiUtil.horizontalDirection(boatPos, targetPos);
-
-        if (towardTarget.lengthSqr() < 0.0001D) {
-            return Vec3.ZERO;
-        }
-
-        return PirateRaidAiUtil.leftOf(towardTarget).normalize();
-    }
-
-    private AbstractPirateEntity findDismountedMateForBoat(ModBoatEntity boat) {
         /*
-         * If this boat has no open seat, it should not wait for anyone.
-         * This prevents full boats from stopping because another boat's boarder is nearby.
+         * If a player is in the control seat, pirates should not fight the player's controls.
          */
-        if (PirateBoatPassengerHelper.isFull(boat)) {
-            return null;
-        }
-
-        AABB searchBox = boat.getBoundingBox().inflate(CREW_WAIT_SEARCH_RANGE);
-
-        List<AbstractPirateEntity> pirates = boat.level().getEntitiesOfClass(
-                AbstractPirateEntity.class,
-                searchBox,
-                pirateEntity -> pirateEntity.isAlive()
-                        && !pirateEntity.isRemoved()
-                        && !pirateEntity.isPassenger()
-                        && this.isRaidBoarder(pirateEntity)
-                        && this.belongsToBoat(pirateEntity, boat)
-        );
-
-        AbstractPirateEntity farthestMate = null;
-        double farthestDistanceSqr = 0.0D;
-
-        for (AbstractPirateEntity pirateEntity : pirates) {
-            double distanceSqr = pirateEntity.distanceToSqr(boat);
-
-            if (distanceSqr > farthestDistanceSqr) {
-                farthestDistanceSqr = distanceSqr;
-                farthestMate = pirateEntity;
-            }
-        }
-
-        return farthestMate;
-    }
-
-    private boolean belongsToBoat(AbstractPirateEntity pirateEntity, ModBoatEntity boat) {
-        /*
-         * New permanent assignment tag.
-         * This is the preferred check.
-         */
-        if (pirateEntity.getPersistentData().hasUUID(PirateBoatPassengerHelper.HOME_BOAT_UUID_TAG)) {
-            UUID homeBoatUuid = pirateEntity.getPersistentData().getUUID(PirateBoatPassengerHelper.HOME_BOAT_UUID_TAG);
-            return homeBoatUuid.equals(boat.getUUID());
+        if (controllingPassenger instanceof Player) {
+            return false;
         }
 
         /*
-         * Older temporary return tag.
-         * Kept so existing spawned pirates can still return correctly.
+         * Normal case: ModBoatEntity returns the front pirate / selected pirate as controller.
          */
-        if (pirateEntity.getPersistentData().hasUUID(RETURN_BOAT_UUID_TAG)) {
-            UUID returnBoatUuid = pirateEntity.getPersistentData().getUUID(RETURN_BOAT_UUID_TAG);
-            return returnBoatUuid.equals(boat.getUUID());
+        if (controllingPassenger == this.pirate) {
+            return true;
         }
 
         /*
-         * Existing raid boat assignment tag.
+         * If another mob is already considered controller, do not let this pirate also drive.
          */
-        if (pirateEntity.getPersistentData().hasUUID(PirateRaidAiUtil.RAID_BOAT_UUID_TAG)) {
-            UUID raidBoatUuid = pirateEntity.getPersistentData().getUUID(PirateRaidAiUtil.RAID_BOAT_UUID_TAG);
-            return raidBoatUuid.equals(boat.getUUID());
+        if (controllingPassenger instanceof Mob) {
+            return false;
         }
 
         /*
-         * Important:
-         * Do NOT fall back to distance.
-         * Distance fallback lets one boat think another boat's boarder belongs to it.
+         * Fallback if seat syncing temporarily fails.
          */
-        return false;
+        return this.getBestPirateDriver(boat) == this.pirate;
     }
 
-    private boolean isRaidBoarder(Entity entity) {
-        return entity.getTags().contains(RAID_PIRATE_TAG)
-                || entity.getTags().contains(BOARDER_TAG)
-                || PirateRaidAiUtil.isBoarder(entity);
-    }
-
-    private boolean isSelectedDriver(ModBoatEntity boat) {
-        Entity selectedDriver = this.getSelectedDriver(boat);
-        return selectedDriver == this.pirate;
-    }
-
-    private Entity getSelectedDriver(ModBoatEntity boat) {
-        Entity bestDriver = null;
-        int bestPriority = Integer.MIN_VALUE;
+    private Mob getBestPirateDriver(ModBoatEntity boat) {
+        Mob bestDriver = null;
+        int bestPriority = -1;
 
         for (Entity passenger : boat.getPassengers()) {
-            if (!(passenger instanceof AbstractPirateEntity piratePassenger)) {
+            if (!(passenger instanceof Mob mob)) {
                 continue;
             }
 
-            if (!passenger.isAlive()) {
+            if (!this.isPirateCrew(mob)) {
                 continue;
             }
 
-            int priority = this.getDriverPriority(piratePassenger);
+            int priority = this.getDriverPriority(mob);
 
             if (priority > bestPriority) {
                 bestPriority = priority;
-                bestDriver = passenger;
+                bestDriver = mob;
             }
         }
 
         return bestDriver;
     }
 
-    private int getDriverPriority(AbstractPirateEntity piratePassenger) {
-        if (PirateRaidAiUtil.isCaptain(piratePassenger)) {
-            return 100;
+    private int getDriverPriority(Mob mob) {
+        if (mob.getTags().contains(PirateRaidAiUtil.CAPTAIN_TAG)) {
+            return 4;
         }
 
-        if (PirateRaidAiUtil.isRanged(piratePassenger)) {
-            return 80;
+        if (mob.getTags().contains(PirateRaidAiUtil.RANGED_TAG)) {
+            return 3;
         }
 
-        if (PirateRaidAiUtil.isBoarder(piratePassenger)) {
-            return 60;
+        if (mob.getTags().contains(PirateRaidAiUtil.BOARDER_TAG)) {
+            return 2;
         }
 
-        if (PirateRaidAiUtil.isRaidPirate(piratePassenger)) {
-            return 50;
+        if (mob.getTags().contains(PirateRaidAiUtil.RAID_PIRATE_TAG)) {
+            return 1;
         }
 
-        return 10;
+        return 0;
     }
 
-    private LivingEntity getOrFindBoatTarget(ModBoatEntity boat) {
+    private boolean shouldWaitForReturningCrew(ModBoatEntity boat) {
+        if (PirateBoatPassengerHelper.getOpenSeatCount(boat) <= 0) {
+            return false;
+        }
+
+        return this.findNearbyReturningBoarderForBoat(boat) != null;
+    }
+
+    private Mob findNearbyReturningBoarderForBoat(ModBoatEntity boat) {
+        AABB searchBox = boat.getBoundingBox().inflate(CREW_WAIT_SEARCH_RANGE);
+
+        List<Mob> nearbyBoarders = boat.level().getEntitiesOfClass(
+                Mob.class,
+                searchBox,
+                mob -> this.canBoatWaitForBoarder(boat, mob)
+        );
+
+        Mob closest = null;
+        double closestDistanceSqr = Double.MAX_VALUE;
+
+        for (Mob boarder : nearbyBoarders) {
+            double distanceSqr = boarder.distanceToSqr(boat);
+
+            if (distanceSqr < closestDistanceSqr) {
+                closestDistanceSqr = distanceSqr;
+                closest = boarder;
+            }
+        }
+
+        return closest;
+    }
+
+    private boolean canBoatWaitForBoarder(ModBoatEntity boat, Mob boarder) {
+        if (boarder == null || !boarder.isAlive()) {
+            return false;
+        }
+
+        if (boarder.isPassenger()) {
+            return false;
+        }
+
+        if (!this.isReturningBoarder(boarder)) {
+            return false;
+        }
+
+        if (!this.sharesRaidGroupTag(boat, boarder)) {
+            return false;
+        }
+
+        /*
+         * If the boarder already reserved another boat, this boat should not wait for it.
+         * That is what stops one boat from acting like it owns all loose pirates.
+         */
+        if (boarder.getPersistentData().hasUUID(RESERVED_RETURN_BOAT_UUID_TAG)) {
+            UUID reservedBoatUuid = boarder.getPersistentData().getUUID(RESERVED_RETURN_BOAT_UUID_TAG);
+            return boat.getUUID().equals(reservedBoatUuid);
+        }
+
+        /*
+         * No reservation yet. Any open boat in the same fleet can wait.
+         * The remount goal will reserve an actual seat when the boarder chooses a boat.
+         */
+        return true;
+    }
+
+    private boolean isReturningBoarder(Mob mob) {
+        return mob.getTags().contains(PirateRaidAiUtil.BOARDER_TAG)
+                || mob.getTags().contains("PirateRaidBoarder");
+    }
+
+    private boolean sharesRaidGroupTag(Entity boat, Entity mob) {
+        String groupPrefix = PirateRaidAiUtil.RAID_PIRATE_TAG + "_";
+        boolean boatHasGroupTag = false;
+
+        for (String tag : boat.getTags()) {
+            if (!tag.startsWith(groupPrefix)) {
+                continue;
+            }
+
+            boatHasGroupTag = true;
+
+            if (mob.getTags().contains(tag)) {
+                return true;
+            }
+        }
+
+        /*
+         * Older/spawned test boats may not have a group tag.
+         * If no group tag exists, allow fallback behavior.
+         */
+        return !boatHasGroupTag;
+    }
+
+    private void driveBoatTowardTarget(ModBoatEntity boat, LivingEntity target) {
+        Vec3 toTarget = target.position().subtract(boat.position());
+        Vec3 horizontalToTarget = new Vec3(toTarget.x, 0.0D, toTarget.z);
+
+        if (horizontalToTarget.lengthSqr() < 0.001D) {
+            boat.clearPirateRaidInput();
+            return;
+        }
+
+        double distance = horizontalToTarget.length();
+        double stopRange = this.getBoatStopRange(boat, target);
+
+        float wantedYaw = this.getYawToward(horizontalToTarget);
+        float yawDifference = Mth.wrapDegrees(wantedYaw - boat.getYRot());
+
+        boolean left = yawDifference < -STEER_DEAD_ZONE_DEGREES;
+        boolean right = yawDifference > STEER_DEAD_ZONE_DEGREES;
+
+        boolean forward = distance > stopRange
+                && Math.abs(yawDifference) <= FORWARD_MAX_TURN_DEGREES
+                && this.isWaterAhead(boat);
+
+        boolean back = false;
+
+        /*
+         * If the boat gets too close, lightly reverse instead of ramming shore/target.
+         */
+        if (distance < Math.max(4.0D, stopRange * 0.65D)
+                && this.isWaterBehind(boat)
+                && this.getHorizontalSpeedSqr(boat) > BRAKE_SPEED_SQR) {
+            forward = false;
+            back = true;
+        }
+
+        boat.setPirateRaidInput(left, right, forward, back);
+    }
+
+    private double getBoatStopRange(ModBoatEntity boat, LivingEntity target) {
+        if (this.boatHasBoarders(boat) && this.isTargetSafeOnLandForBoarder(target)) {
+            return SAFE_LAND_HOLD_RANGE;
+        }
+
+        if (this.boatHasBoarders(boat)) {
+            return BOARDING_STOP_RANGE;
+        }
+
+        return RANGED_STOP_RANGE;
+    }
+
+    private boolean isTargetSafeOnLandForBoarder(LivingEntity target) {
+        if (target == null) {
+            return false;
+        }
+
+        if (target.isInWaterOrBubble()) {
+            return false;
+        }
+
+        return target.onGround();
+    }
+
+    private boolean boatHasBoarders(ModBoatEntity boat) {
+        for (Entity passenger : boat.getPassengers()) {
+            if (passenger instanceof Mob mob && mob.getTags().contains(PirateRaidAiUtil.BOARDER_TAG)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private boolean findTargetFromPirateTarget() {
         LivingEntity currentTarget = this.pirate.getTarget();
 
-        if (AbstractPirateEntity.canPirateAttack(currentTarget)) {
-            return currentTarget;
+        if (this.isValidTarget(currentTarget)) {
+            this.target = currentTarget;
+            return true;
         }
 
-        for (Entity passenger : boat.getPassengers()) {
-            if (passenger instanceof Mob mob) {
-                LivingEntity crewTarget = mob.getTarget();
+        return false;
+    }
 
-                if (AbstractPirateEntity.canPirateAttack(crewTarget)) {
-                    this.pirate.setTarget(crewTarget);
-                    return crewTarget;
-                }
-            }
+    private LivingEntity findTarget(ModBoatEntity boat) {
+        if (this.findTargetFromPirateTarget()) {
+            return this.target;
         }
 
-        if (boat.level() instanceof ServerLevel serverLevel) {
-            CompoundTag boatData = boat.getPersistentData();
+        LivingEntity savedTarget = this.findSavedTarget(boat);
 
-            if (boatData.hasUUID(PirateRaidAiUtil.TARGET_UUID_TAG)) {
-                UUID targetId = boatData.getUUID(PirateRaidAiUtil.TARGET_UUID_TAG);
-                Entity entity = serverLevel.getEntity(targetId);
-
-                if (entity instanceof LivingEntity livingEntity
-                        && AbstractPirateEntity.canPirateAttack(livingEntity)) {
-                    this.pirate.setTarget(livingEntity);
-                    return livingEntity;
-                }
-            }
+        if (this.isValidTarget(savedTarget)) {
+            this.pirate.setTarget(savedTarget);
+            return savedTarget;
         }
 
-        if (this.retargetCooldown > 0) {
-            this.retargetCooldown--;
+        LivingEntity nearestPlayer = this.findNearestPlayerTarget(boat);
+
+        if (nearestPlayer != null) {
+            this.pirate.setTarget(nearestPlayer);
+        }
+
+        return nearestPlayer;
+    }
+
+    private LivingEntity findSavedTarget(ModBoatEntity boat) {
+        if (!(boat.level() instanceof ServerLevel serverLevel)) {
             return null;
         }
 
-        this.retargetCooldown = 20;
+        if (!boat.getPersistentData().hasUUID(PirateRaidAiUtil.TARGET_UUID_TAG)) {
+            return null;
+        }
 
-        Player player = this.pirate.level().getNearestPlayer(
-                this.pirate.getX(),
-                this.pirate.getY(),
-                this.pirate.getZ(),
-                TARGET_SEARCH_DISTANCE,
-                entity -> entity instanceof Player foundPlayer
-                        && foundPlayer.isAlive()
-                        && !foundPlayer.isCreative()
-                        && !foundPlayer.isSpectator()
-        );
+        UUID targetUuid = boat.getPersistentData().getUUID(PirateRaidAiUtil.TARGET_UUID_TAG);
+        Entity entity = serverLevel.getEntity(targetUuid);
 
-        if (player != null) {
-            this.pirate.setTarget(player);
-            boat.getPersistentData().putUUID(PirateRaidAiUtil.TARGET_UUID_TAG, player.getUUID());
-            return player;
+        if (entity instanceof LivingEntity livingEntity) {
+            return livingEntity;
         }
 
         return null;
     }
 
-    private void shareTargetWithCrew(ModBoatEntity boat, LivingEntity target) {
-        if (!AbstractPirateEntity.canPirateAttack(target)) {
+    private LivingEntity findNearestPlayerTarget(ModBoatEntity boat) {
+        AABB searchBox = boat.getBoundingBox().inflate(TARGET_SEARCH_DISTANCE);
+
+        List<Player> players = boat.level().getEntitiesOfClass(
+                Player.class,
+                searchBox,
+                player -> player.isAlive()
+                        && !player.isCreative()
+                        && !player.isSpectator()
+        );
+
+        Player closest = null;
+        double closestDistanceSqr = Double.MAX_VALUE;
+
+        for (Player player : players) {
+            double distanceSqr = player.distanceToSqr(boat);
+
+            if (distanceSqr < closestDistanceSqr) {
+                closestDistanceSqr = distanceSqr;
+                closest = player;
+            }
+        }
+
+        return closest;
+    }
+
+    private boolean isValidTarget(LivingEntity possibleTarget) {
+        return AbstractPirateEntity.canPirateAttack(possibleTarget);
+    }
+
+    private void shareTargetWithBoatCrew(ModBoatEntity boat, LivingEntity target) {
+        if (!this.isValidTarget(target)) {
             return;
         }
 
-        boat.getPersistentData().putUUID(PirateRaidAiUtil.TARGET_UUID_TAG, target.getUUID());
-
         for (Entity passenger : boat.getPassengers()) {
-            if (passenger instanceof Mob mob) {
+            if (passenger instanceof Mob mob && this.isPirateCrew(mob)) {
                 mob.setTarget(target);
             }
         }
     }
 
-    private double getBoatStopRange(ModBoatEntity boat, boolean targetSafeOnLand) {
-        if (targetSafeOnLand) {
-            return SAFE_LAND_HOLD_RANGE;
+    private boolean isPirateCrew(Entity entity) {
+        if (!(entity instanceof Mob mob)) {
+            return false;
         }
 
-        if (PirateRaidAiUtil.boatHasBoarders(boat)) {
-            return BOARDING_STOP_RANGE;
+        return mob instanceof AbstractPirateEntity
+                || mob.getTags().contains(PirateRaidAiUtil.RAID_PIRATE_TAG);
+    }
+
+    private float getYawToward(Vec3 direction) {
+        return (float) (Mth.atan2(direction.z, direction.x) * Mth.RAD_TO_DEG) - 90.0F;
+    }
+
+    private boolean isWaterAhead(ModBoatEntity boat) {
+        return this.isWaterInDirection(boat, boat.getYRot(), FORWARD_WATER_CHECK_DISTANCE)
+                || this.isWaterInDirection(boat, boat.getYRot() - 25.0F, WATER_CHECK_DISTANCE)
+                || this.isWaterInDirection(boat, boat.getYRot() + 25.0F, WATER_CHECK_DISTANCE);
+    }
+
+    private boolean isWaterBehind(ModBoatEntity boat) {
+        return this.isWaterInDirection(boat, boat.getYRot() + 180.0F, FORWARD_WATER_CHECK_DISTANCE);
+    }
+
+    private boolean isWaterInDirection(ModBoatEntity boat, float yawDegrees, double distance) {
+        float yawRadians = yawDegrees * Mth.DEG_TO_RAD;
+
+        double x = boat.getX() + Mth.sin(-yawRadians) * distance;
+        double z = boat.getZ() + Mth.cos(yawRadians) * distance;
+
+        BlockPos pos = BlockPos.containing(x, boat.getY() - 0.15D, z);
+        BlockPos below = pos.below();
+
+        return boat.level().getFluidState(pos).is(FluidTags.WATER)
+                || boat.level().getFluidState(below).is(FluidTags.WATER);
+    }
+
+    private void slowBoat(ModBoatEntity boat) {
+        Vec3 movement = boat.getDeltaMovement();
+
+        boat.setDeltaMovement(
+                movement.x * 0.72D,
+                movement.y,
+                movement.z * 0.72D
+        );
+    }
+
+    private void capBoatSpeed(ModBoatEntity boat) {
+        Vec3 movement = boat.getDeltaMovement();
+
+        double horizontalSpeedSqr = movement.x * movement.x + movement.z * movement.z;
+        double maxSpeedSqr = MAX_BOAT_SPEED * MAX_BOAT_SPEED;
+
+        if (horizontalSpeedSqr <= maxSpeedSqr) {
+            return;
         }
 
-        if (PirateRaidAiUtil.boatHasRangedPirates(boat)) {
-            return RANGED_STOP_RANGE;
-        }
+        double horizontalSpeed = Math.sqrt(horizontalSpeedSqr);
+        double scale = MAX_BOAT_SPEED / horizontalSpeed;
 
-        return RANGED_STOP_RANGE;
+        boat.setDeltaMovement(
+                movement.x * scale,
+                movement.y,
+                movement.z * scale
+        );
+    }
+
+    private double getHorizontalSpeedSqr(ModBoatEntity boat) {
+        Vec3 movement = boat.getDeltaMovement();
+        return movement.x * movement.x + movement.z * movement.z;
     }
 }

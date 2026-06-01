@@ -15,40 +15,16 @@ import java.util.List;
 import java.util.UUID;
 
 public final class PirateBoatPassengerHelper {
+    public static final String RESERVED_RETURN_BOAT_UUID_TAG = "PirateReservedReturnBoatUUID";
+
+    private static final String RAID_PIRATE_TAG = "PirateTreasureRaid";
+    private static final String BOARDER_TAG = "PirateRaidBoarder";
+
+    private static final double RESERVATION_SEARCH_RANGE = 96.0D;
+
     private static final List<PendingMount> PENDING_MOUNTS = new ArrayList<>();
 
-    /*
-     * This is the permanent home boat assignment.
-     * Pirates should not switch boats during raids/patrols.
-     */
-    public static final String HOME_BOAT_UUID_TAG = "PirateHomeBoatUUID";
-
     private PirateBoatPassengerHelper() {
-    }
-
-    public static void assignHomeBoat(Mob pirate, Entity boatEntity) {
-        if (pirate == null || boatEntity == null) {
-            return;
-        }
-
-        pirate.getPersistentData().putUUID(HOME_BOAT_UUID_TAG, boatEntity.getUUID());
-        pirate.getPersistentData().putUUID(PirateRaidAiUtil.RAID_BOAT_UUID_TAG, boatEntity.getUUID());
-    }
-
-    public static boolean isAssignedToBoat(Entity passenger, Boat boat) {
-        if (passenger == null || boat == null) {
-            return false;
-        }
-
-        if (passenger.getPersistentData().hasUUID(HOME_BOAT_UUID_TAG)) {
-            return passenger.getPersistentData().getUUID(HOME_BOAT_UUID_TAG).equals(boat.getUUID());
-        }
-
-        if (passenger.getPersistentData().hasUUID(PirateRaidAiUtil.RAID_BOAT_UUID_TAG)) {
-            return passenger.getPersistentData().getUUID(PirateRaidAiUtil.RAID_BOAT_UUID_TAG).equals(boat.getUUID());
-        }
-
-        return false;
     }
 
     public static boolean canBoard(Entity passenger, Boat boat) {
@@ -76,11 +52,7 @@ public final class PirateBoatPassengerHelper {
             return false;
         }
 
-        return boat.getPassengers().size() < getPassengerLimit(boat);
-    }
-
-    public static boolean canBoardAssignedBoat(Entity passenger, Boat boat) {
-        return canBoard(passenger, boat) && isAssignedToBoat(passenger, boat);
+        return getOpenSeatCount(boat) > 0;
     }
 
     public static boolean tryBoard(Entity passenger, Boat boat) {
@@ -89,18 +61,22 @@ public final class PirateBoatPassengerHelper {
         }
 
         if (boat instanceof ModBoatEntity modBoat && passenger instanceof Mob mob) {
-            return modBoat.addMobToSailboat(mob);
+            boolean mounted = modBoat.addMobToSailboat(mob);
+
+            if (mounted) {
+                clearReservedBoat(passenger);
+            }
+
+            return mounted;
         }
 
-        return passenger.startRiding(boat, true);
-    }
+        boolean mounted = passenger.startRiding(boat, true);
 
-    public static boolean tryBoardAssignedBoat(Entity passenger, Boat boat) {
-        if (!canBoardAssignedBoat(passenger, boat)) {
-            return false;
+        if (mounted) {
+            clearReservedBoat(passenger);
         }
 
-        return tryBoard(passenger, boat);
+        return mounted;
     }
 
     public static boolean queueBoard(Entity passenger, Entity boatEntity, int delayTicks) {
@@ -120,6 +96,22 @@ public final class PirateBoatPassengerHelper {
             return false;
         }
 
+        if (!passenger.isAlive() || !boat.isAlive() || boat.isRemoved()) {
+            return false;
+        }
+
+        if (passenger.isPassenger()) {
+            return false;
+        }
+
+        /*
+         * Count already queued mounts too.
+         * This prevents multiple queued pirates from reserving the same final seat.
+         */
+        if (getQueueAvailableSeatCount(boat) <= 0) {
+            return false;
+        }
+
         PENDING_MOUNTS.add(new PendingMount(
                 serverLevel.dimension(),
                 passenger.getUUID(),
@@ -136,7 +128,7 @@ public final class PirateBoatPassengerHelper {
         while (iterator.hasNext()) {
             PendingMount pendingMount = iterator.next();
 
-            if (pendingMount.dimension != level.dimension()) {
+            if (!pendingMount.dimension.equals(level.dimension())) {
                 continue;
             }
 
@@ -152,7 +144,7 @@ public final class PirateBoatPassengerHelper {
             Entity vehicle = level.getEntity(pendingMount.boatUuid);
 
             if (vehicle instanceof Boat boat) {
-                tryBoardAssignedBoat(passenger, boat);
+                tryBoard(passenger, boat);
             }
         }
     }
@@ -162,6 +154,9 @@ public final class PirateBoatPassengerHelper {
             return modBoat.getSailboatPassengerLimit();
         }
 
+        /*
+         * Vanilla fallback.
+         */
         return 2;
     }
 
@@ -173,36 +168,124 @@ public final class PirateBoatPassengerHelper {
         return Math.max(0, getPassengerLimit(boat) - boat.getPassengers().size());
     }
 
+    public static int getQueueAvailableSeatCount(Boat boat) {
+        if (boat == null) {
+            return 0;
+        }
+
+        return Math.max(0, getOpenSeatCount(boat) - getQueuedSeatCount(boat));
+    }
+
+    public static int getQueuedSeatCount(Boat boat) {
+        if (boat == null) {
+            return 0;
+        }
+
+        int count = 0;
+        UUID boatUuid = boat.getUUID();
+        ResourceKey<Level> dimension = boat.level().dimension();
+
+        for (PendingMount pendingMount : PENDING_MOUNTS) {
+            if (!pendingMount.dimension.equals(dimension)) {
+                continue;
+            }
+
+            if (boatUuid.equals(pendingMount.boatUuid)) {
+                count++;
+            }
+        }
+
+        return count;
+    }
+
     public static boolean isFull(Boat boat) {
         return getOpenSeatCount(boat) <= 0;
     }
 
-    /*
-     * Used by the pilot goal.
-     * If this returns true, the boat should stop/wait instead of chasing.
-     */
-    public static boolean hasMissingAssignedCrewNearby(Boat boat, double searchRange) {
-        if (!(boat.level() instanceof ServerLevel level)) {
+    public static int getReservedSeatCount(Boat boat) {
+        if (!(boat.level() instanceof ServerLevel serverLevel)) {
+            return 0;
+        }
+
+        UUID boatUuid = boat.getUUID();
+        AABB searchBox = boat.getBoundingBox().inflate(RESERVATION_SEARCH_RANGE);
+
+        int count = 0;
+
+        for (Mob mob : serverLevel.getEntitiesOfClass(Mob.class, searchBox, PirateBoatPassengerHelper::isReturningBoarder)) {
+            if (mob.isPassenger()) {
+                continue;
+            }
+
+            if (!mob.getPersistentData().hasUUID(RESERVED_RETURN_BOAT_UUID_TAG)) {
+                continue;
+            }
+
+            if (boatUuid.equals(mob.getPersistentData().getUUID(RESERVED_RETURN_BOAT_UUID_TAG))) {
+                count++;
+            }
+        }
+
+        return count;
+    }
+
+    public static int getAvailableReturnSeatCount(Boat boat) {
+        return Math.max(0, getOpenSeatCount(boat) - getReservedSeatCount(boat));
+    }
+
+    public static boolean hasAvailableReturnSeat(Boat boat) {
+        return getAvailableReturnSeatCount(boat) > 0;
+    }
+
+    public static boolean reserveReturnSeat(Entity passenger, Boat boat) {
+        if (passenger == null || boat == null) {
             return false;
         }
 
-        if (isFull(boat)) {
+        if (passenger.level().isClientSide) {
             return false;
         }
 
-        AABB searchBox = boat.getBoundingBox().inflate(searchRange);
+        if (passenger.level() != boat.level()) {
+            return false;
+        }
 
-        List<Mob> missingCrew = level.getEntitiesOfClass(
-                Mob.class,
-                searchBox,
-                mob -> mob.isAlive()
-                        && !mob.isRemoved()
-                        && isAssignedToBoat(mob, boat)
-                        && mob.getVehicle() != boat
-                        && !mob.isPassenger()
-        );
+        if (!passenger.isAlive() || !boat.isAlive() || boat.isRemoved()) {
+            return false;
+        }
 
-        return !missingCrew.isEmpty();
+        if (passenger.isPassenger()) {
+            return false;
+        }
+
+        if (!hasAvailableReturnSeat(boat)) {
+            return false;
+        }
+
+        passenger.getPersistentData().putUUID(RESERVED_RETURN_BOAT_UUID_TAG, boat.getUUID());
+        return true;
+    }
+
+    public static void clearReservedBoat(Entity passenger) {
+        if (passenger != null) {
+            passenger.getPersistentData().remove(RESERVED_RETURN_BOAT_UUID_TAG);
+        }
+    }
+
+    public static boolean isBoatWaitingForCrew(Boat boat) {
+        return boat != null
+                && boat.isAlive()
+                && !boat.isRemoved()
+                && getOpenSeatCount(boat) > 0;
+    }
+
+    private static boolean isReturningBoarder(Mob mob) {
+        if (mob == null || !mob.isAlive()) {
+            return false;
+        }
+
+        return mob.getTags().contains(RAID_PIRATE_TAG)
+                || mob.getTags().contains(BOARDER_TAG);
     }
 
     private static final class PendingMount {

@@ -1,6 +1,7 @@
 package com.amightytank.vanillatweaks.world;
 
 import com.amightytank.vanillatweaks.entity.ModEntities;
+import com.amightytank.vanillatweaks.entity.ai.PirateBoatBoarderRemountGoal;
 import com.amightytank.vanillatweaks.entity.ai.util.PirateBoatPassengerHelper;
 import com.amightytank.vanillatweaks.entity.ai.util.PirateRaidAiUtil;
 import com.amightytank.vanillatweaks.entity.custom.boat.ModBoatEntity;
@@ -290,6 +291,10 @@ public final class PiratePatrolFormation {
                 0.0F
         );
 
+        /*
+         * Add the boat before any crew mounts it.
+         * Crew boarding is queued in mountCrewToBoat(...).
+         */
         level.addFreshEntity(boat);
 
         return boat;
@@ -341,6 +346,10 @@ public final class PiratePatrolFormation {
             return;
         }
 
+        /*
+         * Count open seats once, then decrement as mounts are queued.
+         * This respects ModBoatEntity's chest-based passenger limit.
+         */
         int openSeats = PirateBoatPassengerHelper.getOpenSeatCount(boat);
 
         for (Mob pirate : crew) {
@@ -352,11 +361,20 @@ public final class PiratePatrolFormation {
                 continue;
             }
 
-            PirateBoatPassengerHelper.assignHomeBoat(pirate, boat);
+            /*
+             * Used by boat/pilot/raid AI.
+             */
+            pirate.getPersistentData().putUUID(PirateRaidAiUtil.RAID_BOAT_UUID_TAG, boat.getUUID());
 
             /*
-             * Delay initial boarding by 1 tick.
-             * This helps prevent "Received passengers for unknown entity".
+             * Used by remount AI.
+             * The pirate will prefer this boat, but can choose another fleet boat
+             * if this one has no unreserved open seat later.
+             */
+            pirate.getPersistentData().putUUID(PirateBoatBoarderRemountGoal.RETURN_BOAT_UUID_TAG, boat.getUUID());
+
+            /*
+             * Queue by 1 tick so the client knows the boat exists before receiving passengers.
              */
             if (PirateBoatPassengerHelper.queueBoard(pirate, boat, 1)) {
                 openSeats--;

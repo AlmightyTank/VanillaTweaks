@@ -35,8 +35,13 @@ public class PiratePatrolSpawner {
         }
 
         /*
-         * Process delayed pirate boat mounts first.
-         * This prevents passenger packets from being sent before the client knows the boat exists.
+         * Tick queued pirate boat mounts every server tick.
+         *
+         * PiratePatrolFormation and PirateShipSpawner queue boarding by 1 tick so
+         * the client receives the boat entity before it receives the passenger packet.
+         * This helps prevent:
+         *
+         * "Received passengers for unknown entity"
          */
         for (ServerLevel level : event.getServer().getAllLevels()) {
             PirateBoatPassengerHelper.tickQueuedMounts(level);

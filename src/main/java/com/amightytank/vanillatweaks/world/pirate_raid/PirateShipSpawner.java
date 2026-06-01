@@ -1,6 +1,7 @@
 package com.amightytank.vanillatweaks.world.pirate_raid;
 
 import com.amightytank.vanillatweaks.entity.ModEntities;
+import com.amightytank.vanillatweaks.entity.ai.PirateBoatBoarderRemountGoal;
 import com.amightytank.vanillatweaks.entity.ai.util.PirateBoatPassengerHelper;
 import com.amightytank.vanillatweaks.entity.ai.util.PirateRaidAiUtil;
 import com.amightytank.vanillatweaks.entity.custom.boat.ModBoatEntity;
@@ -266,6 +267,10 @@ public class PirateShipSpawner {
                 0.0F
         );
 
+        /*
+         * Boat is added before crew gets mounted.
+         * Actual passenger mounting is queued later by mountCrewToBoat(...).
+         */
         level.addFreshEntity(boat);
 
         return boat;
@@ -322,6 +327,11 @@ public class PirateShipSpawner {
             return;
         }
 
+        /*
+         * Count open seats once, then reserve those seats as we queue mounts.
+         * This prevents initial spawning from trying to put more pirates in the boat
+         * than the boat/chest layout supports.
+         */
         int openSeats = PirateBoatPassengerHelper.getOpenSeatCount(boat);
 
         for (Mob pirate : crew) {
@@ -333,11 +343,20 @@ public class PirateShipSpawner {
                 continue;
             }
 
-            PirateBoatPassengerHelper.assignHomeBoat(pirate, boat);
+            /*
+             * RAID_BOAT_UUID_TAG is used by boat/pilot/raid AI.
+             */
+            pirate.getPersistentData().putUUID(PirateRaidAiUtil.RAID_BOAT_UUID_TAG, boat.getUUID());
 
             /*
-             * Delay initial boarding by 1 tick.
-             * This helps prevent "Received passengers for unknown entity".
+             * RETURN_BOAT_UUID_TAG is used by remount AI.
+             * The remount goal will prefer this boat, but if it has no unreserved open seat,
+             * the pirate can still choose another fleet boat with space.
+             */
+            pirate.getPersistentData().putUUID(PirateBoatBoarderRemountGoal.RETURN_BOAT_UUID_TAG, boat.getUUID());
+
+            /*
+             * Queue by 1 tick so clients receive the boat entity before the passenger packet.
              */
             if (PirateBoatPassengerHelper.queueBoard(pirate, boat, 1)) {
                 openSeats--;
