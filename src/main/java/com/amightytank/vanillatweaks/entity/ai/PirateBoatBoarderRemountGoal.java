@@ -24,7 +24,7 @@ public class PirateBoatBoarderRemountGoal extends Goal {
 
     public PirateBoatBoarderRemountGoal(Mob pirate) {
         this.pirate = pirate;
-        this.setFlags(EnumSet.of(Goal.Flag.MOVE, Goal.Flag.LOOK));
+        this.setFlags(EnumSet.of(Goal.Flag.MOVE));
     }
 
     @Override

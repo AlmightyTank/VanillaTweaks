@@ -12,13 +12,7 @@ import java.util.EnumSet;
 
 public class PirateMarauderThrowWhileChargingGoal extends Goal {
     private static final double MAX_CHASE_DISTANCE = 34.0D;
-
-    /*
-     * If the target is farther than melee range but inside this range,
-     * the marauder can throw its axe/trident.
-     */
     private static final double THROW_RANGE = 28.0D;
-
     private static final double MELEE_REACH_DISTANCE = 2.4D;
 
     private static final int THROW_COOLDOWN_TICKS = 45;
@@ -30,14 +24,17 @@ public class PirateMarauderThrowWhileChargingGoal extends Goal {
     private int throwCooldown;
     private int meleeCooldown;
     private int repathCooldown;
+    private int seeTime;
 
     public PirateMarauderThrowWhileChargingGoal(Mob pirate) {
         this.pirate = pirate;
 
         /*
-         * This goal fully replaces PirateBoarderChargeGoal for marauders.
-         * MOVE = charge target.
-         * LOOK = face target while chasing/throwing/meleeing.
+         * Dismounted charge only.
+         * MOVE only.
+         *
+         * Do not claim LOOK here.
+         * Constant LOOK control is what was turning pirates around.
          */
         this.setFlags(EnumSet.of(Goal.Flag.MOVE));
     }
@@ -48,14 +45,13 @@ public class PirateMarauderThrowWhileChargingGoal extends Goal {
             return false;
         }
 
-        if (!(this.pirate instanceof RangedAttackMob)) {
+        LivingEntity target = this.pirate.getTarget();
+
+        if (!AbstractPirateEntity.canPirateAttack(target)) {
             return false;
         }
 
-        LivingEntity target = this.pirate.getTarget();
-
-        return AbstractPirateEntity.canPirateAttack(target)
-                && this.pirate.distanceToSqr(target) <= MAX_CHASE_DISTANCE * MAX_CHASE_DISTANCE;
+        return this.pirate.distanceToSqr(target) <= MAX_CHASE_DISTANCE * MAX_CHASE_DISTANCE;
     }
 
     @Override
@@ -66,8 +62,11 @@ public class PirateMarauderThrowWhileChargingGoal extends Goal {
 
         LivingEntity target = this.pirate.getTarget();
 
-        return AbstractPirateEntity.canPirateAttack(target)
-                && this.pirate.distanceToSqr(target) <= MAX_CHASE_DISTANCE * MAX_CHASE_DISTANCE;
+        if (!AbstractPirateEntity.canPirateAttack(target)) {
+            return false;
+        }
+
+        return this.pirate.distanceToSqr(target) <= MAX_CHASE_DISTANCE * MAX_CHASE_DISTANCE;
     }
 
     @Override
@@ -75,11 +74,13 @@ public class PirateMarauderThrowWhileChargingGoal extends Goal {
         this.throwCooldown = 10;
         this.meleeCooldown = 0;
         this.repathCooldown = 0;
+        this.seeTime = 0;
     }
 
     @Override
     public void stop() {
         this.pirate.getNavigation().stop();
+        this.seeTime = 0;
     }
 
     @Override
@@ -89,8 +90,6 @@ public class PirateMarauderThrowWhileChargingGoal extends Goal {
         if (!AbstractPirateEntity.canPirateAttack(target)) {
             return;
         }
-
-        PirateLookHelper.lookAtEntity(this.pirate, target);
 
         if (this.throwCooldown > 0) {
             this.throwCooldown--;
@@ -105,50 +104,63 @@ public class PirateMarauderThrowWhileChargingGoal extends Goal {
         }
 
         double distanceSqr = this.pirate.distanceToSqr(target);
-        double meleeRangeSqr = MELEE_REACH_DISTANCE * MELEE_REACH_DISTANCE;
-        double throwRangeSqr = THROW_RANGE * THROW_RANGE;
+        boolean canSeeTarget = this.pirate.getSensing().hasLineOfSight(target);
 
-        /*
-         * Close enough = stop and melee.
-         */
-        if (distanceSqr <= meleeRangeSqr) {
-            this.pirate.getNavigation().stop();
+        if (canSeeTarget) {
+            this.seeTime++;
+        } else {
+            this.seeTime = 0;
+        }
 
-            if (this.meleeCooldown <= 0) {
-                PirateLookHelper.lookAtEntity(this.pirate, target);
-                this.pirate.swing(InteractionHand.MAIN_HAND);
-                this.pirate.doHurtTarget(target);
-                this.meleeCooldown = MELEE_COOLDOWN_TICKS;
-            }
+        if (this.repathCooldown <= 0) {
+            this.pirate.getNavigation().moveTo(target, 1.15D);
+            this.repathCooldown = REPATH_COOLDOWN_TICKS;
+        }
 
+        if (distanceSqr <= MELEE_REACH_DISTANCE * MELEE_REACH_DISTANCE) {
+            this.tryMeleeAttack(target);
+            return;
+        }
+
+        if (distanceSqr <= THROW_RANGE * THROW_RANGE) {
+            this.tryThrowAttack(target);
+        }
+    }
+
+    private void tryMeleeAttack(LivingEntity target) {
+        if (this.meleeCooldown > 0) {
             return;
         }
 
         /*
-         * Too far to melee = throw axe/trident if in throw range.
-         *
-         * This is the important part:
-         * - target must be outside melee range
-         * - target must be inside throw range
-         * - line of sight required
-         * - cooldown required
+         * No look control here.
+         * Movement/pathing already turns the body naturally.
          */
-        if (distanceSqr <= throwRangeSqr
-                && this.throwCooldown <= 0
-                && this.pirate.getSensing().hasLineOfSight(target)
-                && this.pirate instanceof RangedAttackMob rangedAttackMob) {
-            PirateLookHelper.lookAtEntity(this.pirate, target);
-            this.pirate.swing(InteractionHand.MAIN_HAND);
-            rangedAttackMob.performRangedAttack(target, 1.0F);
-            this.throwCooldown = THROW_COOLDOWN_TICKS;
+        this.pirate.swing(InteractionHand.MAIN_HAND);
+        this.pirate.doHurtTarget(target);
+        this.meleeCooldown = MELEE_COOLDOWN_TICKS;
+    }
+
+    private void tryThrowAttack(LivingEntity target) {
+        if (this.throwCooldown > 0) {
+            return;
+        }
+
+        if (this.seeTime < 5) {
+            return;
+        }
+
+        if (!(this.pirate instanceof RangedAttackMob rangedAttackMob)) {
+            return;
         }
 
         /*
-         * Keep charging even while throwing.
+         * Only look when actually throwing.
+         * Do not force look every tick while charging.
          */
-        if (this.repathCooldown <= 0) {
-            this.pirate.getNavigation().moveTo(target, 1.2D);
-            this.repathCooldown = REPATH_COOLDOWN_TICKS;
-        }
+        PirateLookHelper.lookAtEntity(this.pirate, target);
+
+        rangedAttackMob.performRangedAttack(target, 1.0F);
+        this.throwCooldown = THROW_COOLDOWN_TICKS;
     }
 }

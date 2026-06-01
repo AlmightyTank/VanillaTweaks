@@ -33,7 +33,7 @@ public class PirateBoatBoarderDismountGoal extends Goal {
         /*
          * LOOK makes them stare at the target before jumping out.
          */
-        this.setFlags(EnumSet.of(Goal.Flag.MOVE, Goal.Flag.LOOK));
+        this.setFlags(EnumSet.of(Goal.Flag.MOVE));
     }
 
     @Override

@@ -23,7 +23,9 @@ public class PirateCloseDefenseGoal extends Goal {
         /*
          * No MOVE.
          * No LOOK.
-         * This prevents melee fallback from turning pirates around.
+         *
+         * This is only a close slap if the target is already beside the pirate.
+         * It will not turn the pirate around mounted or dismounted.
          */
     }
 

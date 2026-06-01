@@ -22,8 +22,11 @@ public class PirateMountedThrowAttackGoal extends Goal {
         this.pirate = pirate;
 
         /*
-         * Mounted attack can look/aim.
-         * It must NEVER claim MOVE because PirateBoatPilotGoal owns boat movement.
+         * Mounted ranged pressure.
+         * LOOK only.
+         *
+         * Never claim MOVE while mounted.
+         * PirateBoatPilotGoal owns MOVE.
          */
         this.setFlags(EnumSet.of(Goal.Flag.LOOK));
     }
@@ -83,7 +86,11 @@ public class PirateMountedThrowAttackGoal extends Goal {
             return;
         }
 
-        if (this.attackCooldown <= 0 && this.pirate instanceof RangedAttackMob rangedAttackMob) {
+        if (this.attackCooldown > 0) {
+            return;
+        }
+
+        if (this.pirate instanceof RangedAttackMob rangedAttackMob) {
             PirateLookHelper.lookAtEntity(this.pirate, target);
             rangedAttackMob.performRangedAttack(target, 1.0F);
             this.attackCooldown = ATTACK_COOLDOWN_TICKS;
