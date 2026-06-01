@@ -1,642 +1,636 @@
 package com.amightytank.vanillatweaks.world.pirate_raid;
 
 import com.amightytank.vanillatweaks.entity.ModEntities;
-import com.amightytank.vanillatweaks.entity.ai.PirateBoatBoarderRemountGoal;
 import com.amightytank.vanillatweaks.entity.ai.util.PirateBoatPassengerHelper;
-import com.amightytank.vanillatweaks.entity.ai.util.PirateRaidAiUtil;
 import com.amightytank.vanillatweaks.entity.custom.boat.ModBoatEntity;
+import com.amightytank.vanillatweaks.entity.custom.pirate.AbstractPirateEntity;
+import com.amightytank.vanillatweaks.entity.custom.pirate.PirateCaptainEntity;
 import com.amightytank.vanillatweaks.util.PirateLootHelper;
 import net.minecraft.core.BlockPos;
-import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.tags.FluidTags;
+import net.minecraft.world.DifficultyInstance;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.MobSpawnType;
-import net.minecraft.world.entity.raid.Raid;
+import net.minecraft.world.entity.SpawnGroupData;
 import net.minecraft.world.entity.vehicle.Boat;
+import net.minecraft.world.entity.raid.Raid;
 import net.minecraft.world.phys.Vec3;
 
+import javax.annotation.Nullable;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
-public class PirateShipSpawner {
-    /*
-     * Optional legacy tag.
-     * Keep this only so older treasure-raid cleanup/tracking code can still find these boats.
-     * AI goals use PirateRaidAiUtil.RAID_BOAT_TAG.
-     */
-    private static final String LEGACY_TREASURE_RAID_BOAT_TAG = "PirateTreasureRaidBoat";
+import static com.amightytank.vanillatweaks.world.PiratePatrolFormation.getRandomBoatType;
+
+public final class PirateShipSpawner {
+    public static final String RAID_BOAT_TAG = "PirateRaidBoat";
+    public static final String CAPTAIN_TAG = "PirateRaidCaptain";
+    public static final String RANGED_TAG = "PirateRaidRanged";
+    public static final String BOAT_UUID_TAG_PREFIX = "PirateRaidBoatUUID:";
+
+    private PirateShipSpawner() {
+    }
 
     public static List<Mob> spawnWave(
             ServerLevel level,
-            ServerPlayer target,
+            ServerPlayer player,
             BlockPos treasurePos,
-            int wave,
-            UUID raidId,
-            List<PirateShipSpawnEntry> wavePlan
+            int currentWave,
+            Object raidId,
+            Object wavePlan
     ) {
         List<Mob> spawnedPirates = new ArrayList<>();
 
-        if (wavePlan.isEmpty()) {
-            target.displayClientMessage(
-                    Component.literal("Pirate raid wave " + wave + " has no ships in its wave plan!"),
-                    false
-            );
-            return spawnedPirates;
-        }
+        UUID fleetId = toFleetUuid(raidId);
+        Boat.Type woodType = getRandomBoatType(level);
 
-        target.displayClientMessage(
-                Component.literal("Pirate raid wave " + wave + " spawning " + wavePlan.size() + " ships."),
-                false
+        Vec3 center = findBestWaveBoatSpawnCenter(level, player, treasurePos, currentWave);
+        Vec3 forward = getForwardDirection(center, player);
+        Vec3 right = new Vec3(-forward.z, 0.0D, forward.x);
+
+        int captainShips = readIntFromPlan(
+                wavePlan,
+                currentWave >= 3 ? 1 : 0,
+                "captainShips",
+                "captainShipCount",
+                "captainCount",
+                "captains"
         );
 
-        double attackAngle = Math.toRadians(level.random.nextInt(360));
-        Boat.Type fleetWoodType = getRandomBoatType(level);
+        int combatShips = readIntFromPlan(
+                wavePlan,
+                Math.min(1 + currentWave, 3),
+                "combatShips",
+                "combatShipCount",
+                "boatCount",
+                "ships"
+        );
 
-        for (int i = 0; i < wavePlan.size(); i++) {
-            PirateShipSpawnEntry entry = wavePlan.get(i);
+        int lootShips = readIntFromPlan(
+                wavePlan,
+                0,
+                "lootShips",
+                "lootShipCount",
+                "chestShips",
+                "chestShipCount"
+        );
 
-            BlockPos formationPos = getVFormationPosition(
-                    level,
-                    target.blockPosition(),
-                    wavePlan.size(),
-                    i,
-                    attackAngle
-            );
+        ShipSize combatSize = readShipSizeFromPlan(
+                wavePlan,
+                currentWave >= 3 ? ShipSize.LARGE : currentWave == 2 ? ShipSize.MEDIUM : ShipSize.SMALL,
+                "shipSize",
+                "combatShipSize",
+                "boatSize"
+        );
 
-            spawnedPirates.addAll(spawnShipEntryAtPosition(
-                    level,
-                    target,
-                    formationPos,
-                    raidId,
-                    entry,
-                    fleetWoodType
-            ));
+        ShipSize lootSize = readShipSizeFromPlan(
+                wavePlan,
+                ShipSize.MEDIUM,
+                "lootShipSize",
+                "chestShipSize"
+        );
+
+        int index = 0;
+
+        for (int i = 0; i < captainShips; i++) {
+            Vec3 pos = center.add(right.scale((index - 1.0D) * 8.0D));
+            ModBoatEntity boat = spawnCaptainShip(level, pos, woodType, fleetId, false);
+            collectBoatPirates(boat, spawnedPirates);
+            index++;
         }
 
-        target.displayClientMessage(
-                Component.literal("Pirate raid wave " + wave + " spawned " + spawnedPirates.size() + " pirates."),
-                false
-        );
+        for (int i = 0; i < combatShips; i++) {
+            double sideOffset = ((i % 2 == 0) ? 1.0D : -1.0D) * (8.0D + (i / 2) * 7.0D);
+            double backOffset = 8.0D + (i / 2) * 8.0D;
+
+            Vec3 pos = center.subtract(forward.scale(backOffset)).add(right.scale(sideOffset));
+
+            ModBoatEntity boat = spawnCombatShip(level, pos, woodType, combatSize, fleetId);
+            collectBoatPirates(boat, spawnedPirates);
+            index++;
+        }
+
+        for (int i = 0; i < lootShips; i++) {
+            double sideOffset = ((i % 2 == 0) ? 1.0D : -1.0D) * 6.0D;
+            double backOffset = 18.0D + (i / 2) * 7.0D;
+
+            Vec3 pos = center.subtract(forward.scale(backOffset)).add(right.scale(sideOffset));
+
+            ModBoatEntity boat = spawnLootShip(level, pos, woodType, lootSize, fleetId);
+            collectBoatPirates(boat, spawnedPirates);
+        }
 
         return spawnedPirates;
     }
 
-    private static List<Mob> spawnShipEntryAtPosition(
-            ServerLevel level,
-            ServerPlayer target,
-            BlockPos spawnPos,
-            UUID raidId,
-            PirateShipSpawnEntry entry,
-            Boat.Type woodType
-    ) {
-        List<Mob> spawnedPirates = new ArrayList<>();
-
-        if (spawnPos == null) {
-            target.displayClientMessage(
-                    Component.literal("Could not find V formation surface water for " + entry.size() + " " + entry.role() + " ship."),
-                    false
-            );
-            return spawnedPirates;
-        }
-
-        announceDebugShip(target, entry);
-
-        Entity boat = spawnRaidBoat(level, spawnPos, entry, woodType);
-
+    private static void collectBoatPirates(Boat boat, List<Mob> spawnedPirates) {
         if (boat == null) {
-            return spawnedPirates;
+            return;
         }
 
-        setupRaidBoat(boat, target, raidId);
+        for (Entity passenger : boat.getPassengers()) {
+            if (passenger instanceof Mob mob) {
+                spawnedPirates.add(mob);
+            }
+        }
+    }
 
-        if (boat instanceof ModBoatEntity modBoat && isLootShip(entry)) {
-            fillLootShip(level, modBoat);
+    private static UUID toFleetUuid(Object raidId) {
+        if (raidId instanceof UUID uuid) {
+            return uuid;
         }
 
-        if (entry.role() == PirateShipRole.CAPTAIN_LOOT) {
-            spawnedPirates.addAll(spawnCaptainLootShipPirates(level, target, spawnPos, raidId));
-        } else if (entry.role() == PirateShipRole.CAPTAIN) {
-            spawnedPirates.addAll(spawnCaptainShipPirates(level, target, spawnPos, raidId));
-        } else if (entry.role() == PirateShipRole.LOOT) {
-            spawnedPirates.addAll(spawnLootShipPirates(level, target, spawnPos, raidId, entry.size()));
-        } else {
-            spawnedPirates.addAll(spawnCombatShipPirates(level, target, spawnPos, raidId, entry.size()));
+        if (raidId != null) {
+            return UUID.nameUUIDFromBytes(String.valueOf(raidId).getBytes(StandardCharsets.UTF_8));
         }
 
-        mountCrewToBoat(boat, spawnedPirates);
-
-        return spawnedPirates;
+        return UUID.randomUUID();
     }
 
-    private static boolean isLootShip(PirateShipSpawnEntry entry) {
-        return entry.role() == PirateShipRole.LOOT
-                || entry.role() == PirateShipRole.CAPTAIN_LOOT;
-    }
-
-    private static void fillLootShip(ServerLevel level, ModBoatEntity boat) {
-        PirateLootHelper.fillPirateLootShip(level, boat);
-    }
-
-    private static BlockPos getVFormationPosition(
+    private static Vec3 findBestWaveBoatSpawnCenter(
             ServerLevel level,
-            BlockPos targetPos,
-            int shipCount,
-            int shipIndex,
-            double attackAngle
+            ServerPlayer player,
+            BlockPos treasurePos,
+            int currentWave
     ) {
-        Vec3 forwardToPlayer = new Vec3(
-                Math.cos(attackAngle),
-                0.0D,
-                Math.sin(attackAngle)
-        ).normalize();
+        Vec3 treasureCenter = Vec3.atBottomCenterOf(treasurePos);
 
-        Vec3 right = new Vec3(
-                -forwardToPlayer.z,
-                0.0D,
-                forwardToPlayer.x
-        ).normalize();
+        Vec3 awayFromPlayer;
 
-        int row = getVRow(shipIndex);
-        int side = getVSide(shipIndex);
+        if (player != null) {
+            awayFromPlayer = treasureCenter.subtract(player.position());
+            awayFromPlayer = new Vec3(awayFromPlayer.x, 0.0D, awayFromPlayer.z);
+        } else {
+            awayFromPlayer = new Vec3(1.0D, 0.0D, 0.0D);
+        }
 
-        double baseDistance = 34.0D;
-        double rowDepth = 9.0D;
-        double sideSpacing = 9.0D;
+        if (awayFromPlayer.lengthSqr() < 0.001D) {
+            awayFromPlayer = new Vec3(1.0D, 0.0D, 0.0D);
+        }
 
-        Vec3 targetCenter = Vec3.atBottomCenterOf(targetPos);
+        awayFromPlayer = awayFromPlayer.normalize();
 
-        Vec3 spawn = targetCenter
-                .subtract(forwardToPlayer.scale(baseDistance + row * rowDepth))
-                .add(right.scale(side * sideSpacing * Math.max(1, row)));
+        double baseDistance = 28.0D + currentWave * 5.0D;
 
-        BlockPos wantedPos = BlockPos.containing(spawn);
+        for (double distance : new double[]{baseDistance, baseDistance + 10.0D, baseDistance - 8.0D, baseDistance + 18.0D}) {
+            Vec3 testCenter = treasureCenter.add(awayFromPlayer.scale(distance));
 
-        return findNearbySurfaceWater(level, wantedPos, 10);
+            BlockPos waterPos = findNearestWaterSurface(level, BlockPos.containing(testCenter), 14, 8);
+
+            if (waterPos != null) {
+                return Vec3.atBottomCenterOf(waterPos).add(0.0D, 0.12D, 0.0D);
+            }
+        }
+
+        BlockPos fallbackWater = findNearestWaterSurface(level, treasurePos, 42, 10);
+
+        if (fallbackWater != null) {
+            return Vec3.atBottomCenterOf(fallbackWater).add(0.0D, 0.12D, 0.0D);
+        }
+
+        return treasureCenter.add(awayFromPlayer.scale(baseDistance));
     }
 
-    private static int getVRow(int index) {
-        return switch (index) {
-            case 0 -> 0;
-            case 1, 2 -> 1;
-            default -> 2;
-        };
-    }
+    private static BlockPos findNearestWaterSurface(ServerLevel level, BlockPos center, int horizontalRange, int verticalRange) {
+        BlockPos.MutableBlockPos mutable = new BlockPos.MutableBlockPos();
 
-    private static int getVSide(int index) {
-        return switch (index) {
-            case 0 -> 0;
-            case 1 -> -1;
-            case 2 -> 1;
-            case 3 -> -2;
-            case 4 -> 2;
-            default -> 0;
-        };
-    }
+        BlockPos bestPos = null;
+        double bestDistance = Double.MAX_VALUE;
 
-    private static BlockPos findNearbySurfaceWater(ServerLevel level, BlockPos center, int radius) {
-        for (int r = 0; r <= radius; r++) {
-            for (int x = -r; x <= r; x++) {
-                for (int z = -r; z <= r; z++) {
-                    if (Math.abs(x) != r && Math.abs(z) != r) {
+        for (int x = -horizontalRange; x <= horizontalRange; x++) {
+            for (int z = -horizontalRange; z <= horizontalRange; z++) {
+                for (int y = verticalRange; y >= -verticalRange; y--) {
+                    mutable.set(center.getX() + x, center.getY() + y, center.getZ() + z);
+
+                    if (!level.getFluidState(mutable).is(FluidTags.WATER)) {
                         continue;
                     }
 
-                    BlockPos surface = findWaterSurfaceAt(level, center.getX() + x, center.getZ() + z);
+                    BlockPos above = mutable.above();
 
-                    if (surface != null) {
-                        return surface;
+                    if (!level.getBlockState(above).isAir() && !level.getFluidState(above).isEmpty()) {
+                        continue;
+                    }
+
+                    double distance = mutable.distSqr(center);
+
+                    if (distance < bestDistance) {
+                        bestDistance = distance;
+                        bestPos = mutable.immutable();
                     }
                 }
+            }
+        }
+
+        return bestPos;
+    }
+
+    private static Vec3 getForwardDirection(Vec3 center, ServerPlayer player) {
+        if (player == null) {
+            return new Vec3(0.0D, 0.0D, 1.0D);
+        }
+
+        Vec3 towardPlayer = player.position().subtract(center);
+        towardPlayer = new Vec3(towardPlayer.x, 0.0D, towardPlayer.z);
+
+        if (towardPlayer.lengthSqr() < 0.001D) {
+            return new Vec3(0.0D, 0.0D, 1.0D);
+        }
+
+        return towardPlayer.normalize();
+    }
+
+    private static int readIntFromPlan(Object wavePlan, int fallback, String... names) {
+        if (wavePlan == null) {
+            return fallback;
+        }
+
+        for (String name : names) {
+            Integer value = readIntGetter(wavePlan, name);
+
+            if (value != null) {
+                return Math.max(0, value);
+            }
+
+            value = readIntField(wavePlan, name);
+
+            if (value != null) {
+                return Math.max(0, value);
+            }
+        }
+
+        return fallback;
+    }
+
+    private static Integer readIntGetter(Object wavePlan, String name) {
+        String capitalized = Character.toUpperCase(name.charAt(0)) + name.substring(1);
+
+        for (String methodName : new String[]{name, "get" + capitalized}) {
+            try {
+                Method method = wavePlan.getClass().getMethod(methodName);
+                Object result = method.invoke(wavePlan);
+
+                if (result instanceof Number number) {
+                    return number.intValue();
+                }
+            } catch (Exception ignored) {
             }
         }
 
         return null;
     }
 
-    private static Entity spawnRaidBoat(
-            ServerLevel level,
-            BlockPos spawnPos,
-            PirateShipSpawnEntry entry,
-            Boat.Type woodType
-    ) {
-        boolean lootBoat = isLootShip(entry);
+    private static Integer readIntField(Object wavePlan, String name) {
+        try {
+            Field field = wavePlan.getClass().getDeclaredField(name);
+            field.setAccessible(true);
 
-        PirateShipSize finalSize = entry.role() == PirateShipRole.CAPTAIN_LOOT
-                ? PirateShipSize.LARGE
-                : entry.size();
+            Object result = field.get(wavePlan);
 
-        int chestCount = lootBoat ? 1 : 0;
+            if (result instanceof Number number) {
+                return number.intValue();
+            }
+        } catch (Exception ignored) {
+        }
 
-        return spawnSailboat(level, spawnPos, finalSize, chestCount, woodType);
+        return null;
     }
 
-    private static Entity spawnSailboat(
+    private static ShipSize readShipSizeFromPlan(Object wavePlan, ShipSize fallback, String... names) {
+        if (wavePlan == null) {
+            return fallback;
+        }
+
+        for (String name : names) {
+            Object value = readValueFromPlan(wavePlan, name);
+
+            if (value instanceof ShipSize shipSize) {
+                return shipSize;
+            }
+
+            if (value instanceof Enum<?> enumValue) {
+                try {
+                    return ShipSize.valueOf(enumValue.name());
+                } catch (Exception ignored) {
+                }
+            }
+
+            if (value instanceof String stringValue) {
+                try {
+                    return ShipSize.valueOf(stringValue.toUpperCase());
+                } catch (Exception ignored) {
+                }
+            }
+        }
+
+        return fallback;
+    }
+
+    private static Object readValueFromPlan(Object wavePlan, String name) {
+        String capitalized = Character.toUpperCase(name.charAt(0)) + name.substring(1);
+
+        for (String methodName : new String[]{name, "get" + capitalized}) {
+            try {
+                Method method = wavePlan.getClass().getMethod(methodName);
+                return method.invoke(wavePlan);
+            } catch (Exception ignored) {
+            }
+        }
+
+        try {
+            Field field = wavePlan.getClass().getDeclaredField(name);
+            field.setAccessible(true);
+            return field.get(wavePlan);
+        } catch (Exception ignored) {
+        }
+
+        return null;
+    }
+
+    public enum ShipSize {
+        SMALL,
+        MEDIUM,
+        LARGE
+    }
+
+    public static ModBoatEntity spawnCaptainShip(
             ServerLevel level,
-            BlockPos spawnPos,
-            PirateShipSize size,
-            int chestCount,
-            Boat.Type woodType
+            Vec3 position,
+            Boat.Type woodType,
+            UUID fleetId,
+            boolean hasChest
     ) {
-        ModBoatEntity boat = createBoatForSize(level, size);
+        ModBoatEntity boat = spawnSailboat(level, position, woodType, ShipSize.LARGE, hasChest, true, fleetId);
 
         if (boat == null) {
             return null;
         }
 
-        boat.setModVariant(woodType);
-        boat.setBoatSizeTier(getBoatSizeTier(size));
-        boat.setChestCount(chestCount);
-        boat.setBannerStack(Raid.getLeaderBannerInstance());
+        PirateCaptainEntity captain = spawnCaptain(level, position.add(0.0D, 0.25D, 0.0D));
 
-        /*
-         * Large sailboats support two banners.
-         */
-        if (boat.isLargeSailboat()) {
-            boat.setSecondBannerStack(Raid.getLeaderBannerInstance());
+        if (captain != null) {
+            setupPirate(captain, boat, fleetId, CAPTAIN_TAG);
+            addPirateToBoat(boat, captain);
+
+            PirateBoatPassengerHelper.assignHomeBoat(captain, boat);
+            boat.addTag(PirateBoatPassengerHelper.CAPTAIN_SHIP_TAG);
         }
 
-        boat.moveTo(
-                spawnPos.getX() + 0.5D,
-                spawnPos.getY(),
-                spawnPos.getZ() + 0.5D,
-                level.random.nextFloat() * 360.0F,
-                0.0F
-        );
+        if (hasChest) {
+            PirateLootHelper.fillPirateLootShip(level, boat);
+        }
+
+        return boat;
+    }
+
+    public static ModBoatEntity spawnCombatShip(
+            ServerLevel level,
+            Vec3 position,
+            Boat.Type woodType,
+            ShipSize shipSize,
+            UUID fleetId
+    ) {
+        ModBoatEntity boat = spawnSailboat(level, position, woodType, shipSize, false, false, fleetId);
+
+        if (boat == null) {
+            return null;
+        }
+
+        int seats = getSeatCountForSize(shipSize, false);
 
         /*
-         * Boat is added before crew gets mounted.
-         * Actual passenger mounting is queued later by mountCrewToBoat(...).
+         * First passenger should be a melee pirate so this boat has a stable pilot.
          */
+        Mob pilot = spawnMarauder(level, position.add(0.0D, 0.25D, 0.0D));
+
+        if (pilot == null) {
+            pilot = spawnDeckhand(level, position.add(0.0D, 0.25D, 0.0D));
+        }
+
+        if (pilot != null) {
+            setupPirate(pilot, boat, fleetId, PirateBoatPassengerHelper.BOARDER_TAG);
+            addPirateToBoat(boat, pilot);
+            PirateBoatPassengerHelper.assignHomeBoat(pilot, boat);
+        }
+
+        for (int i = 1; i < seats; i++) {
+            Mob crew;
+
+            if (i % 2 == 0) {
+                crew = spawnGunner(level, position.add(0.0D, 0.25D, 0.0D));
+            } else {
+                crew = spawnDeckhand(level, position.add(0.0D, 0.25D, 0.0D));
+            }
+
+            if (crew == null) {
+                continue;
+            }
+
+            String roleTag = crew instanceof AbstractPirateEntity && crew.getClass().getSimpleName().toLowerCase().contains("gunner")
+                    ? RANGED_TAG
+                    : PirateBoatPassengerHelper.BOARDER_TAG;
+
+            setupPirate(crew, boat, fleetId, roleTag);
+            addPirateToBoat(boat, crew);
+            PirateBoatPassengerHelper.assignHomeBoat(crew, boat);
+        }
+
+        return boat;
+    }
+
+    public static ModBoatEntity spawnLootShip(
+            ServerLevel level,
+            Vec3 position,
+            Boat.Type woodType,
+            ShipSize shipSize,
+            UUID fleetId
+    ) {
+        ModBoatEntity boat = spawnSailboat(level, position, woodType, shipSize, true, false, fleetId);
+
+        if (boat == null) {
+            return null;
+        }
+
+        boat.addTag("PirateLootShip");
+        PirateLootHelper.fillPirateLootShip(level, boat);
+
+        int seats = getSeatCountForSize(shipSize, true);
+
+        /*
+         * Loot ships still get a small crew, but they should not be preferred for captain rescue
+         * unless every combat boat is unavailable.
+         */
+        for (int i = 0; i < seats; i++) {
+            Mob crew = i == 0
+                    ? spawnDeckhand(level, position.add(0.0D, 0.25D, 0.0D))
+                    : spawnGunner(level, position.add(0.0D, 0.25D, 0.0D));
+
+            if (crew == null) {
+                continue;
+            }
+
+            String roleTag = i == 0 ? PirateBoatPassengerHelper.BOARDER_TAG : RANGED_TAG;
+
+            setupPirate(crew, boat, fleetId, roleTag);
+            addPirateToBoat(boat, crew);
+            PirateBoatPassengerHelper.assignHomeBoat(crew, boat);
+        }
+
+        return boat;
+    }
+
+    public static ModBoatEntity spawnSailboat(
+            ServerLevel level,
+            Vec3 position,
+            Boat.Type woodType,
+            ShipSize shipSize,
+            boolean hasChest,
+            boolean captainShip,
+            UUID fleetId
+    ) {
+        ModBoatEntity boat = createBoatForSize(level, shipSize);
+
+        if (boat == null) {
+            return null;
+        }
+
+        boat.moveTo(position.x, position.y, position.z, level.random.nextFloat() * 360.0F, 0.0F);
+
+        boat.setModVariant(woodType);
+        boat.setBannerStack(Raid.getLeaderBannerInstance());
+        boat.setBannerCount(getBannerCountForSize(shipSize));
+
+        if (hasChest) {
+            boat.setChestCount(1);
+        } else {
+            boat.setChestCount(0);
+        }
+
+        setupBoat(boat, fleetId);
+
+        if (captainShip) {
+            boat.addTag(PirateBoatPassengerHelper.CAPTAIN_SHIP_TAG);
+        }
+
         level.addFreshEntity(boat);
 
         return boat;
     }
 
-    private static ModBoatEntity createBoatForSize(ServerLevel level, PirateShipSize size) {
-        return switch (size) {
+    private static ModBoatEntity createBoatForSize(ServerLevel level, ShipSize shipSize) {
+        return switch (shipSize) {
             case SMALL -> ModEntities.MOD_BOAT.get().create(level);
             case MEDIUM -> ModEntities.MEDIUM_MOD_BOAT.get().create(level);
             case LARGE -> ModEntities.LARGE_MOD_BOAT.get().create(level);
         };
     }
 
-    private static int getBoatSizeTier(PirateShipSize size) {
-        return switch (size) {
-            case SMALL -> 1;
-            case MEDIUM -> 2;
-            case LARGE -> 3;
-        };
+    private static void setupBoat(ModBoatEntity boat, UUID fleetId) {
+        boat.addTag(PirateBoatPassengerHelper.RAID_PIRATE_TAG);
+        boat.addTag(RAID_BOAT_TAG);
+        boat.addTag(PirateBoatPassengerHelper.FLEET_TAG_PREFIX + fleetId);
     }
 
-    private static Boat.Type getRandomBoatType(ServerLevel level) {
-        Boat.Type[] types = Boat.Type.values();
-        return types[level.random.nextInt(types.length)];
+    private static void setupPirate(Mob pirate, ModBoatEntity boat, UUID fleetId, String roleTag) {
+        pirate.addTag(PirateBoatPassengerHelper.RAID_PIRATE_TAG);
+        pirate.addTag(PirateBoatPassengerHelper.FLEET_TAG_PREFIX + fleetId);
+        pirate.addTag(BOAT_UUID_TAG_PREFIX + boat.getUUID());
+
+        if (roleTag != null && !roleTag.isBlank()) {
+            pirate.addTag(roleTag);
+        }
     }
 
-    private static void setupRaidBoat(Entity boat, ServerPlayer target, UUID raidId) {
+    private static void addPirateToBoat(ModBoatEntity boat, Mob pirate) {
         /*
-         * Important:
-         * AI goals look for PirateRaidAiUtil.RAID_BOAT_TAG.
+         * Use your custom sailboat helper first so seat limits stay correct.
+         * Fallback to vanilla riding if your boat accepts normal passengers.
          */
-        boat.addTag(PirateRaidAiUtil.RAID_BOAT_TAG);
-
-        /*
-         * Optional old treasure raid boat tag.
-         * Safe to keep for compatibility with older cleanup/tracking code.
-         */
-        boat.addTag(LEGACY_TREASURE_RAID_BOAT_TAG);
-
-        boat.addTag(getRaidGroupTag(raidId));
-        boat.getPersistentData().putUUID(PirateRaidAiUtil.TARGET_UUID_TAG, target.getUUID());
-
-        Vec3 lookDirection = target.position().subtract(boat.position());
-
-        if (lookDirection.lengthSqr() > 0.01D) {
-            float yaw = (float) (Math.atan2(lookDirection.z, lookDirection.x) * (180.0D / Math.PI)) - 90.0F;
-            boat.setYRot(yaw);
-            boat.setYHeadRot(yaw);
+        if (!boat.addMobToSailboat(pirate)) {
+            pirate.startRiding(boat, true);
         }
     }
 
-    private static void mountCrewToBoat(Entity boatEntity, List<Mob> crew) {
-        if (!(boatEntity instanceof Boat boat)) {
-            return;
+    private static PirateCaptainEntity spawnCaptain(ServerLevel level, Vec3 position) {
+        PirateCaptainEntity captain = ModEntities.PIRATE_CAPTAIN.get().create(level);
+
+        if (captain == null) {
+            return null;
         }
 
-        /*
-         * Count open seats once, then reserve those seats as we queue mounts.
-         * This prevents initial spawning from trying to put more pirates in the boat
-         * than the boat/chest layout supports.
-         */
-        int openSeats = PirateBoatPassengerHelper.getOpenSeatCount(boat);
-
-        for (Mob pirate : crew) {
-            if (openSeats <= 0) {
-                break;
-            }
-
-            if (pirate == null || !pirate.isAlive()) {
-                continue;
-            }
-
-            /*
-             * RAID_BOAT_UUID_TAG is used by boat/pilot/raid AI.
-             */
-            pirate.getPersistentData().putUUID(PirateRaidAiUtil.RAID_BOAT_UUID_TAG, boat.getUUID());
-
-            /*
-             * RETURN_BOAT_UUID_TAG is used by remount AI.
-             * The remount goal will prefer this boat, but if it has no unreserved open seat,
-             * the pirate can still choose another fleet boat with space.
-             */
-            pirate.getPersistentData().putUUID(PirateBoatBoarderRemountGoal.RETURN_BOAT_UUID_TAG, boat.getUUID());
-
-            /*
-             * Queue by 1 tick so clients receive the boat entity before the passenger packet.
-             */
-            if (PirateBoatPassengerHelper.queueBoard(pirate, boat, 1)) {
-                openSeats--;
-            }
-        }
+        finishSpawn(level, captain, position);
+        return captain;
     }
 
-    private static List<Mob> spawnCombatShipPirates(
-            ServerLevel level,
-            ServerPlayer target,
-            BlockPos spawnPos,
-            UUID raidId,
-            PirateShipSize size
-    ) {
-        List<Mob> spawnedPirates = new ArrayList<>();
+    private static Mob spawnDeckhand(ServerLevel level, Vec3 position) {
+        Mob pirate = ModEntities.PIRATE_DECKHAND.get().create(level);
 
-        spawnRandomPirates(
-                spawnedPirates,
-                level,
-                target,
-                spawnPos,
-                raidId,
-                getCombatCrewCount(size)
-        );
-
-        return spawnedPirates;
-    }
-
-    private static List<Mob> spawnLootShipPirates(
-            ServerLevel level,
-            ServerPlayer target,
-            BlockPos spawnPos,
-            UUID raidId,
-            PirateShipSize size
-    ) {
-        List<Mob> spawnedPirates = new ArrayList<>();
-
-        spawnRandomPirates(
-                spawnedPirates,
-                level,
-                target,
-                spawnPos,
-                raidId,
-                getLootCrewCount(size)
-        );
-
-        return spawnedPirates;
-    }
-
-    private static List<Mob> spawnCaptainLootShipPirates(
-            ServerLevel level,
-            ServerPlayer target,
-            BlockPos spawnPos,
-            UUID raidId
-    ) {
-        List<Mob> spawnedPirates = new ArrayList<>();
-
-        addIfNotNull(
-                spawnedPirates,
-                spawnPirateCaptain(level, target, spawnPos, raidId)
-        );
-
-        spawnRandomPirates(
-                spawnedPirates,
-                level,
-                target,
-                spawnPos.offset(1, 0, 0),
-                raidId,
-                2
-        );
-
-        return spawnedPirates;
-    }
-
-    private static List<Mob> spawnCaptainShipPirates(
-            ServerLevel level,
-            ServerPlayer target,
-            BlockPos spawnPos,
-            UUID raidId
-    ) {
-        List<Mob> spawnedPirates = new ArrayList<>();
-
-        addIfNotNull(
-                spawnedPirates,
-                spawnPirateCaptain(level, target, spawnPos, raidId)
-        );
-
-        spawnRandomPirates(
-                spawnedPirates,
-                level,
-                target,
-                spawnPos.offset(1, 0, 0),
-                raidId,
-                3
-        );
-
-        return spawnedPirates;
-    }
-
-    private static int getCombatCrewCount(PirateShipSize size) {
-        return switch (size) {
-            case SMALL -> 1;
-            case MEDIUM -> 2;
-            case LARGE -> 4;
-        };
-    }
-
-    private static int getLootCrewCount(PirateShipSize size) {
-        return switch (size) {
-            case SMALL -> 1;
-            case MEDIUM -> 2;
-            case LARGE -> 3;
-        };
-    }
-
-    private static void spawnRandomPirates(
-            List<Mob> spawnedPirates,
-            ServerLevel level,
-            ServerPlayer target,
-            BlockPos spawnPos,
-            UUID raidId,
-            int count
-    ) {
-        for (int i = 0; i < count; i++) {
-            BlockPos offsetPos = spawnPos.offset(getCrewOffsetX(i), 0, getCrewOffsetZ(i));
-
-            addIfNotNull(
-                    spawnedPirates,
-                    spawnRandomPirate(level, target, offsetPos, raidId)
-            );
-        }
-    }
-
-    private static Mob spawnRandomPirate(ServerLevel level, ServerPlayer target, BlockPos pos, UUID raidId) {
-        int roll = level.random.nextInt(100);
-
-        if (roll < 50) {
-            return spawnPirateDeckhand(level, target, pos, raidId);
-        }
-
-        if (roll < 80) {
-            return spawnPirateGunner(level, target, pos, raidId);
-        }
-
-        /*
-         * Marauder is the heavy boarder hybrid.
-         */
-        return spawnPirateMarauder(level, target, pos, raidId);
-    }
-
-    private static int getCrewOffsetX(int index) {
-        return switch (index) {
-            case 1 -> 1;
-            case 2 -> -1;
-            default -> 0;
-        };
-    }
-
-    private static int getCrewOffsetZ(int index) {
-        return switch (index) {
-            case 3 -> 1;
-            case 4 -> -1;
-            default -> 0;
-        };
-    }
-
-    private static BlockPos findWaterSurfaceAt(ServerLevel level, int x, int z) {
-        BlockPos.MutableBlockPos mutable = new BlockPos.MutableBlockPos();
-
-        int topY = level.getMaxBuildHeight() - 1;
-        int bottomY = level.getMinBuildHeight();
-
-        for (int y = topY; y >= bottomY; y--) {
-            mutable.set(x, y, z);
-
-            boolean isWater = level.getFluidState(mutable).is(FluidTags.WATER);
-            boolean aboveIsAir = level.getBlockState(mutable.above()).isAir();
-            boolean twoAboveIsAir = level.getBlockState(mutable.above(2)).isAir();
-
-            if (isWater && aboveIsAir && twoAboveIsAir) {
-                return mutable.immutable().above();
-            }
-        }
-
-        return null;
-    }
-
-    private static Mob spawnPirateCaptain(ServerLevel level, ServerPlayer target, BlockPos pos, UUID raidId) {
-        Mob pirate = ModEntities.PIRATE_CAPTAIN.get().spawn(
-                level,
-                pos,
-                MobSpawnType.EVENT
-        );
-
-        Mob result = setupPirate(pirate, target, pos, raidId, PirateRaidAiUtil.RANGED_TAG);
-
-        if (result != null) {
-            result.addTag(PirateRaidAiUtil.CAPTAIN_TAG);
-        }
-
-        return result;
-    }
-
-    private static Mob spawnPirateDeckhand(ServerLevel level, ServerPlayer target, BlockPos pos, UUID raidId) {
-        Mob pirate = ModEntities.PIRATE_DECKHAND.get().spawn(
-                level,
-                pos,
-                MobSpawnType.EVENT
-        );
-
-        return setupPirate(pirate, target, pos, raidId, PirateRaidAiUtil.BOARDER_TAG);
-    }
-
-    private static Mob spawnPirateGunner(ServerLevel level, ServerPlayer target, BlockPos pos, UUID raidId) {
-        Mob pirate = ModEntities.PIRATE_GUNNER.get().spawn(
-                level,
-                pos,
-                MobSpawnType.EVENT
-        );
-
-        return setupPirate(pirate, target, pos, raidId, PirateRaidAiUtil.RANGED_TAG);
-    }
-
-    private static Mob spawnPirateMarauder(ServerLevel level, ServerPlayer target, BlockPos pos, UUID raidId) {
-        Mob pirate = ModEntities.PIRATE_MARAUDER.get().spawn(
-                level,
-                pos,
-                MobSpawnType.EVENT
-        );
-
-        /*
-         * Marauder is a boarder hybrid.
-         * Do NOT give it RANGED_TAG.
-         */
-        return setupPirate(pirate, target, pos, raidId, PirateRaidAiUtil.BOARDER_TAG);
-    }
-
-    private static Mob setupPirate(
-            Mob pirate,
-            ServerPlayer target,
-            BlockPos pos,
-            UUID raidId,
-            String raidRoleTag
-    ) {
         if (pirate == null) {
             return null;
         }
 
-        pirate.moveTo(Vec3.atBottomCenterOf(pos));
-        pirate.setTarget(target);
-        pirate.setPersistenceRequired();
-
-        pirate.addTag(PirateRaidAiUtil.RAID_PIRATE_TAG);
-        pirate.addTag(getRaidGroupTag(raidId));
-        pirate.addTag(raidRoleTag);
-
+        finishSpawn(level, pirate, position);
         return pirate;
     }
 
-    private static String getRaidGroupTag(UUID raidId) {
-        return PirateRaidAiUtil.RAID_PIRATE_TAG + "_" + raidId;
-    }
+    private static Mob spawnGunner(ServerLevel level, Vec3 position) {
+        Mob pirate = ModEntities.PIRATE_GUNNER.get().create(level);
 
-    private static void addIfNotNull(List<Mob> list, Mob mob) {
-        if (mob != null) {
-            list.add(mob);
+        if (pirate == null) {
+            return null;
         }
+
+        finishSpawn(level, pirate, position);
+        return pirate;
     }
 
-    private static void announceDebugShip(ServerPlayer target, PirateShipSpawnEntry entry) {
-        String shipName = switch (entry.role()) {
-            case COMBAT -> entry.size().name().toLowerCase() + " combat sailboat";
-            case LOOT -> entry.size().name().toLowerCase() + " loot sailboat";
-            case CAPTAIN -> "captain ship";
-            case CAPTAIN_LOOT -> "captain loot ship";
-        };
+    private static Mob spawnMarauder(ServerLevel level, Vec3 position) {
+        Mob pirate = ModEntities.PIRATE_MARAUDER.get().create(level);
 
-        target.displayClientMessage(
-                Component.literal("Spawning " + shipName),
-                false
+        if (pirate == null) {
+            return null;
+        }
+
+        finishSpawn(level, pirate, position);
+        return pirate;
+    }
+
+    private static void finishSpawn(ServerLevel level, Mob mob, Vec3 position) {
+        mob.moveTo(position.x, position.y, position.z, level.random.nextFloat() * 360.0F, 0.0F);
+
+        DifficultyInstance difficulty = level.getCurrentDifficultyAt(BlockPos.containing(position));
+
+        mob.finalizeSpawn(
+                level,
+                difficulty,
+                MobSpawnType.EVENT,
+                (SpawnGroupData) null,
+                null
         );
+
+        level.addFreshEntity(mob);
+    }
+
+    private static int getBannerCountForSize(ShipSize shipSize) {
+        return switch (shipSize) {
+            case SMALL -> 1;
+            case MEDIUM -> 1;
+            case LARGE -> 2;
+        };
+    }
+
+    private static int getSeatCountForSize(ShipSize shipSize, boolean hasChest) {
+        return switch (shipSize) {
+            case SMALL -> 1;
+            case MEDIUM -> hasChest ? 1 : 2;
+            case LARGE -> hasChest ? 2 : 3;
+        };
     }
 }

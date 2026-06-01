@@ -1,410 +1,175 @@
 package com.amightytank.vanillatweaks.entity.ai;
 
 import com.amightytank.vanillatweaks.entity.ai.util.PirateBoatPassengerHelper;
-import com.amightytank.vanillatweaks.entity.ai.util.PirateLookHelper;
 import com.amightytank.vanillatweaks.entity.custom.pirate.AbstractPirateEntity;
-import net.minecraft.server.level.ServerLevel;
-import net.minecraft.world.entity.Entity;
+import com.amightytank.vanillatweaks.entity.custom.pirate.PirateCaptainEntity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.ai.goal.Goal;
 import net.minecraft.world.entity.vehicle.Boat;
-import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.Vec3;
 
-import java.util.Comparator;
 import java.util.EnumSet;
-import java.util.List;
-import java.util.UUID;
 
 public class PirateBoatBoarderRemountGoal extends Goal {
-    private static final String RAID_PIRATE_TAG = "PirateTreasureRaid";
-    private static final String BOARDER_TAG = "PirateRaidBoarder";
-
-    private static final String PIRATE_RAID_BOAT_TAG = "PirateRaidBoat";
-    private static final String PIRATE_PATROL_BOAT_TAG = "PiratePatrolBoat";
-    private static final String PIRATE_TREASURE_RAID_BOAT_TAG = "PirateTreasureRaidBoat";
-
-    public static final String RETURN_BOAT_UUID_TAG = "PirateReturnBoatUUID";
-
-    /*
-     * If the target gets farther than this, boarders stop foot chasing and go back to the boat.
-     */
-    private static final double REMOUNT_WHEN_TARGET_FARTHER_THAN = 34.0D;
-
-    /*
-     * Even if the player is still close, force the boarder to go back if its boat is getting away.
-     * This is what stops pirates from leaving their mates behind.
-     */
-    private static final double FORCE_REMOUNT_WHEN_BOAT_FARTHER_THAN = 14.0D;
-
-    private static final double BOAT_SEARCH_RANGE = 56.0D;
-    private static final double BOARD_BOAT_DISTANCE = 2.8D;
-
-    /*
-     * Do not mount the exact tick the pirate touches the boat.
-     * This helps avoid passenger sync packets being sent too aggressively.
-     */
-    private static final int CLOSE_TICKS_BEFORE_MOUNT = 2;
-
-    /*
-     * If mounting fails because the boat is full / invalid / syncing weirdly,
-     * do not spam it every tick.
-     */
-    private static final int MOUNT_RETRY_COOLDOWN_TICKS = 10;
+    private static final double MAX_FOOT_CHASE_DISTANCE = 34.0D;
+    private static final double TARGET_BOAT_SEARCH_RANGE = 96.0D;
+    private static final double BOARD_DISTANCE = 4.0D;
+    private static final int REPATH_COOLDOWN_TICKS = 10;
 
     private final Mob pirate;
 
     private Boat targetBoat;
     private int repathCooldown;
-    private int closeBoatTicks;
-    private int mountRetryCooldown;
 
     public PirateBoatBoarderRemountGoal(Mob pirate) {
         this.pirate = pirate;
 
-        /*
-         * MOVE = walk back to the boat.
-         * LOOK = stare at the boat while returning.
-         */
         this.setFlags(EnumSet.of(Goal.Flag.MOVE, Goal.Flag.LOOK));
     }
 
     @Override
     public boolean canUse() {
-        if (this.pirate.level().isClientSide) {
+        if (!this.pirate.isAlive() || this.pirate.isPassenger()) {
             return false;
         }
-
-        if (!this.isRaidBoarder()) {
-            return false;
-        }
-
-        if (this.pirate.isPassenger()) {
-            this.clearReservation();
-            return false;
-        }
-
-        this.targetBoat = this.findReturnBoat();
-
-        if (!this.isValidBoat(this.targetBoat)) {
-            this.clearReservation();
-            this.targetBoat = null;
-            return false;
-        }
-
-        LivingEntity target = this.pirate.getTarget();
 
         /*
-         * Stay fighting only while:
-         * - the target is still close
-         * - AND the return boat has not started leaving.
-         *
-         * If we decide to keep fighting, clear the reservation so another loose pirate
-         * can use that open seat.
+         * Captain rescue ignores normal boarder rules.
+         * If the captain lost his ship, he must get another fleet boat.
          */
-        if (this.shouldKeepFightingOnFoot(target)) {
-            this.clearReservation();
-            this.targetBoat = null;
+        if (this.pirate instanceof PirateCaptainEntity && PirateBoatPassengerHelper.isCaptainNeedingRescue(this.pirate)) {
+            this.targetBoat = PirateBoatPassengerHelper.findBestCaptainRescueBoat(this.pirate, TARGET_BOAT_SEARCH_RANGE);
+
+            if (this.targetBoat != null) {
+                PirateBoatPassengerHelper.requestCaptainRescue(this.pirate, this.targetBoat);
+                return true;
+            }
+
             return false;
         }
 
+        /*
+         * Normal remounting only applies to raid boarders or displaced drivers.
+         */
+        if (!isRaidBoarder() && !PirateBoatPassengerHelper.isDisplacedDriver(this.pirate)) {
+            return false;
+        }
+
+        /*
+         * If the target is still close, keep fighting on foot.
+         * If the target ran away, reboard and let the fleet chase again.
+         */
+        LivingEntity target = this.pirate.getTarget();
+
+        if (AbstractPirateEntity.canPirateAttack(target)
+                && this.pirate.distanceToSqr(target) <= MAX_FOOT_CHASE_DISTANCE * MAX_FOOT_CHASE_DISTANCE
+                && !PirateBoatPassengerHelper.isDisplacedDriver(this.pirate)) {
+            return false;
+        }
+
+        this.targetBoat = PirateBoatPassengerHelper.findBestReturnBoat(this.pirate, TARGET_BOAT_SEARCH_RANGE);
+
+        if (this.targetBoat == null) {
+            return false;
+        }
+
+        PirateBoatPassengerHelper.queueBoard(this.pirate, this.targetBoat, false);
         return true;
     }
 
     @Override
     public boolean canContinueToUse() {
-        if (this.pirate.level().isClientSide) {
+        if (!this.pirate.isAlive() || this.pirate.isPassenger()) {
             return false;
         }
 
-        if (this.pirate.isPassenger()) {
+        if (this.targetBoat == null || !this.targetBoat.isAlive() || this.targetBoat.isRemoved()) {
             return false;
         }
 
-        /*
-         * If our target boat vanished, became invalid, or somehow lost our reservation,
-         * find a new boat with an actual unreserved open seat.
-         */
-        if (!this.isValidBoat(this.targetBoat) || !this.hasSeatReservedOnTargetBoat()) {
-            this.clearReservation();
-            this.targetBoat = this.findReturnBoat();
-
-            if (!this.isValidBoat(this.targetBoat)) {
-                return false;
-            }
+        if (this.pirate instanceof PirateCaptainEntity) {
+            return true;
         }
 
-        LivingEntity target = this.pirate.getTarget();
-
-        /*
-         * If the player comes back close and the boat is still nearby,
-         * stop returning and let foot charge take over.
-         */
-        return !this.shouldKeepFightingOnFoot(target);
+        return PirateBoatPassengerHelper.hasAvailableReturnSeatFor(this.pirate, this.targetBoat);
     }
 
     @Override
     public void start() {
         this.repathCooldown = 0;
-        this.closeBoatTicks = 0;
-        this.mountRetryCooldown = 0;
     }
 
     @Override
     public void stop() {
-        if (!this.pirate.isPassenger()) {
-            this.clearReservation();
-        }
-
         this.targetBoat = null;
-        this.closeBoatTicks = 0;
-        this.mountRetryCooldown = 0;
         this.pirate.getNavigation().stop();
     }
 
     @Override
     public void tick() {
-        if (this.pirate.level().isClientSide) {
+        if (this.targetBoat == null || !this.targetBoat.isAlive() || this.targetBoat.isRemoved()) {
+            findNewTargetBoat();
             return;
         }
 
-        if (!this.isValidBoat(this.targetBoat) || !this.hasSeatReservedOnTargetBoat()) {
-            this.clearReservation();
-            this.targetBoat = this.findReturnBoat();
-
-            if (!this.isValidBoat(this.targetBoat)) {
-                return;
-            }
-        }
-
-        PirateLookHelper.lookAtEntity(this.pirate, this.targetBoat);
-
-        if (this.repathCooldown > 0) {
-            this.repathCooldown--;
-        }
-
-        if (this.mountRetryCooldown > 0) {
-            this.mountRetryCooldown--;
-        }
+        this.pirate.getLookControl().setLookAt(this.targetBoat, 30.0F, 30.0F);
 
         double distanceSqr = this.pirate.distanceToSqr(this.targetBoat);
 
-        if (distanceSqr <= BOARD_BOAT_DISTANCE * BOARD_BOAT_DISTANCE) {
-            this.pirate.getNavigation().stop();
+        if (distanceSqr <= BOARD_DISTANCE * BOARD_DISTANCE) {
+            boolean priorityCaptain = this.pirate instanceof PirateCaptainEntity;
 
-            this.closeBoatTicks++;
+            PirateBoatPassengerHelper.queueBoard(this.pirate, this.targetBoat, priorityCaptain);
 
-            if (this.closeBoatTicks < CLOSE_TICKS_BEFORE_MOUNT) {
-                return;
-            }
-
-            if (this.mountRetryCooldown > 0) {
-                return;
-            }
-
-            this.mountRetryCooldown = MOUNT_RETRY_COOLDOWN_TICKS;
-
-            /*
-             * Use the shared helper instead of direct startRiding.
-             * It checks boat capacity and uses ModBoatEntity.addMobToSailboat(...)
-             * for your custom sailboat seats.
-             */
-            if (PirateBoatPassengerHelper.tryBoard(this.pirate, this.targetBoat)) {
-                this.pirate.getPersistentData().remove(RETURN_BOAT_UUID_TAG);
-                this.clearReservation();
+            if (PirateBoatPassengerHelper.tryBoardQueuedNow(this.pirate)) {
+                this.pirate.getNavigation().stop();
             }
 
             return;
         }
 
-        this.closeBoatTicks = 0;
+        this.repathCooldown--;
 
         if (this.repathCooldown <= 0) {
-            this.pirate.getNavigation().moveTo(
-                    this.targetBoat.getX(),
-                    this.targetBoat.getY(),
-                    this.targetBoat.getZ(),
-                    1.25D
-            );
-
-            this.repathCooldown = 8;
-        }
-    }
-
-    private boolean shouldKeepFightingOnFoot(LivingEntity target) {
-        if (!AbstractPirateEntity.canPirateAttack(target)) {
-            return false;
-        }
-
-        if (this.pirate.distanceToSqr(target) > REMOUNT_WHEN_TARGET_FARTHER_THAN * REMOUNT_WHEN_TARGET_FARTHER_THAN) {
-            return false;
-        }
-
-        if (!this.isValidBoat(this.targetBoat)) {
-            return false;
+            this.repathCooldown = REPATH_COOLDOWN_TICKS;
+            this.pirate.getNavigation().moveTo(this.targetBoat, 1.15D);
         }
 
         /*
-         * If the boat is too far away, stop fighting and go back.
+         * Helps pirates swim toward the rescue boat instead of just spinning
+         * if normal ground navigation cannot path through water.
          */
-        return this.pirate.distanceToSqr(this.targetBoat) <= FORCE_REMOUNT_WHEN_BOAT_FARTHER_THAN * FORCE_REMOUNT_WHEN_BOAT_FARTHER_THAN;
-    }
+        if (this.pirate.isInWater()) {
+            Vec3 direction = this.targetBoat.position().subtract(this.pirate.position());
 
-    private Boat findReturnBoat() {
-        Boat exactBoat = this.findSavedReturnBoat();
-
-        /*
-         * First choice: the boat this pirate originally came from.
-         * But only use it if it has an unreserved open seat, or this pirate already reserved it.
-         */
-        if (this.canUseBoatForReturn(exactBoat)) {
-            this.reserveBoat(exactBoat);
-            return exactBoat;
-        }
-
-        AABB searchBox = this.pirate.getBoundingBox().inflate(BOAT_SEARCH_RANGE);
-
-        List<Boat> boats = this.pirate.level().getEntitiesOfClass(
-                Boat.class,
-                searchBox,
-                boat -> this.canUseBoatForReturn(boat)
-        );
-
-        /*
-         * Pick the boat that needs crew the most.
-         * If tied, pick the nearest one.
-         *
-         * This prevents one open boat from becoming the target for every loose boarder.
-         */
-        Boat bestBoat = boats.stream()
-                .max((a, b) -> {
-                    int aSeats = PirateBoatPassengerHelper.getAvailableReturnSeatCount(a);
-                    int bSeats = PirateBoatPassengerHelper.getAvailableReturnSeatCount(b);
-
-                    if (aSeats != bSeats) {
-                        return Integer.compare(aSeats, bSeats);
-                    }
-
-                    return Double.compare(
-                            b.distanceToSqr(this.pirate),
-                            a.distanceToSqr(this.pirate)
-                    );
-                })
-                .orElse(null);
-
-        if (bestBoat != null) {
-            this.reserveBoat(bestBoat);
-        }
-
-        return bestBoat;
-    }
-
-    private boolean canUseBoatForReturn(Boat boat) {
-        if (!this.isValidBoat(boat)) {
-            return false;
-        }
-
-        if (!this.isPirateBoat(boat)) {
-            return false;
-        }
-
-        if (this.isReservedForThisPirate(boat)) {
-            return true;
-        }
-
-        return PirateBoatPassengerHelper.hasAvailableReturnSeat(boat);
-    }
-
-    private boolean reserveBoat(Boat boat) {
-        if (!this.isValidBoat(boat)) {
-            return false;
-        }
-
-        if (this.isReservedForThisPirate(boat)) {
-            return true;
-        }
-
-        this.clearReservation();
-        return PirateBoatPassengerHelper.reserveReturnSeat(this.pirate, boat);
-    }
-
-    private boolean hasSeatReservedOnTargetBoat() {
-        if (!this.isValidBoat(this.targetBoat)) {
-            return false;
-        }
-
-        if (this.isReservedForThisPirate(this.targetBoat)) {
-            return true;
-        }
-
-        return this.reserveBoat(this.targetBoat);
-    }
-
-    private boolean isReservedForThisPirate(Boat boat) {
-        if (!this.isValidBoat(boat)) {
-            return false;
-        }
-
-        if (!this.pirate.getPersistentData().hasUUID(PirateBoatPassengerHelper.RESERVED_RETURN_BOAT_UUID_TAG)) {
-            return false;
-        }
-
-        UUID reservedBoatUuid = this.pirate.getPersistentData().getUUID(PirateBoatPassengerHelper.RESERVED_RETURN_BOAT_UUID_TAG);
-        return boat.getUUID().equals(reservedBoatUuid);
-    }
-
-    private void clearReservation() {
-        PirateBoatPassengerHelper.clearReservedBoat(this.pirate);
-    }
-
-    private Boat findSavedReturnBoat() {
-        if (!(this.pirate.level() instanceof ServerLevel serverLevel)) {
-            return null;
-        }
-
-        if (!this.pirate.getPersistentData().hasUUID(RETURN_BOAT_UUID_TAG)) {
-            return null;
-        }
-
-        UUID boatUuid = this.pirate.getPersistentData().getUUID(RETURN_BOAT_UUID_TAG);
-        Entity entity = serverLevel.getEntity(boatUuid);
-
-        if (entity instanceof Boat boat && this.isValidBoat(boat)) {
-            return boat;
-        }
-
-        return null;
-    }
-
-    private boolean isValidBoat(Boat boat) {
-        return boat != null
-                && boat.isAlive()
-                && !boat.isRemoved()
-                && boat.level() == this.pirate.level();
-    }
-
-    private boolean isPirateBoat(Boat boat) {
-        if (!this.isValidBoat(boat)) {
-            return false;
-        }
-
-        if (boat.getTags().contains(PIRATE_RAID_BOAT_TAG)
-                || boat.getTags().contains(PIRATE_PATROL_BOAT_TAG)
-                || boat.getTags().contains(PIRATE_TREASURE_RAID_BOAT_TAG)) {
-            return true;
-        }
-
-        for (Entity passenger : boat.getPassengers()) {
-            if (passenger instanceof AbstractPirateEntity) {
-                return true;
+            if (direction.lengthSqr() > 0.001D) {
+                Vec3 push = direction.normalize().scale(0.045D);
+                this.pirate.setDeltaMovement(this.pirate.getDeltaMovement().add(push));
             }
         }
+    }
 
-        return false;
+    private void findNewTargetBoat() {
+        if (this.pirate instanceof PirateCaptainEntity) {
+            this.targetBoat = PirateBoatPassengerHelper.findBestCaptainRescueBoat(this.pirate, TARGET_BOAT_SEARCH_RANGE);
+
+            if (this.targetBoat != null) {
+                PirateBoatPassengerHelper.requestCaptainRescue(this.pirate, this.targetBoat);
+            }
+
+            return;
+        }
+
+        this.targetBoat = PirateBoatPassengerHelper.findBestReturnBoat(this.pirate, TARGET_BOAT_SEARCH_RANGE);
+
+        if (this.targetBoat != null) {
+            PirateBoatPassengerHelper.queueBoard(this.pirate, this.targetBoat, false);
+        }
     }
 
     private boolean isRaidBoarder() {
-        return this.pirate.getTags().contains(RAID_PIRATE_TAG)
-                || this.pirate.getTags().contains(BOARDER_TAG);
+        return this.pirate.getTags().contains(PirateBoatPassengerHelper.RAID_PIRATE_TAG)
+                && this.pirate.getTags().contains(PirateBoatPassengerHelper.BOARDER_TAG);
     }
 }
