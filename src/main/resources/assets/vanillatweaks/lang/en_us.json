@@ -5,6 +5,8 @@
   "key.categories.vanillatweaks": "Vanilla Tweaks",
 
   "key.vanillatweaks.swap_sailboat_seat": "Swap Sailboat Seats",
+  "key.vanillatweaks.ai_debug_hud": "Toggle AI Debug HUD",
+  "key.vanillatweaks.ai_debug_select": "Select AI Debug Mob",
 
   "entity.vanillatweaks.pirate_captain": "Pirate Captain",
   "entity.vanillatweaks.pirate_parrot": "Pirate Parrot",

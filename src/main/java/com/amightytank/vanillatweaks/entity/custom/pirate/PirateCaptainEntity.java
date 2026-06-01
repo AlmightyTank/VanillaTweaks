@@ -1,9 +1,6 @@
 package com.amightytank.vanillatweaks.entity.custom.pirate;
 
-import com.amightytank.vanillatweaks.entity.ai.CaptainParrotSwarmGoal;
-import com.amightytank.vanillatweaks.entity.ai.CaptainSummonKrakenGoal;
-import com.amightytank.vanillatweaks.entity.ai.PirateBoatPilotGoal;
-import com.amightytank.vanillatweaks.entity.ai.PirateMountedAwareMeleeAttackGoal;
+import com.amightytank.vanillatweaks.entity.ai.*;
 import com.amightytank.vanillatweaks.entity.ai.util.PirateRaidAiUtil;
 import net.minecraft.network.syncher.EntityDataAccessor;
 import net.minecraft.network.syncher.EntityDataSerializers;
@@ -126,26 +123,26 @@ public class PirateCaptainEntity extends AbstractPirateEntity {
     protected void registerGoals() {
         super.registerGoals();
 
-        //this.goalSelector.addGoal(2, new LookAtPlayerGoal(this, Player.class, 8.0F));
         /*
-         * Pilot first.
-         * PirateBoatPilotGoal only claims MOVE, so captain casting goals can still use LOOK
-         * if those goals are set up correctly.
+         * Mounted movement.
+         * MOVE only.
          */
-        this.goalSelector.addGoal(3, new PirateBoatPilotGoal(this));
+        this.goalSelector.addGoal(2, new PirateBoatPilotGoal(this));
 
         /*
          * Captain pressure abilities.
-         * These should act like ranged/offshore pressure, not boarder behavior.
+         * These should be LOOK only inside their own goal files.
          */
-        this.goalSelector.addGoal(4, new CaptainSummonKrakenGoal(this));
-        this.goalSelector.addGoal(5, new CaptainParrotSwarmGoal(this));
+        this.goalSelector.addGoal(3, new CaptainSummonKrakenGoal(this));
+        this.goalSelector.addGoal(4, new CaptainParrotSwarmGoal(this));
 
         /*
-         * Fallback only if the captain gets knocked off the boat.
-         * This goal already refuses to run while mounted.
+         * Emergency close defense only.
+         * No vanilla MeleeAttackGoal.
+         * No MOVE.
+         * No LOOK.
          */
-        this.goalSelector.addGoal(6, new MeleeAttackGoal(this, 1.0D, false));
+        this.goalSelector.addGoal(8, new PirateCloseDefenseGoal(this));
     }
 
     @Override

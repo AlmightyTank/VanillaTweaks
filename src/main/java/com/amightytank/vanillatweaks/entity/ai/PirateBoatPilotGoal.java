@@ -3,8 +3,8 @@ package com.amightytank.vanillatweaks.entity.ai;
 import com.amightytank.vanillatweaks.entity.ai.util.PirateBoatPassengerHelper;
 import com.amightytank.vanillatweaks.entity.custom.pirate.AbstractPirateEntity;
 import net.minecraft.util.Mth;
-import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.ai.goal.Goal;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.entity.vehicle.Boat;
@@ -15,27 +15,34 @@ import java.util.EnumSet;
 public class PirateBoatPilotGoal extends Goal {
     private static final double TARGET_SEARCH_RANGE = 96.0D;
 
+    /*
+     * If this boat has an empty seat, it tries to pick up nearby fleet pirates
+     * before chasing the player.
+     */
+    private static final double CREW_PICKUP_RANGE = 72.0D;
+    private static final double CREW_PICKUP_STOP_RANGE = 5.0D;
+
     private static final double BOAT_ACCELERATION = 0.055D;
-    private static final double RESCUE_BOAT_ACCELERATION = 0.045D;
+    private static final double PICKUP_ACCELERATION = 0.045D;
 
     private static final double MAX_BOAT_SPEED = 0.34D;
-    private static final double MAX_RESCUE_SPEED = 0.25D;
+    private static final double MAX_PICKUP_SPEED = 0.25D;
 
     private static final double TARGET_STOP_RANGE = 10.0D;
-    private static final double RESCUE_STOP_RANGE = 5.0D;
 
     private static final float TURN_SPEED = 6.0F;
 
     private final AbstractPirateEntity pirate;
 
     private LivingEntity target;
+    private Mob pickupPirate;
 
     public PirateBoatPilotGoal(AbstractPirateEntity pirate) {
         this.pirate = pirate;
 
         /*
          * Do not claim LOOK.
-         * Gunner/captain casting goals can still aim while the boat moves.
+         * Gunners/captains can still aim while the pilot moves the boat.
          */
         this.setFlags(EnumSet.of(Goal.Flag.MOVE));
     }
@@ -50,10 +57,9 @@ public class PirateBoatPilotGoal extends Goal {
             return false;
         }
 
-        /*
-         * A rescue boat should move even if there is no player target.
-         */
-        if (PirateBoatPassengerHelper.hasCaptainRescueTarget(boat)) {
+        this.pickupPirate = findPickupPirate(boat);
+
+        if (this.pickupPirate != null) {
             return true;
         }
 
@@ -71,7 +77,9 @@ public class PirateBoatPilotGoal extends Goal {
             return false;
         }
 
-        if (PirateBoatPassengerHelper.hasCaptainRescueTarget(boat)) {
+        this.pickupPirate = findPickupPirate(boat);
+
+        if (this.pickupPirate != null) {
             return true;
         }
 
@@ -83,9 +91,11 @@ public class PirateBoatPilotGoal extends Goal {
     public void stop() {
         if (this.pirate.getVehicle() instanceof Boat boat) {
             setBoatInput(boat, false, false, false, false);
+            slowBoat(boat);
         }
 
         this.target = null;
+        this.pickupPirate = null;
     }
 
     @Override
@@ -99,29 +109,36 @@ public class PirateBoatPilotGoal extends Goal {
         }
 
         /*
-         * Captain rescue overrides chasing.
-         * The boat goes back to the captain and waits.
+         * Priority 1:
+         * Fill open seats before chasing the player.
          */
-        Entity rescueCaptain = PirateBoatPassengerHelper.getCaptainRescueTarget(boat);
+        this.pickupPirate = findPickupPirate(boat);
 
-        if (rescueCaptain instanceof LivingEntity livingCaptain && livingCaptain.isAlive() && !livingCaptain.isPassenger()) {
-            this.pirate.getLookControl().setLookAt(livingCaptain, 30.0F, 30.0F);
+        if (this.pickupPirate != null) {
+            this.pirate.getLookControl().setLookAt(this.pickupPirate, 30.0F, 30.0F);
 
-            double distanceSqr = boat.distanceToSqr(livingCaptain);
+            double distanceSqr = boat.distanceToSqr(this.pickupPirate);
 
-            if (distanceSqr <= RESCUE_STOP_RANGE * RESCUE_STOP_RANGE) {
+            if (distanceSqr <= CREW_PICKUP_STOP_RANGE * CREW_PICKUP_STOP_RANGE) {
                 slowBoat(boat);
-
-                PirateBoatPassengerHelper.queueBoard((net.minecraft.world.entity.Mob) livingCaptain, boat, true);
-                PirateBoatPassengerHelper.tryBoardQueuedNow((net.minecraft.world.entity.Mob) livingCaptain);
-
+                PirateBoatPassengerHelper.attemptBoard(this.pickupPirate, boat, false);
                 return;
             }
 
-            driveBoatToward(boat, livingCaptain.position(), RESCUE_BOAT_ACCELERATION, MAX_RESCUE_SPEED);
+            driveBoatToward(
+                    boat,
+                    this.pickupPirate.position(),
+                    PICKUP_ACCELERATION,
+                    MAX_PICKUP_SPEED
+            );
+
             return;
         }
 
+        /*
+         * Priority 2:
+         * Once the boat is full, chase the player.
+         */
         this.target = findTarget();
 
         if (this.target == null) {
@@ -136,7 +153,20 @@ public class PirateBoatPilotGoal extends Goal {
             return;
         }
 
-        driveBoatToward(boat, this.target.position(), BOAT_ACCELERATION, MAX_BOAT_SPEED);
+        driveBoatToward(
+                boat,
+                this.target.position(),
+                BOAT_ACCELERATION,
+                MAX_BOAT_SPEED
+        );
+    }
+
+    private Mob findPickupPirate(Boat boat) {
+        if (!PirateBoatPassengerHelper.hasAvailableReturnSeat(boat)) {
+            return null;
+        }
+
+        return PirateBoatPassengerHelper.findBestPickupPirate(boat, CREW_PICKUP_RANGE);
     }
 
     private LivingEntity findTarget() {
@@ -179,17 +209,17 @@ public class PirateBoatPilotGoal extends Goal {
         setBoatInput(boat, turningLeft, turningRight, mostlyFacingTarget, false);
 
         if (!mostlyFacingTarget) {
-            Vec3 currentSlowMotion = boat.getDeltaMovement();
-            boat.setDeltaMovement(currentSlowMotion.x * 0.92D, currentSlowMotion.y, currentSlowMotion.z * 0.92D);
+            Vec3 motion = boat.getDeltaMovement();
+            boat.setDeltaMovement(motion.x * 0.92D, motion.y, motion.z * 0.92D);
             boat.hasImpulse = true;
             return;
         }
 
         Vec3 forward = Vec3.directionFromRotation(0.0F, boat.getYRot());
-        Vec3 currentMotion = boat.getDeltaMovement();
+        Vec3 motion = boat.getDeltaMovement();
 
-        double newX = currentMotion.x + forward.x * acceleration;
-        double newZ = currentMotion.z + forward.z * acceleration;
+        double newX = motion.x + forward.x * acceleration;
+        double newZ = motion.z + forward.z * acceleration;
 
         double horizontalSpeed = Math.sqrt(newX * newX + newZ * newZ);
 
@@ -199,7 +229,7 @@ public class PirateBoatPilotGoal extends Goal {
             newZ *= scale;
         }
 
-        boat.setDeltaMovement(newX, currentMotion.y, newZ);
+        boat.setDeltaMovement(newX, motion.y, newZ);
         boat.hasImpulse = true;
     }
 

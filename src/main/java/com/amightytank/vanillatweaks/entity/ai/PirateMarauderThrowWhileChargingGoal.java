@@ -39,7 +39,7 @@ public class PirateMarauderThrowWhileChargingGoal extends Goal {
          * MOVE = charge target.
          * LOOK = face target while chasing/throwing/meleeing.
          */
-        this.setFlags(EnumSet.of(Goal.Flag.MOVE, Goal.Flag.LOOK));
+        this.setFlags(EnumSet.of(Goal.Flag.MOVE));
     }
 
     @Override

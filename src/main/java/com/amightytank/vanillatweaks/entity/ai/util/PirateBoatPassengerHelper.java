@@ -4,18 +4,13 @@ import com.amightytank.vanillatweaks.entity.custom.pirate.PirateCaptainEntity;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.Mob;
-import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.entity.vehicle.Boat;
 import net.minecraft.world.entity.vehicle.ChestBoat;
 import net.minecraft.world.level.Level;
-import net.minecraft.world.phys.AABB;
 
 import java.lang.reflect.Method;
-import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.Iterator;
 import java.util.List;
-import java.util.UUID;
 
 public final class PirateBoatPassengerHelper {
     public static final String RAID_PIRATE_TAG = "PirateTreasureRaid";
@@ -29,61 +24,29 @@ public final class PirateBoatPassengerHelper {
     public static final String DISPLACED_DRIVER_TAG = "PirateDisplacedDriver";
 
     private static final double BOAT_SEARCH_RANGE = 96.0D;
-    private static final double RESERVATION_CLEANUP_RANGE = 128.0D;
-    private static final double QUEUED_BOARD_DISTANCE = 4.0D;
-
-    private static final List<QueuedMount> QUEUED_MOUNTS = new ArrayList<>();
+    private static final double CAPTAIN_SHIP_CLEAR_RANGE = 128.0D;
 
     private PirateBoatPassengerHelper() {
     }
 
-    private record QueuedMount(UUID pirateId, UUID boatId, boolean priority) {
-    }
-
+    /*
+     * Kept so old calls do not break.
+     * The simplified system does not use queued mounts anymore.
+     */
     public static void tickQueuedMounts(ServerLevel level) {
-        tickQueuedMounts((Level) level);
     }
 
     public static void tickQueuedMounts(Level level) {
-        Iterator<QueuedMount> iterator = QUEUED_MOUNTS.iterator();
-
-        while (iterator.hasNext()) {
-            QueuedMount mount = iterator.next();
-
-            Entity pirateEntity = findEntityByUuid(level, mount.pirateId(), null, 0.0D);
-            Entity boatEntity = findEntityByUuid(level, mount.boatId(), null, 0.0D);
-
-            if (!(pirateEntity instanceof Mob pirate) || !(boatEntity instanceof Boat boat)) {
-                iterator.remove();
-                continue;
-            }
-
-            if (!isValidBoat(boat) || !pirate.isAlive() || pirate.isRemoved()) {
-                clearReservationForPirate(pirate);
-                iterator.remove();
-                continue;
-            }
-
-            if (pirate.isPassenger()) {
-                clearReservationForPirate(pirate);
-                iterator.remove();
-                continue;
-            }
-
-            if (pirate.distanceToSqr(boat) > QUEUED_BOARD_DISTANCE * QUEUED_BOARD_DISTANCE) {
-                continue;
-            }
-
-            if (attemptBoard(pirate, boat, mount.priority())) {
-                iterator.remove();
-            }
-        }
     }
 
+    /*
+     * Simplified:
+     * No home boat ownership. Just copy the fleet tag to the boat.
+     */
     public static void assignHomeBoat(Mob pirate, Boat boat) {
-        clearHomeBoatTag(pirate);
-
-        pirate.addTag(HOME_BOAT_TAG_PREFIX + boat.getUUID());
+        if (pirate == null || boat == null) {
+            return;
+        }
 
         copyFleetTag(pirate, boat);
 
@@ -92,66 +55,29 @@ public final class PirateBoatPassengerHelper {
         }
     }
 
+    /*
+     * Kept so old calls do not break.
+     */
     public static void clearReservedBoat(Mob pirate) {
-        clearHomeBoatTag(pirate);
-        clearReservationForPirate(pirate);
+        clearDisplacedDriver(pirate);
     }
 
+    /*
+     * Simplified:
+     * Queueing now just tries to board immediately.
+     */
     public static void queueBoard(Mob pirate, Boat boat) {
         queueBoard(pirate, boat, false);
     }
 
     public static void queueBoard(Mob pirate, Boat boat, boolean priority) {
-        if (pirate == null || boat == null || !isValidBoat(boat)) {
-            return;
-        }
-
-        clearReservationForPirate(pirate);
-
-        if (!priority && !hasAvailableReturnSeatFor(pirate, boat)) {
-            return;
-        }
-
-        reserveSeat(pirate, boat);
-
-        QUEUED_MOUNTS.removeIf(entry -> entry.pirateId().equals(pirate.getUUID()));
-        QUEUED_MOUNTS.add(new QueuedMount(pirate.getUUID(), boat.getUUID(), priority));
+        attemptBoard(pirate, boat, priority);
     }
 
+    /*
+     * Kept so old calls do not break.
+     */
     public static boolean tryBoardQueuedNow(Mob pirate) {
-        if (pirate == null || pirate.level().isClientSide) {
-            return false;
-        }
-
-        Iterator<QueuedMount> iterator = QUEUED_MOUNTS.iterator();
-
-        while (iterator.hasNext()) {
-            QueuedMount mount = iterator.next();
-
-            if (!mount.pirateId().equals(pirate.getUUID())) {
-                continue;
-            }
-
-            Entity boatEntity = findEntityByUuid(pirate.level(), mount.boatId(), pirate.position(), BOAT_SEARCH_RANGE);
-
-            if (!(boatEntity instanceof Boat boat)) {
-                clearReservationForPirate(pirate);
-                iterator.remove();
-                return false;
-            }
-
-            if (pirate.distanceToSqr(boat) > QUEUED_BOARD_DISTANCE * QUEUED_BOARD_DISTANCE) {
-                return false;
-            }
-
-            if (attemptBoard(pirate, boat, mount.priority())) {
-                iterator.remove();
-                return true;
-            }
-
-            return false;
-        }
-
         return false;
     }
 
@@ -164,26 +90,15 @@ public final class PirateBoatPassengerHelper {
             return pirate.getVehicle() == boat;
         }
 
-        if (priority && pirate instanceof PirateCaptainEntity && !hasAvailableReturnSeatFor(pirate, boat)) {
-            return swapDriverForCaptain(pirate, boat);
-        }
-
         if (!hasAvailableReturnSeatFor(pirate, boat)) {
             return false;
         }
-
-        clearReservationForPirate(pirate);
 
         boolean mounted = pirate.startRiding(boat, true);
 
         if (mounted) {
             assignHomeBoat(pirate, boat);
             clearDisplacedDriver(pirate);
-
-            if (pirate instanceof PirateCaptainEntity) {
-                clearCaptainRescue(boat);
-                makeCaptainShip(pirate, boat);
-            }
         }
 
         return mounted;
@@ -198,58 +113,30 @@ public final class PirateBoatPassengerHelper {
             return false;
         }
 
-        pruneStaleReservations(boat);
-
-        UUID excludedPirate = pirate == null ? null : pirate.getUUID();
-
-        int passengers = boat.getPassengers().size();
-        int reserved = getReservedSeatCount(boat, excludedPirate);
-        int maxPassengers = getBoatSeatLimit(boat);
-
         if (pirate != null && pirate.getVehicle() == boat) {
             return true;
         }
 
-        return passengers + reserved < maxPassengers;
+        return boat.getPassengers().size() < getBoatSeatLimit(boat);
     }
 
+    /*
+     * Simplified:
+     * Home boat tracking is removed.
+     */
     public static Boat getHomeBoat(Mob pirate) {
-        if (pirate == null) {
-            return null;
-        }
-
-        UUID boatUuid = getHomeBoatUuid(pirate);
-
-        if (boatUuid == null) {
-            return null;
-        }
-
-        Entity entity = findEntityByUuid(pirate.level(), boatUuid, pirate.position(), RESERVATION_CLEANUP_RANGE);
-
-        if (entity instanceof Boat boat && isValidBoat(boat)) {
+        if (pirate != null && pirate.getVehicle() instanceof Boat boat && isValidBoat(boat)) {
             return boat;
         }
 
-        clearHomeBoatTag(pirate);
         return null;
     }
 
     public static boolean isCaptainNeedingRescue(Mob pirate) {
-        if (!(pirate instanceof PirateCaptainEntity)) {
-            return false;
-        }
-
-        if (!pirate.isAlive() || pirate.isRemoved()) {
-            return false;
-        }
-
-        if (pirate.getVehicle() instanceof Boat currentBoat && isValidBoat(currentBoat)) {
-            return false;
-        }
-
-        Boat homeBoat = getHomeBoat(pirate);
-
-        return homeBoat == null || !isValidBoat(homeBoat);
+        return pirate instanceof PirateCaptainEntity
+                && pirate.isAlive()
+                && !pirate.isRemoved()
+                && !(pirate.getVehicle() instanceof Boat);
     }
 
     public static Boat findBestCaptainRescueBoat(Mob captain) {
@@ -257,63 +144,7 @@ public final class PirateBoatPassengerHelper {
     }
 
     public static Boat findBestCaptainRescueBoat(Mob captain, double range) {
-        if (!(captain instanceof PirateCaptainEntity)) {
-            return null;
-        }
-
-        List<Boat> boats = getNearbyFleetBoats(captain, range);
-
-        if (boats.isEmpty()) {
-            return null;
-        }
-
-        /*
-         * First choice:
-         * closest non-loot boat with open room.
-         */
-        Boat openCombatBoat = boats.stream()
-                .filter(boat -> !isLootBoat(boat))
-                .filter(boat -> hasAvailableReturnSeatFor(captain, boat))
-                .min(Comparator.comparingDouble(captain::distanceToSqr))
-                .orElse(null);
-
-        if (openCombatBoat != null) {
-            return openCombatBoat;
-        }
-
-        /*
-         * Second choice:
-         * closest boat with open room, even if it is a chest/loot boat.
-         */
-        Boat openAnyBoat = boats.stream()
-                .filter(boat -> hasAvailableReturnSeatFor(captain, boat))
-                .min(Comparator.comparingDouble(captain::distanceToSqr))
-                .orElse(null);
-
-        if (openAnyBoat != null) {
-            return openAnyBoat;
-        }
-
-        /*
-         * No boat has room:
-         * closest non-loot boat becomes the rescue boat and will swap driver.
-         */
-        Boat fullCombatBoat = boats.stream()
-                .filter(boat -> !isLootBoat(boat))
-                .min(Comparator.comparingDouble(captain::distanceToSqr))
-                .orElse(null);
-
-        if (fullCombatBoat != null) {
-            return fullCombatBoat;
-        }
-
-        /*
-         * Last resort:
-         * any closest boat.
-         */
-        return boats.stream()
-                .min(Comparator.comparingDouble(captain::distanceToSqr))
-                .orElse(null);
+        return findBestReturnBoat(captain, range);
     }
 
     public static Boat findBestReturnBoat(Mob pirate) {
@@ -321,14 +152,8 @@ public final class PirateBoatPassengerHelper {
     }
 
     public static Boat findBestReturnBoat(Mob pirate, double range) {
-        if (pirate == null) {
+        if (pirate == null || pirate.level() == null) {
             return null;
-        }
-
-        Boat homeBoat = getHomeBoat(pirate);
-
-        if (homeBoat != null && hasAvailableReturnSeatFor(pirate, homeBoat)) {
-            return homeBoat;
         }
 
         List<Boat> boats = getNearbyFleetBoats(pirate, range);
@@ -338,10 +163,16 @@ public final class PirateBoatPassengerHelper {
                 .min(Comparator.comparingDouble(boat -> {
                     double score = pirate.distanceToSqr(boat);
 
+                    /*
+                     * Prefer combat boats over chest/loot boats.
+                     */
                     if (isLootBoat(boat)) {
                         score += 400.0D;
                     }
 
+                    /*
+                     * Captain ship is a little more important.
+                     */
                     if (isCaptainShip(boat)) {
                         score -= 50.0D;
                     }
@@ -351,154 +182,38 @@ public final class PirateBoatPassengerHelper {
                 .orElse(null);
     }
 
+    /*
+     * Kept so old calls do not break.
+     * The simplified system does not make boats drive backward for rescue.
+     */
     public static void requestCaptainRescue(Mob captain, Boat rescueBoat) {
-        if (!(captain instanceof PirateCaptainEntity) || rescueBoat == null) {
-            return;
+        if (captain != null && rescueBoat != null) {
+            assignHomeBoat(captain, rescueBoat);
         }
-
-        clearCaptainRescue(rescueBoat);
-        rescueBoat.addTag(CAPTAIN_RESCUE_TAG_PREFIX + captain.getUUID());
-
-        copyFleetTag(captain, rescueBoat);
-        assignHomeBoat(captain, rescueBoat);
-        queueBoard(captain, rescueBoat, true);
     }
 
     public static Mob getCaptainRescueTarget(Boat boat) {
-        if (boat == null || boat.level().isClientSide) {
-            return null;
-        }
-
-        for (String tag : boat.getTags()) {
-            if (!tag.startsWith(CAPTAIN_RESCUE_TAG_PREFIX)) {
-                continue;
-            }
-
-            UUID captainUuid = parseUuid(tag.substring(CAPTAIN_RESCUE_TAG_PREFIX.length()));
-
-            if (captainUuid == null) {
-                continue;
-            }
-
-            Entity entity = findEntityByUuid(boat.level(), captainUuid, boat.position(), BOAT_SEARCH_RANGE);
-
-            if (entity instanceof Mob captain && captain instanceof PirateCaptainEntity && captain.isAlive() && !captain.isPassenger()) {
-                return captain;
-            }
-        }
-
-        clearCaptainRescue(boat);
         return null;
     }
 
     public static boolean hasCaptainRescueTarget(Boat boat) {
-        return getCaptainRescueTarget(boat) != null;
+        return false;
     }
 
     public static void clearCaptainRescue(Boat boat) {
-        if (boat == null) {
-            return;
-        }
-
-        removeTagsStartingWith(boat, CAPTAIN_RESCUE_TAG_PREFIX);
     }
 
+    /*
+     * Simplified:
+     * No driver swapping. If the boat has room, the captain boards.
+     * If the boat is full, he does not.
+     */
     public static boolean swapDriverForCaptain(Mob captain, Boat boat) {
-        if (!(captain instanceof PirateCaptainEntity) || boat == null || !isValidBoat(boat)) {
-            return false;
-        }
-
-        if (captain.getVehicle() == boat && boat.getControllingPassenger() == captain) {
-            return true;
-        }
-
-        /*
-         * Never kick out players.
-         */
-        for (Entity passenger : boat.getPassengers()) {
-            if (passenger instanceof Player) {
-                return false;
-            }
-        }
-
-        Entity driver = boat.getControllingPassenger();
-
-        if (driver == null && !boat.getPassengers().isEmpty()) {
-            driver = boat.getPassengers().get(0);
-        }
-
-        if (driver == null || driver == captain) {
-            return attemptBoard(captain, boat, false);
-        }
-
-        if (!(driver instanceof Mob oldDriver)) {
-            return false;
-        }
-
-        /*
-         * Temporarily remove the current crew so the captain can be inserted first.
-         * First passenger is normally the controlling passenger, so this makes the
-         * captain become the driver instead of merely joining the back of the list.
-         */
-        List<Entity> oldPassengers = new ArrayList<>(boat.getPassengers());
-        List<Entity> passengersToRestore = new ArrayList<>();
-
-        for (Entity passenger : oldPassengers) {
-            if (passenger == captain) {
-                continue;
-            }
-
-            passenger.stopRiding();
-
-            if (passenger == oldDriver) {
-                markDisplacedDriver(oldDriver);
-                clearReservedBoat(oldDriver);
-                continue;
-            }
-
-            passengersToRestore.add(passenger);
-        }
-
-        clearReservationForPirate(captain);
-
-        boolean captainMounted = captain.startRiding(boat, true);
-
-        if (!captainMounted) {
-            /*
-             * Best-effort recovery: put the non-displaced passengers back.
-             */
-            for (Entity passenger : passengersToRestore) {
-                if (hasRawRoom(boat)) {
-                    passenger.startRiding(boat, true);
-                }
-            }
-
-            if (hasRawRoom(boat)) {
-                oldDriver.startRiding(boat, true);
-            }
-
-            return false;
-        }
-
-        assignHomeBoat(captain, boat);
-        makeCaptainShip(captain, boat);
-        clearCaptainRescue(boat);
-
-        for (Entity passenger : passengersToRestore) {
-            if (hasRawRoom(boat)) {
-                passenger.startRiding(boat, true);
-
-                if (passenger instanceof Mob mob) {
-                    assignHomeBoat(mob, boat);
-                }
-            }
-        }
-
-        return boat.getControllingPassenger() == captain;
+        return attemptBoard(captain, boat, false);
     }
 
     public static boolean isDisplacedDriver(Mob pirate) {
-        return pirate != null && pirate.getTags().contains(DISPLACED_DRIVER_TAG);
+        return false;
     }
 
     public static void clearDisplacedDriver(Mob pirate) {
@@ -518,12 +233,12 @@ public final class PirateBoatPassengerHelper {
     }
 
     public static boolean isLootBoat(Boat boat) {
-        if (boat instanceof ChestBoat) {
-            return true;
-        }
-
         if (boat == null) {
             return false;
+        }
+
+        if (boat instanceof ChestBoat) {
+            return true;
         }
 
         for (String tag : boat.getTags()) {
@@ -538,20 +253,18 @@ public final class PirateBoatPassengerHelper {
     }
 
     private static void makeCaptainShip(Mob captain, Boat boat) {
-        if (captain == null || boat == null) {
+        if (captain == null || boat == null || captain.level() == null) {
             return;
         }
 
-        String captainFleet = getFleetId(captain);
-
         List<Boat> nearbyBoats = captain.level().getEntitiesOfClass(
                 Boat.class,
-                captain.getBoundingBox().inflate(RESERVATION_CLEANUP_RANGE),
+                captain.getBoundingBox().inflate(CAPTAIN_SHIP_CLEAR_RANGE),
                 otherBoat -> otherBoat != boat && isValidBoat(otherBoat)
         );
 
         for (Boat otherBoat : nearbyBoats) {
-            if (captainFleet == null || sameFleet(captain, otherBoat)) {
+            if (sameFleet(captain, otherBoat)) {
                 otherBoat.removeTag(CAPTAIN_SHIP_TAG);
             }
         }
@@ -569,6 +282,10 @@ public final class PirateBoatPassengerHelper {
     }
 
     private static boolean sameFleetOrRaid(Entity pirate, Boat boat) {
+        if (pirate == null || boat == null) {
+            return false;
+        }
+
         if (sameFleet(pirate, boat)) {
             return true;
         }
@@ -580,9 +297,10 @@ public final class PirateBoatPassengerHelper {
         }
 
         /*
-         * Fallback for older spawned fleets that only had the generic raid tag.
+         * Fallback for older fleets that only use the generic raid tag.
          */
-        return pirate.getTags().contains(RAID_PIRATE_TAG) && boat.getTags().contains(RAID_PIRATE_TAG);
+        return pirate.getTags().contains(RAID_PIRATE_TAG)
+                && boat.getTags().contains(RAID_PIRATE_TAG);
     }
 
     private static boolean sameFleet(Entity first, Entity second) {
@@ -620,95 +338,25 @@ public final class PirateBoatPassengerHelper {
         }
     }
 
-    private static void reserveSeat(Mob pirate, Boat boat) {
-        boat.addTag(RESERVED_BY_TAG_PREFIX + pirate.getUUID());
-    }
-
-    private static void clearReservationForPirate(Mob pirate) {
-        if (pirate == null) {
+    private static void removeTagsStartingWith(Entity entity, String prefix) {
+        if (entity == null) {
             return;
         }
 
-        UUID pirateUuid = pirate.getUUID();
-
-        if (pirate.level() == null) {
-            return;
-        }
-
-        List<Boat> boats = pirate.level().getEntitiesOfClass(
-                Boat.class,
-                pirate.getBoundingBox().inflate(RESERVATION_CLEANUP_RANGE),
-                PirateBoatPassengerHelper::isValidBoat
-        );
-
-        for (Boat boat : boats) {
-            boat.removeTag(RESERVED_BY_TAG_PREFIX + pirateUuid);
-        }
-    }
-
-    private static int getReservedSeatCount(Boat boat, UUID excludedPirate) {
-        int count = 0;
-
-        for (String tag : boat.getTags()) {
-            if (!tag.startsWith(RESERVED_BY_TAG_PREFIX)) {
-                continue;
-            }
-
-            UUID reservedUuid = parseUuid(tag.substring(RESERVED_BY_TAG_PREFIX.length()));
-
-            if (reservedUuid == null) {
-                continue;
-            }
-
-            if (excludedPirate != null && excludedPirate.equals(reservedUuid)) {
-                continue;
-            }
-
-            count++;
-        }
-
-        return count;
-    }
-
-    private static void pruneStaleReservations(Boat boat) {
-        if (boat == null || boat.level().isClientSide) {
-            return;
-        }
-
-        List<String> tagsToRemove = new ArrayList<>();
-
-        for (String tag : boat.getTags()) {
-            if (!tag.startsWith(RESERVED_BY_TAG_PREFIX)) {
-                continue;
-            }
-
-            UUID reservedUuid = parseUuid(tag.substring(RESERVED_BY_TAG_PREFIX.length()));
-
-            if (reservedUuid == null) {
-                tagsToRemove.add(tag);
-                continue;
-            }
-
-            Entity reservedEntity = findEntityByUuid(boat.level(), reservedUuid, boat.position(), RESERVATION_CLEANUP_RANGE);
-
-            if (!(reservedEntity instanceof Mob mob) || !mob.isAlive() || mob.isRemoved() || mob.isPassenger()) {
-                tagsToRemove.add(tag);
-            }
-        }
+        List<String> tagsToRemove = entity.getTags()
+                .stream()
+                .filter(tag -> tag.startsWith(prefix))
+                .toList();
 
         for (String tag : tagsToRemove) {
-            boat.removeTag(tag);
+            entity.removeTag(tag);
         }
-    }
-
-    private static boolean hasRawRoom(Boat boat) {
-        return boat.getPassengers().size() < getBoatSeatLimit(boat);
     }
 
     private static int getBoatSeatLimit(Boat boat) {
         /*
-         * This uses reflection so it works with your custom sailboats even if
-         * getMaxPassengers is protected or overridden by small/medium/large boats.
+         * Uses reflection so your custom sailboats can still override
+         * getMaxPassengers.
          */
         Class<?> type = boat.getClass();
 
@@ -731,8 +379,7 @@ public final class PirateBoatPassengerHelper {
         }
 
         /*
-         * Fallback guesses. Reflection above should normally catch your custom
-         * passenger limit.
+         * Fallback guesses.
          */
         String className = boat.getClass().getSimpleName().toLowerCase();
 
@@ -751,77 +398,47 @@ public final class PirateBoatPassengerHelper {
         return 2;
     }
 
-    private static UUID getHomeBoatUuid(Mob pirate) {
-        for (String tag : pirate.getTags()) {
-            if (!tag.startsWith(HOME_BOAT_TAG_PREFIX)) {
-                continue;
-            }
-
-            return parseUuid(tag.substring(HOME_BOAT_TAG_PREFIX.length()));
-        }
-
-        return null;
-    }
-
-    private static void clearHomeBoatTag(Mob pirate) {
-        removeTagsStartingWith(pirate, HOME_BOAT_TAG_PREFIX);
-    }
-
-    private static void removeTagsStartingWith(Entity entity, String prefix) {
-        if (entity == null) {
-            return;
-        }
-
-        List<String> tagsToRemove = new ArrayList<>();
-
-        for (String tag : entity.getTags()) {
-            if (tag.startsWith(prefix)) {
-                tagsToRemove.add(tag);
-            }
-        }
-
-        for (String tag : tagsToRemove) {
-            entity.removeTag(tag);
-        }
-    }
-
-    private static UUID parseUuid(String value) {
-        try {
-            return UUID.fromString(value);
-        } catch (Exception ignored) {
-            return null;
-        }
-    }
-
-    private static Entity findEntityByUuid(Level level, UUID uuid, net.minecraft.world.phys.Vec3 center, double range) {
-        if (level == null || uuid == null) {
+    public static Mob findBestPickupPirate(Boat boat, double range) {
+        if (boat == null || boat.level() == null || !isValidBoat(boat)) {
             return null;
         }
 
-        if (level instanceof ServerLevel serverLevel) {
-            Entity entity = serverLevel.getEntity(uuid);
-
-            if (entity != null) {
-                return entity;
-            }
-        }
-
-        if (center == null || range <= 0.0D) {
+        if (!hasAvailableReturnSeat(boat)) {
             return null;
         }
 
-        AABB box = new AABB(
-                center.x - range,
-                center.y - range,
-                center.z - range,
-                center.x + range,
-                center.y + range,
-                center.z + range
-        );
+        return boat.level().getEntitiesOfClass(
+                        Mob.class,
+                        boat.getBoundingBox().inflate(range),
+                        pirate -> canBoatPickUpPirate(boat, pirate)
+                )
+                .stream()
+                .min(Comparator.comparingDouble(boat::distanceToSqr))
+                .orElse(null);
+    }
 
-        List<Entity> entities = level.getEntities((Entity) null, box, entity -> entity.getUUID().equals(uuid));
+    private static boolean canBoatPickUpPirate(Boat boat, Mob pirate) {
+        if (pirate == null || boat == null) {
+            return false;
+        }
 
-        return entities.isEmpty() ? null : entities.get(0);
+        if (!pirate.isAlive() || pirate.isRemoved()) {
+            return false;
+        }
+
+        if (pirate.isPassenger()) {
+            return false;
+        }
+
+        if (!pirate.getTags().contains(RAID_PIRATE_TAG)) {
+            return false;
+        }
+
+        if (!sameFleetOrRaid(pirate, boat)) {
+            return false;
+        }
+
+        return hasAvailableReturnSeatFor(pirate, boat);
     }
 
     private static boolean isValidBoat(Boat boat) {
