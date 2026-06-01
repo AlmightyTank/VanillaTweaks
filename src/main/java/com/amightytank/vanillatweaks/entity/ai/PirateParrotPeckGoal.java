@@ -1,5 +1,6 @@
 package com.amightytank.vanillatweaks.entity.ai;
 
+import com.amightytank.vanillatweaks.entity.ai.util.PirateLookHelper;
 import com.amightytank.vanillatweaks.entity.custom.pirate.AbstractPirateEntity;
 import com.amightytank.vanillatweaks.entity.custom.pirate.PirateParrotEntity;
 import net.minecraft.world.entity.LivingEntity;
@@ -9,6 +10,9 @@ import net.minecraft.world.phys.Vec3;
 import java.util.EnumSet;
 
 public class PirateParrotPeckGoal extends Goal {
+    private static final double PECK_DISTANCE = 1.6D;
+    private static final float PECK_DAMAGE = 2.0F;
+
     private final PirateParrotEntity parrot;
     private final double speed;
 
@@ -18,6 +22,11 @@ public class PirateParrotPeckGoal extends Goal {
     public PirateParrotPeckGoal(PirateParrotEntity parrot, double speed) {
         this.parrot = parrot;
         this.speed = speed;
+
+        /*
+         * MOVE = fly/chase.
+         * LOOK = face the target while diving/pecking.
+         */
         this.setFlags(EnumSet.of(Goal.Flag.MOVE, Goal.Flag.LOOK));
     }
 
@@ -42,15 +51,26 @@ public class PirateParrotPeckGoal extends Goal {
     }
 
     @Override
+    public void start() {
+        this.attackCooldown = 0;
+        this.retreatTicks = 0;
+    }
+
+    @Override
+    public void stop() {
+        this.parrot.getNavigation().stop();
+        this.retreatTicks = 0;
+    }
+
+    @Override
     public void tick() {
         LivingEntity target = this.parrot.getTarget();
 
         if (!AbstractPirateEntity.canPirateAttack(target)) {
-            this.parrot.setTarget(null);
             return;
         }
 
-        this.parrot.getLookControl().setLookAt(target, 30.0F, 30.0F);
+        PirateLookHelper.lookAtEntity(this.parrot, target);
 
         if (this.attackCooldown > 0) {
             this.attackCooldown--;
@@ -58,82 +78,52 @@ public class PirateParrotPeckGoal extends Goal {
 
         if (this.retreatTicks > 0) {
             this.retreatTicks--;
-            moveAwayFromTarget(target);
+            this.flyAwayFromTarget(target);
             return;
         }
 
-        moveTowardTarget(target);
+        double distanceSqr = this.parrot.distanceToSqr(target);
 
-        double distance = this.parrot.distanceToSqr(target);
+        if (distanceSqr <= PECK_DISTANCE * PECK_DISTANCE) {
+            this.parrot.getNavigation().stop();
 
-        if (distance <= 2.25D && this.attackCooldown <= 0) {
-            peckTarget(target);
+            if (this.attackCooldown <= 0) {
+                target.hurt(this.parrot.damageSources().mobAttack(this.parrot), PECK_DAMAGE);
+
+                this.attackCooldown = 18;
+                this.retreatTicks = 10;
+            }
+
+            return;
         }
+
+        this.parrot.getNavigation().moveTo(target, this.speed);
     }
 
-    private void moveTowardTarget(LivingEntity target) {
-        this.parrot.getMoveControl().setWantedPosition(
-                target.getX(),
-                target.getEyeY() + 0.15D,
-                target.getZ(),
-                this.speed
-        );
-    }
-
-    private void moveAwayFromTarget(LivingEntity target) {
-        Vec3 away = this.parrot.position().subtract(target.position());
+    private void flyAwayFromTarget(LivingEntity target) {
+        Vec3 away = this.parrot.position()
+                .subtract(target.position())
+                .normalize();
 
         if (away.lengthSqr() < 0.01D) {
             away = new Vec3(
                     this.parrot.getRandom().nextDouble() - 0.5D,
-                    0.2D,
+                    0.4D,
                     this.parrot.getRandom().nextDouble() - 0.5D
-            );
+            ).normalize();
         }
 
-        away = away.normalize();
-
-        double retreatX = this.parrot.getX() + away.x * 2.0D;
-        double retreatY = this.parrot.getY() + 0.8D;
-        double retreatZ = this.parrot.getZ() + away.z * 2.0D;
+        Vec3 retreatPos = this.parrot.position().add(
+                away.x * 3.0D,
+                1.2D,
+                away.z * 3.0D
+        );
 
         this.parrot.getMoveControl().setWantedPosition(
-                retreatX,
-                retreatY,
-                retreatZ,
-                this.speed * 1.15D
+                retreatPos.x,
+                retreatPos.y,
+                retreatPos.z,
+                this.speed
         );
-    }
-
-    private void peckTarget(LivingEntity target) {
-        if (!AbstractPirateEntity.canPirateAttack(target)) {
-            this.parrot.setTarget(null);
-            return;
-        }
-
-        if (!this.parrot.level().isClientSide) {
-            target.hurt(this.parrot.damageSources().mobAttack(this.parrot), 2.0F);
-
-            double knockX = this.parrot.getX() - target.getX();
-            double knockZ = this.parrot.getZ() - target.getZ();
-            target.knockback(0.12D, knockX, knockZ);
-        }
-
-        Vec3 bounce = this.parrot.position().subtract(target.position());
-
-        if (bounce.lengthSqr() > 0.01D) {
-            bounce = bounce.normalize();
-
-            this.parrot.setDeltaMovement(
-                    bounce.x * 0.35D,
-                    0.24D,
-                    bounce.z * 0.35D
-            );
-
-            this.parrot.hasImpulse = true;
-        }
-
-        this.attackCooldown = 14;
-        this.retreatTicks = 8;
     }
 }

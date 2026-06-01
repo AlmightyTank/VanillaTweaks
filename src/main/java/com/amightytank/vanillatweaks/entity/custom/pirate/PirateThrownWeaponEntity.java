@@ -1,6 +1,5 @@
 package com.amightytank.vanillatweaks.entity.custom.pirate;
 
-import com.amightytank.vanillatweaks.entity.ModEntities;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.syncher.EntityDataAccessor;
 import net.minecraft.network.syncher.EntityDataSerializers;
@@ -8,89 +7,89 @@ import net.minecraft.network.syncher.SynchedEntityData;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LivingEntity;
-import net.minecraft.world.entity.projectile.ThrowableItemProjectile;
-import net.minecraft.world.item.Item;
+import net.minecraft.world.entity.projectile.AbstractArrow;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.EntityHitResult;
-import net.minecraft.world.phys.HitResult;
-import net.minecraft.world.phys.Vec3;
 
-public class PirateThrownWeaponEntity extends ThrowableItemProjectile {
+public class PirateThrownWeaponEntity extends AbstractArrow {
     private static final EntityDataAccessor<Integer> DATA_WEAPON_TYPE =
             SynchedEntityData.defineId(PirateThrownWeaponEntity.class, EntityDataSerializers.INT);
 
-    private float damage = 8.0F;
-    private float knockback = 0.7F;
+    public enum WeaponType {
+        TRIDENT,
+        AXE;
+
+        public static WeaponType byId(int id) {
+            WeaponType[] values = values();
+
+            if (id < 0 || id >= values.length) {
+                return TRIDENT;
+            }
+
+            return values[id];
+        }
+    }
 
     public PirateThrownWeaponEntity(EntityType<? extends PirateThrownWeaponEntity> entityType, Level level) {
         super(entityType, level);
+
+        this.pickup = Pickup.DISALLOWED;
     }
 
-    public PirateThrownWeaponEntity(Level level, LivingEntity owner) {
-        super(ModEntities.PIRATE_THROWN_WEAPON.get(), owner, level);
+    public PirateThrownWeaponEntity(EntityType<? extends PirateThrownWeaponEntity> entityType,
+                                    Level level,
+                                    LivingEntity owner) {
+        super(entityType, owner, level);
+
+        this.pickup = Pickup.DISALLOWED;
     }
 
     @Override
     protected void defineSynchedData() {
         super.defineSynchedData();
-        this.entityData.define(DATA_WEAPON_TYPE, PirateBruteEntity.BruteWeaponType.SPEAR.getId());
+
+        this.entityData.define(DATA_WEAPON_TYPE, WeaponType.TRIDENT.ordinal());
     }
 
-    public void setWeaponType(PirateBruteEntity.BruteWeaponType type) {
-        this.entityData.set(DATA_WEAPON_TYPE, type.getId());
+    public void setWeaponType(WeaponType weaponType) {
+        this.entityData.set(DATA_WEAPON_TYPE, weaponType.ordinal());
+    }
 
-        if (type == PirateBruteEntity.BruteWeaponType.AXE) {
-            this.setItem(new net.minecraft.world.item.ItemStack(Items.IRON_AXE));
-        } else {
-            this.setItem(new net.minecraft.world.item.ItemStack(Items.TRIDENT));
+    public WeaponType getWeaponType() {
+        return WeaponType.byId(this.entityData.get(DATA_WEAPON_TYPE));
+    }
+
+    public ItemStack getRenderStack() {
+        if (this.getWeaponType() == WeaponType.AXE) {
+            return new ItemStack(Items.IRON_AXE);
         }
-    }
 
-    public PirateBruteEntity.BruteWeaponType getWeaponType() {
-        return PirateBruteEntity.BruteWeaponType.byId(this.entityData.get(DATA_WEAPON_TYPE));
-    }
-
-    public void setThrownDamage(float damage) {
-        this.damage = damage;
-    }
-
-    public void setThrownKnockback(float knockback) {
-        this.knockback = knockback;
+        return new ItemStack(Items.TRIDENT);
     }
 
     @Override
-    protected Item getDefaultItem() {
-        return this.getWeaponType() == PirateBruteEntity.BruteWeaponType.AXE
-                ? Items.IRON_AXE
-                : Items.TRIDENT;
+    protected ItemStack getPickupItem() {
+        // Brute-thrown weapons should not be picked up.
+        return ItemStack.EMPTY;
     }
 
     @Override
-    protected void onHitEntity(EntityHitResult result) {
-        super.onHitEntity(result);
+    protected void onHitEntity(EntityHitResult hitResult) {
+        Entity hitEntity = hitResult.getEntity();
 
-        Entity hitEntity = result.getEntity();
-        Entity owner = this.getOwner();
-
-        if (hitEntity == owner) {
-            return;
-        }
-
+        // No pirate friendly fire.
         if (AbstractPirateEntity.isPirateAlly(hitEntity)) {
             if (!this.level().isClientSide) {
                 this.discard();
             }
+
             return;
         }
 
-        boolean hurt = hitEntity.hurt(this.damageSources().thrown(this, owner), this.damage);
-
-        if (hurt && hitEntity instanceof LivingEntity living) {
-            Vec3 push = living.position().subtract(this.position()).normalize().scale(this.knockback);
-            living.push(push.x, 0.15D, push.z);
-            living.hurtMarked = true;
-        }
+        super.onHitEntity(hitResult);
 
         if (!this.level().isClientSide) {
             this.discard();
@@ -98,10 +97,11 @@ public class PirateThrownWeaponEntity extends ThrowableItemProjectile {
     }
 
     @Override
-    protected void onHit(HitResult result) {
-        super.onHit(result);
+    protected void onHitBlock(BlockHitResult hitResult) {
+        super.onHitBlock(hitResult);
 
-        if (result.getType() != HitResult.Type.ENTITY && !this.level().isClientSide) {
+        // Brute has infinite thrown weapons, so do not leave them stuck in blocks.
+        if (!this.level().isClientSide) {
             this.discard();
         }
     }
@@ -110,23 +110,13 @@ public class PirateThrownWeaponEntity extends ThrowableItemProjectile {
     public void addAdditionalSaveData(CompoundTag tag) {
         super.addAdditionalSaveData(tag);
 
-        tag.putInt("WeaponType", this.getWeaponType().getId());
-        tag.putFloat("ThrownDamage", this.damage);
-        tag.putFloat("ThrownKnockback", this.knockback);
+        tag.putInt("WeaponType", this.getWeaponType().ordinal());
     }
 
     @Override
     public void readAdditionalSaveData(CompoundTag tag) {
         super.readAdditionalSaveData(tag);
 
-        this.setWeaponType(PirateBruteEntity.BruteWeaponType.byId(tag.getInt("WeaponType")));
-
-        if (tag.contains("ThrownDamage")) {
-            this.damage = tag.getFloat("ThrownDamage");
-        }
-
-        if (tag.contains("ThrownKnockback")) {
-            this.knockback = tag.getFloat("ThrownKnockback");
-        }
+        this.setWeaponType(WeaponType.byId(tag.getInt("WeaponType")));
     }
 }

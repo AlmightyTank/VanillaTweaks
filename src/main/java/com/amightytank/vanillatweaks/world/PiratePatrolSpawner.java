@@ -1,29 +1,60 @@
 package com.amightytank.vanillatweaks.world;
 
-import com.amightytank.vanillatweaks.entity.custom.boat.ModBoatEntity;
-import com.amightytank.vanillatweaks.entity.custom.boat.ModChestBoatEntity;
+import com.amightytank.vanillatweaks.entity.ai.util.PirateBoatPassengerHelper;
 import net.minecraft.core.BlockPos;
+import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.util.RandomSource;
-import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.vehicle.Boat;
-import net.minecraft.world.level.block.Blocks;
+import net.minecraft.tags.FluidTags;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 
+import java.util.ArrayList;
+import java.util.List;
+
 public class PiratePatrolSpawner {
-    private static int piratePatrolDelay = 20 * 60 * 5; // 5 minutes
+    private static final String PATROL_COOLDOWN_TAG = "PiratePatrolCooldown";
+
+    private static final int MIN_PLAYERS_REQUIRED = 1;
+    private static final int PATROL_DELAY_TICKS = 20 * 60 * 5;
+    private static final int PLAYER_PATROL_COOLDOWN_TICKS = 20 * 60 * 10;
+    private static final int SPAWN_CHANCE_PERCENT = 35;
+
+    /*
+     * How close the player must be to surface water before a patrol can spawn.
+     * Keeping this at 64 means land can be safer, but shores/coasts still feel dangerous.
+     */
+    private static final int WATER_SEARCH_RADIUS = 64;
+
+    private static int piratePatrolDelay = PATROL_DELAY_TICKS;
 
     @SubscribeEvent
     public static void onServerTick(TickEvent.ServerTickEvent event) {
-        if (event.phase != TickEvent.Phase.END) return;
+        if (event.phase != TickEvent.Phase.END) {
+            return;
+        }
+
+        /*
+         * Tick queued pirate boat mounts every server tick.
+         *
+         * PiratePatrolFormation and PirateShipSpawner queue boarding by 1 tick so
+         * the client receives the boat entity before it receives the passenger packet.
+         * This helps prevent:
+         *
+         * "Received passengers for unknown entity"
+         */
+        for (ServerLevel level : event.getServer().getAllLevels()) {
+            PirateBoatPassengerHelper.tickQueuedMounts(level);
+            tickPlayerCooldowns(level);
+        }
 
         piratePatrolDelay--;
 
-        if (piratePatrolDelay > 0) return;
+        if (piratePatrolDelay > 0) {
+            return;
+        }
 
-        piratePatrolDelay = 20 * 60 * 5;
+        piratePatrolDelay = PATROL_DELAY_TICKS;
 
         for (ServerLevel level : event.getServer().getAllLevels()) {
             trySpawnPiratePatrol(level);
@@ -31,91 +62,100 @@ public class PiratePatrolSpawner {
     }
 
     private static void trySpawnPiratePatrol(ServerLevel level) {
-        RandomSource random = level.random;
+        List<ServerPlayer> candidates = getValidPatrolTargets(level);
 
-        if (level.players().isEmpty()) return;
-
-        ServerPlayer player = level.players().get(random.nextInt(level.players().size()));
-
-        if (!isPlayerSailing(player)) return;
-
-        // 25% chance every 5-minute check while sailing.
-        if (random.nextFloat() > 0.25F) return;
-
-        BlockPos spawnPos = findWaterSpawnPos(level, player.blockPosition(), random);
-
-        if (spawnPos == null) return;
-
-        PiratePatrolSize size = pickPatrolSize(random);
-
-        PiratePatrolFormation.spawn(level, spawnPos, player, size);
-    }
-
-    public static void spawnTestPatrol(ServerLevel level, BlockPos spawnPos, Entity user) {
-        if (user instanceof ServerPlayer player) {
-            PiratePatrolFormation.spawn(level, spawnPos, player, PiratePatrolSize.MEDIUM);
+        if (candidates.size() < MIN_PLAYERS_REQUIRED) {
             return;
         }
 
-        if (!level.players().isEmpty()) {
-            ServerPlayer player = level.players().get(0);
-            PiratePatrolFormation.spawn(level, spawnPos, player, PiratePatrolSize.MEDIUM);
+        ServerPlayer target = candidates.get(level.random.nextInt(candidates.size()));
+
+        if (target.getPersistentData().getInt(PATROL_COOLDOWN_TAG) > 0) {
+            return;
+        }
+
+        if (level.random.nextInt(100) >= SPAWN_CHANCE_PERCENT) {
+            return;
+        }
+
+        if (!hasSurfaceWaterNear(level, target.blockPosition(), WATER_SEARCH_RADIUS)) {
+            return;
+        }
+
+        if (!PiratePatrolFormation.spawnPatrol(level, target).isEmpty()) {
+            target.getPersistentData().putInt(PATROL_COOLDOWN_TAG, PLAYER_PATROL_COOLDOWN_TICKS);
+            target.displayClientMessage(Component.literal("Pirate patrol incoming!"), false);
         }
     }
 
-    private static boolean isPlayerSailing(ServerPlayer player) {
-        Entity vehicle = player.getVehicle();
+    private static void tickPlayerCooldowns(ServerLevel level) {
+        for (ServerPlayer player : level.players()) {
+            int cooldown = player.getPersistentData().getInt(PATROL_COOLDOWN_TAG);
 
-        return vehicle instanceof Boat
-                || vehicle instanceof ModBoatEntity
-                || vehicle instanceof ModChestBoatEntity;
+            if (cooldown > 0) {
+                player.getPersistentData().putInt(PATROL_COOLDOWN_TAG, Math.max(0, cooldown - 1));
+            }
+        }
     }
 
-    private static BlockPos findWaterSpawnPos(ServerLevel level, BlockPos playerPos, RandomSource random) {
-        for (int i = 0; i < 20; i++) {
-            int distance = 48 + random.nextInt(32); // 48-80 blocks away
-            double angle = random.nextDouble() * Math.PI * 2.0D;
+    private static List<ServerPlayer> getValidPatrolTargets(ServerLevel level) {
+        List<ServerPlayer> candidates = new ArrayList<>();
 
-            int x = playerPos.getX() + (int) (Math.cos(angle) * distance);
-            int z = playerPos.getZ() + (int) (Math.sin(angle) * distance);
+        for (ServerPlayer player : level.players()) {
+            if (!player.isAlive()) {
+                continue;
+            }
 
-            BlockPos pos = new BlockPos(x, level.getSeaLevel(), z);
-            BlockPos surface = findWaterSurface(level, pos);
+            if (player.isSpectator() || player.isCreative()) {
+                continue;
+            }
 
-            if (surface != null) {
-                return surface;
+            if (player.getPersistentData().getInt(PATROL_COOLDOWN_TAG) > 0) {
+                continue;
+            }
+
+            candidates.add(player);
+        }
+
+        return candidates;
+    }
+
+    private static boolean hasSurfaceWaterNear(ServerLevel level, BlockPos center, int radius) {
+        for (int r = 0; r <= radius; r += 4) {
+            for (int x = -r; x <= r; x += 4) {
+                for (int z = -r; z <= r; z += 4) {
+                    if (Math.abs(x) != r && Math.abs(z) != r) {
+                        continue;
+                    }
+
+                    if (findWaterSurfaceAt(level, center.getX() + x, center.getZ() + z)) {
+                        return true;
+                    }
+                }
             }
         }
 
-        return null;
+        return false;
     }
 
-    private static BlockPos findWaterSurface(ServerLevel level, BlockPos pos) {
-        for (int y = level.getSeaLevel() + 6; y >= level.getSeaLevel() - 8; y--) {
-            BlockPos checkPos = new BlockPos(pos.getX(), y, pos.getZ());
+    private static boolean findWaterSurfaceAt(ServerLevel level, int x, int z) {
+        BlockPos.MutableBlockPos mutable = new BlockPos.MutableBlockPos();
 
-            boolean water = level.getBlockState(checkPos).is(Blocks.WATER);
-            boolean airAbove = level.getBlockState(checkPos.above()).isAir();
+        int topY = level.getMaxBuildHeight() - 1;
+        int bottomY = level.getMinBuildHeight();
 
-            if (water && airAbove) {
-                return checkPos;
+        for (int y = topY; y >= bottomY; y--) {
+            mutable.set(x, y, z);
+
+            boolean isWater = level.getFluidState(mutable).is(FluidTags.WATER);
+            boolean aboveIsAir = level.getBlockState(mutable.above()).isAir();
+            boolean twoAboveIsAir = level.getBlockState(mutable.above(2)).isAir();
+
+            if (isWater && aboveIsAir && twoAboveIsAir) {
+                return true;
             }
         }
 
-        return null;
-    }
-
-    private static PiratePatrolSize pickPatrolSize(RandomSource random) {
-        float roll = random.nextFloat();
-
-        if (roll < 0.55F) {
-            return PiratePatrolSize.SMALL;
-        }
-
-        if (roll < 0.85F) {
-            return PiratePatrolSize.MEDIUM;
-        }
-
-        return PiratePatrolSize.LARGE;
+        return false;
     }
 }

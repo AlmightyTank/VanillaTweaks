@@ -2,7 +2,7 @@ package com.amightytank.vanillatweaks.entity;
 
 import com.amightytank.vanillatweaks.VanillaTweaks;
 import com.amightytank.vanillatweaks.entity.custom.boat.ModBoatEntity;
-import com.amightytank.vanillatweaks.entity.custom.boat.ModChestBoatEntity;
+import com.amightytank.vanillatweaks.entity.custom.boat.SailboatCollisionPartEntity;
 import com.amightytank.vanillatweaks.entity.custom.pirate.*;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.MobCategory;
@@ -23,13 +23,6 @@ public class ModEntities {
                             .clientTrackingRange(10)
                             .build("mod_boat"));
 
-    public static final RegistryObject<EntityType<ModChestBoatEntity>> MOD_CHEST_BOAT =
-            ENTITY_TYPES.register("mod_chest_boat", () ->
-                    EntityType.Builder.<ModChestBoatEntity>of(ModChestBoatEntity::new, MobCategory.MISC)
-                            .sized(1.375F, 0.35F)
-                            .clientTrackingRange(10)
-                            .build("mod_chest_boat"));
-
     // Medium sailboat
     public static final RegistryObject<EntityType<ModBoatEntity>> MEDIUM_MOD_BOAT =
             ENTITY_TYPES.register("medium_mod_boat", () ->
@@ -37,13 +30,6 @@ public class ModEntities {
                             .sized(1.55F, 0.40F)
                             .clientTrackingRange(10)
                             .build("medium_mod_boat"));
-
-    public static final RegistryObject<EntityType<ModChestBoatEntity>> MEDIUM_MOD_CHEST_BOAT =
-            ENTITY_TYPES.register("medium_mod_chest_boat", () ->
-                    EntityType.Builder.<ModChestBoatEntity>of(ModChestBoatEntity::new, MobCategory.MISC)
-                            .sized(1.55F, 0.40F)
-                            .clientTrackingRange(10)
-                            .build("medium_mod_chest_boat"));
 
     // Large sailboat
     public static final RegistryObject<EntityType<ModBoatEntity>> LARGE_MOD_BOAT =
@@ -53,12 +39,15 @@ public class ModEntities {
                             .clientTrackingRange(10)
                             .build("large_mod_boat"));
 
-    public static final RegistryObject<EntityType<ModChestBoatEntity>> LARGE_MOD_CHEST_BOAT =
-            ENTITY_TYPES.register("large_mod_chest_boat", () ->
-                    EntityType.Builder.<ModChestBoatEntity>of(ModChestBoatEntity::new, MobCategory.MISC)
-                            .sized(1.85F, 0.45F)
+    public static final RegistryObject<EntityType<SailboatCollisionPartEntity>> SAILBOAT_COLLISION_PART =
+            ENTITY_TYPES.register("sailboat_collision_part", () ->
+                    EntityType.Builder.<SailboatCollisionPartEntity>of(SailboatCollisionPartEntity::new, MobCategory.MISC)
+                            .sized(1.0F, 0.5F)
                             .clientTrackingRange(10)
-                            .build("large_mod_chest_boat"));
+                            .updateInterval(1)
+                            .noSave()
+                            .noSummon()
+                            .build("sailboat_collision_part"));
 
     public static final RegistryObject<EntityType<PirateCaptainEntity>> PIRATE_CAPTAIN =
             ENTITY_TYPES.register("pirate_captain",
@@ -81,20 +70,11 @@ public class ModEntities {
                             .clientTrackingRange(10)
                             .build("kraken_tentacle"));
 
-    public static final RegistryObject<EntityType<PirateBruteEntity>> PIRATE_BRUTE =
-            ENTITY_TYPES.register("pirate_brute",
-                    () -> EntityType.Builder.of(PirateBruteEntity::new, MobCategory.MONSTER)
-                            .sized(0.7F, 2.05F)
-                            .clientTrackingRange(8)
-                            .build("pirate_brute"));
-
-    public static final RegistryObject<EntityType<PirateSpearEntity>> PIRATE_SPEAR =
-            ENTITY_TYPES.register("pirate_spear",
-                    () -> EntityType.Builder.<PirateSpearEntity>of(PirateSpearEntity::new, MobCategory.MISC)
-                            .sized(0.5F, 0.5F)
-                            .clientTrackingRange(4)
-                            .updateInterval(20)
-                            .build("pirate_spear"));
+    public static final RegistryObject<EntityType<PirateMarauderEntity>> PIRATE_MARAUDER =
+            ENTITY_TYPES.register("pirate_marauder",
+                    () -> EntityType.Builder.of(PirateMarauderEntity::new, MobCategory.MONSTER)
+                            .sized(0.8F, 2.2F)
+                            .build("pirate_marauder"));
 
     public static final RegistryObject<EntityType<PirateGunnerEntity>> PIRATE_GUNNER =
             ENTITY_TYPES.register("pirate_gunner",
@@ -102,6 +82,15 @@ public class ModEntities {
                             .sized(0.6F, 1.95F)
                             .clientTrackingRange(8)
                             .build("pirate_gunner"));
+
+    public static final RegistryObject<EntityType<PirateThrownWeaponEntity>> PIRATE_THROWN_WEAPON =
+            ENTITY_TYPES.register("pirate_thrown_weapon", () ->
+                    EntityType.Builder.<PirateThrownWeaponEntity>of(PirateThrownWeaponEntity::new, MobCategory.MISC)
+                            .sized(0.5F, 0.5F)
+                            .clientTrackingRange(8)
+                            .updateInterval(10)
+                            .build("pirate_thrown_weapon")
+            );
 
     public static final RegistryObject<EntityType<PirateDynamiteArrowEntity>> PIRATE_DYNAMITE_ARROW =
             ENTITY_TYPES.register("pirate_dynamite_arrow",

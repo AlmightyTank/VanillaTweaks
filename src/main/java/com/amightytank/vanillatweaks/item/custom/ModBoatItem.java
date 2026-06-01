@@ -1,7 +1,6 @@
 package com.amightytank.vanillatweaks.item.custom;
 
 import com.amightytank.vanillatweaks.entity.custom.boat.ModBoatEntity;
-import com.amightytank.vanillatweaks.entity.custom.boat.ModChestBoatEntity;
 import net.minecraft.stats.Stats;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResultHolder;
@@ -27,18 +26,56 @@ public class ModBoatItem extends Item {
     private static final Predicate<Entity> ENTITY_PREDICATE =
             EntitySelector.NO_SPECTATORS.and(Entity::isPickable);
 
-    private final ModBoatEntity.Type type;
-    private final boolean hasChest;
+    private final Boat.Type type;
+    private final int bannerCount;
+    private final int startingChestCount;
     private final Supplier<? extends EntityType<? extends Boat>> boatEntity;
 
+    /**
+     * Old constructor support.
+     *
+     * hasChest true now means:
+     * Spawn a normal ModBoatEntity with 1 chest already attached.
+     *
+     * If you are deleting all chest boat items, use the constructor below with bannerCount instead.
+     */
     public ModBoatItem(boolean hasChest,
-                       ModBoatEntity.Type type,
+                       Boat.Type type,
+                       Supplier<? extends EntityType<? extends Boat>> boatEntity,
+                       Properties properties) {
+        this(hasChest, type, 1, boatEntity, properties);
+    }
+
+    /**
+     * Main constructor.
+     *
+     * bannerCount:
+     * 1 = small sailboat
+     * 2 = medium sailboat
+     * 3 = large sailboat
+     */
+    public ModBoatItem(boolean hasChest,
+                       Boat.Type type,
+                       int bannerCount,
                        Supplier<? extends EntityType<? extends Boat>> boatEntity,
                        Properties properties) {
         super(properties);
-        this.hasChest = hasChest;
         this.type = type;
+        this.bannerCount = Math.max(1, Math.min(3, bannerCount));
+        this.startingChestCount = hasChest ? 1 : 0;
         this.boatEntity = boatEntity;
+    }
+
+    /**
+     * Clean constructor for the new system.
+     *
+     * Use this for normal sailboat items.
+     */
+    public ModBoatItem(Boat.Type type,
+                       int bannerCount,
+                       Supplier<? extends EntityType<? extends Boat>> boatEntity,
+                       Properties properties) {
+        this(false, type, bannerCount, boatEntity, properties);
     }
 
     @Override
@@ -62,6 +99,7 @@ public class ModBoatItem extends Item {
 
             for (Entity entity : entities) {
                 AABB aabb = entity.getBoundingBox().inflate(entity.getPickRadius());
+
                 if (aabb.contains(eyePosition)) {
                     return InteractionResultHolder.pass(itemStack);
                 }
@@ -73,15 +111,6 @@ public class ModBoatItem extends Item {
         }
 
         Boat boat = this.getBoat(level, hitResult, player.getYRot());
-
-        // Set rotation before variant so the custom rectangular hitbox builds in the right direction
-        boat.setYRot(player.getYRot());
-
-        if (boat instanceof ModChestBoatEntity chestBoat) {
-            chestBoat.setVariant(this.type);
-        } else if (boat instanceof ModBoatEntity modBoat) {
-            modBoat.setVariant(this.type);
-        }
 
         if (!level.noCollision(boat, boat.getBoundingBox())) {
             return InteractionResultHolder.fail(itemStack);
@@ -105,15 +134,22 @@ public class ModBoatItem extends Item {
         double y = hitResult.getLocation().y;
         double z = hitResult.getLocation().z;
 
-        Boat boat = this.boatEntity.get().create(level);
+        Boat createdBoat = this.boatEntity.get().create(level);
+        ModBoatEntity boat;
 
-        if (boat == null) {
-            boat = this.hasChest
-                    ? new ModChestBoatEntity(level, x, y, z)
-                    : new ModBoatEntity(level, x, y, z);
+        if (createdBoat instanceof ModBoatEntity modBoat) {
+            boat = modBoat;
+        } else {
+            boat = new ModBoatEntity(level, x, y, z);
         }
 
+        boat.setModVariant(this.type);
+        boat.setBannerCount(this.bannerCount);
+        boat.setChestCount(this.startingChestCount);
+
         boat.moveTo(x, y, z, yaw, 0.0F);
+        boat.setYRot(yaw);
+
         return boat;
     }
 }

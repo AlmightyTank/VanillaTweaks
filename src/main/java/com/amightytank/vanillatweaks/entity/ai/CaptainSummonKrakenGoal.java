@@ -19,9 +19,13 @@ public class CaptainSummonKrakenGoal extends Goal {
     private int castTime;
     private int cooldown;
 
+    private static final int SHARED_SPELL_COOLDOWN_TIME = 100;
+
     private static final int CIRCLE_STRIKE_COUNT = 3;
     private static final double CIRCLE_RADIUS = 2.0D;
     private static final float TENTACLE_YAW_OFFSET = 0.0F;
+
+    private static final double KRAKEN_ATTACK_RANGE = 48.0D;
 
     /*
      * Faster summon timing only.
@@ -30,12 +34,13 @@ public class CaptainSummonKrakenGoal extends Goal {
     private static final int SMALL_CHASE_DELAY_STEP = 2;  // was i * 3
     private static final int BIG_STRIKE_DELAY = 14;
     private static final int CAST_TIME = 24;              // was 35
+    private static final int EXTRA_SHARED_COOLDOWN_TICKS = 20 * 5;
     private static final int SUMMON_TIME = 12;            // was 18
     private static final int COOLDOWN_TIME = 100;         // was 140
 
     public CaptainSummonKrakenGoal(PirateCaptainEntity captain) {
         this.captain = captain;
-        this.setFlags(EnumSet.of(Goal.Flag.MOVE, Goal.Flag.LOOK));
+        this.setFlags(EnumSet.of(Goal.Flag.LOOK));
     }
 
     @Override
@@ -51,7 +56,15 @@ public class CaptainSummonKrakenGoal extends Goal {
             return false;
         }
 
-        return this.captain.distanceToSqr(target) <= 24.0D * 24.0D;
+        if (this.captain.isCaptainSpellOnCooldown()) {
+            return false;
+        }
+
+        if (this.captain.hasActiveParrotSwarm()) {
+            return false;
+        }
+
+        return this.captain.distanceToSqr(target) <= KRAKEN_ATTACK_RANGE * KRAKEN_ATTACK_RANGE;
     }
 
     @Override
@@ -63,6 +76,11 @@ public class CaptainSummonKrakenGoal extends Goal {
     @Override
     public void start() {
         this.castTime = CAST_TIME;
+
+        if (!this.captain.level().isClientSide) {
+            this.captain.setCaptainSpellCooldown(CAST_TIME + EXTRA_SHARED_COOLDOWN_TICKS);
+        }
+
         this.captain.getNavigation().stop();
         this.captain.setAggressive(true);
     }
@@ -71,6 +89,11 @@ public class CaptainSummonKrakenGoal extends Goal {
     public void stop() {
         this.castTime = 0;
         this.cooldown = COOLDOWN_TIME;
+
+        if (!this.captain.level().isClientSide) {
+            this.captain.setCaptainSpellCooldown(SHARED_SPELL_COOLDOWN_TIME);
+        }
+
         this.captain.setAggressive(false);
     }
 

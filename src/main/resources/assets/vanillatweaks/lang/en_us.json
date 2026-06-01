@@ -2,13 +2,17 @@
   "itemGroup.vanillatweaks": "Vanilla Tweaks",
   "creativetab.vanillatweaks.vanilla_tweaks_tab": "Vanilla Tweaks",
   "creativetab.vanilla_tweaks_tab": "Vanilla Tweaks",
+  "key.categories.vanillatweaks": "Vanilla Tweaks",
+
+  "key.vanillatweaks.swap_sailboat_seat": "Swap Sailboat Seats",
 
   "entity.vanillatweaks.pirate_captain": "Pirate Captain",
   "entity.vanillatweaks.pirate_parrot": "Pirate Parrot",
   "entity.vanillatweaks.kraken_tentacle": "Kraken Tentacle",
 
-  "entity.vanillatweaks.pirate_brute": "Pirate Brute",
-  "item.vanillatweaks.pirate_brute_spawn_egg": "Pirate Brute Spawn Egg",
+  "entity.vanillatweaks.pirate_marauder": "Pirate Marauder",
+  "entity.vanillatweaks.pirate_thrown_weapon": "Pirate Thrown Weapon",
+  "item.vanillatweaks.pirate_marauder_spawn_egg": "Pirate Marauder Spawn Egg",
   "item.vanillatweaks.pirate_spear": "Pirate Spear",
   "tooltip.vanillatweaks.pirate_spear": "A heavy boarding spear used by pirate brutes.",
 

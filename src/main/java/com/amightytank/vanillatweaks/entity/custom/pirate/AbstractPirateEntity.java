@@ -1,5 +1,9 @@
 package com.amightytank.vanillatweaks.entity.custom.pirate;
 
+import com.amightytank.vanillatweaks.entity.ai.PirateBoatBoarderRemountGoal;
+import com.amightytank.vanillatweaks.entity.ai.PirateBoatPilotGoal;
+import com.amightytank.vanillatweaks.entity.custom.boat.ModBoatEntity;
+import com.amightytank.vanillatweaks.event.PirateFriendlyFireEvents;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
@@ -10,8 +14,11 @@ import net.minecraft.world.entity.ai.goal.RandomLookAroundGoal;
 import net.minecraft.world.entity.ai.goal.WaterAvoidingRandomStrollGoal;
 import net.minecraft.world.entity.ai.goal.target.HurtByTargetGoal;
 import net.minecraft.world.entity.ai.goal.target.NearestAttackableTargetGoal;
+import net.minecraft.world.entity.animal.IronGolem;
 import net.minecraft.world.entity.monster.AbstractIllager;
+import net.minecraft.world.entity.npc.AbstractVillager;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.entity.vehicle.Boat;
 import net.minecraft.world.level.Level;
 import org.jetbrains.annotations.Nullable;
 
@@ -25,15 +32,15 @@ public abstract class AbstractPirateEntity extends AbstractIllager {
     protected void registerGoals() {
         this.goalSelector.addGoal(0, new FloatGoal(this));
 
-        this.goalSelector.addGoal(6, new WaterAvoidingRandomStrollGoal(this, 0.8D));
-        this.goalSelector.addGoal(7, new LookAtPlayerGoal(this, Player.class, 8.0F));
-        this.goalSelector.addGoal(8, new RandomLookAroundGoal(this));
+        this.goalSelector.addGoal(1, new WaterAvoidingRandomStrollGoal(this, 0.8D));
+        //this.goalSelector.addGoal(2, new LookAtPlayerGoal(this, Player.class, 8.0F));
+        //this.goalSelector.addGoal(9, new RandomLookAroundGoal(this));
 
         // Pirates can still fight back, but NOT against other pirates.
         this.targetSelector.addGoal(1, new HurtByTargetGoal(this));
-
-        // Normal pirate target.
         this.targetSelector.addGoal(2, new NearestAttackableTargetGoal<>(this, Player.class, true));
+        this.targetSelector.addGoal(3, new NearestAttackableTargetGoal<>(this, AbstractVillager.class, false));
+        this.targetSelector.addGoal(4, new NearestAttackableTargetGoal<>(this, IronGolem.class, true));
     }
 
     public static boolean isPirateAlly(@Nullable Entity entity) {
@@ -42,8 +49,16 @@ public abstract class AbstractPirateEntity extends AbstractIllager {
                 || entity instanceof KrakenTentacleEntity;
     }
 
-    public static boolean canPirateAttack(@Nullable LivingEntity target) {
-        return target != null && target.isAlive() && !isPirateAlly(target);
+    public static boolean canPirateAttack(LivingEntity target) {
+        if (target == null || !target.isAlive()) {
+            return false;
+        }
+
+        if (PirateFriendlyFireEvents.isPirateAlly(target)) {
+            return false;
+        }
+
+        return true;
     }
 
     @Override
@@ -68,11 +83,11 @@ public abstract class AbstractPirateEntity extends AbstractIllager {
 
     @Override
     public boolean isAlliedTo(Entity entity) {
-        if (isPirateAlly(entity)) {
+        if (super.isAlliedTo(entity)) {
             return true;
         }
 
-        return super.isAlliedTo(entity);
+        return PirateFriendlyFireEvents.isPirateAlly(entity);
     }
 
     @Override
@@ -87,6 +102,21 @@ public abstract class AbstractPirateEntity extends AbstractIllager {
         }
 
         return super.hurt(source, amount);
+    }
+
+    public boolean canBoatRangedAttackTarget(LivingEntity target) {
+        if (!(this.getVehicle() instanceof Boat boat)) {
+            return true;
+        }
+
+        // 90 left + 90 right = 180 total attack view.
+        // They cannot shoot/throw behind the boat.
+        return ModBoatEntity.canBoatPassengerAttackTarget(
+                boat,
+                this,
+                target,
+                90.0F
+        );
     }
 
     @Override

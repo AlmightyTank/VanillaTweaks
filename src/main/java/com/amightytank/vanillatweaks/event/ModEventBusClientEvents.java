@@ -3,10 +3,12 @@ package com.amightytank.vanillatweaks.event;
 import com.amightytank.vanillatweaks.VanillaTweaks;
 import com.amightytank.vanillatweaks.entity.ModEntities;
 import com.amightytank.vanillatweaks.entity.client.ModModelLayers;
+import com.amightytank.vanillatweaks.entity.client.boat.SailboatCollisionPartRenderer;
 import com.amightytank.vanillatweaks.entity.client.pirate.PirateDeckhandRenderer;
 import com.amightytank.vanillatweaks.entity.client.boat.model.*;
 import com.amightytank.vanillatweaks.entity.client.pirate.*;
 import com.amightytank.vanillatweaks.entity.client.pirate.model.*;
+import net.minecraft.client.renderer.entity.ThrownItemRenderer;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.client.event.EntityRenderersEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
@@ -18,17 +20,15 @@ public class ModEventBusClientEvents {
     @SubscribeEvent
     public static void registerLayer(EntityRenderersEvent.RegisterLayerDefinitions event) {
         event.registerLayerDefinition(ModModelLayers.SAILBOAT_LAYER, SmallSailboatModel::createBodyLayer);
-        event.registerLayerDefinition(ModModelLayers.SAILBOAT_CHEST_LAYER, SmallChestSailboatModel::createBodyLayer);
-
         event.registerLayerDefinition(ModModelLayers.MEDIUM_SAILBOAT_LAYER, MediumSailboatModel::createBodyLayer);
-        event.registerLayerDefinition(ModModelLayers.MEDIUM_SAILBOAT_CHEST_LAYER, MediumChestSailboatModel::createBodyLayer);
-
         event.registerLayerDefinition(ModModelLayers.LARGE_SAILBOAT_LAYER, LargeSailboatModel::createBodyLayer);
-        event.registerLayerDefinition(ModModelLayers.LARGE_SAILBOAT_CHEST_LAYER, LargeChestSailboatModel::createBodyLayer);
+
+        event.registerLayerDefinition(ModModelLayers.BAMBOO_SAILBOAT_LAYER, BambooSailboatModel::createBodyLayer);
+        event.registerLayerDefinition(ModModelLayers.BAMBOO_MEDIUM_SAILBOAT_LAYER, BambooMediumSailboatModel::createBodyLayer);
+        event.registerLayerDefinition(ModModelLayers.BAMBOO_LARGE_SAILBOAT_LAYER, BambooLargeSailboatModel::createBodyLayer);
 
         event.registerLayerDefinition(ModModelLayers.KRAKEN_TENTACLE_LAYER, KrakenTentacleModel::createBodyLayer);
         event.registerLayerDefinition(ModModelLayers.PIRATE_CAPTAIN_LAYER, PirateCaptainModel::createBodyLayer);
-        event.registerLayerDefinition(ModModelLayers.PIRATE_BRUTE_LAYER, PirateBruteModel::createBodyLayer);
         event.registerLayerDefinition(ModModelLayers.SHOULDER_PIRATE_PARROT_LAYER, ShoulderPirateParrotModel::createBodyLayer);
     }
 
@@ -37,9 +37,11 @@ public class ModEventBusClientEvents {
         event.registerEntityRenderer(ModEntities.PIRATE_CAPTAIN.get(), PirateCaptainRenderer::new);
         event.registerEntityRenderer(ModEntities.PIRATE_PARROT.get(), PirateParrotRenderer::new);
         event.registerEntityRenderer(ModEntities.KRAKEN_TENTACLE.get(), KrakenTentacleRenderer::new);
-        event.registerEntityRenderer(ModEntities.PIRATE_BRUTE.get(), PirateBruteRenderer::new);
+        event.registerEntityRenderer(ModEntities.PIRATE_MARAUDER.get(), PirateMarauderRenderer::new);
+        event.registerEntityRenderer(ModEntities.PIRATE_THROWN_WEAPON.get(), PirateThrownWeaponRenderer::new);
         event.registerEntityRenderer(ModEntities.PIRATE_GUNNER.get(), PirateGunnerRenderer::new);
         event.registerEntityRenderer(ModEntities.PIRATE_DYNAMITE_ARROW.get(), PirateDynamiteArrowRenderer::new);
         event.registerEntityRenderer(ModEntities.PIRATE_DECKHAND.get(), PirateDeckhandRenderer::new);
+        event.registerEntityRenderer(ModEntities.SAILBOAT_COLLISION_PART.get(), SailboatCollisionPartRenderer::new);
     }
 }

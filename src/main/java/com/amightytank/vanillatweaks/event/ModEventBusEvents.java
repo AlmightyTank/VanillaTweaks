@@ -14,7 +14,7 @@ public class ModEventBusEvents {
     public static void registerAttributes(EntityAttributeCreationEvent event) {
         event.put(ModEntities.PIRATE_CAPTAIN.get(), PirateCaptainEntity.createAttributes().build());
         event.put(ModEntities.PIRATE_PARROT.get(), PirateParrotEntity.createAttributes().build());
-        event.put(ModEntities.PIRATE_BRUTE.get(), PirateBruteEntity.createAttributes().build());
+        event.put(ModEntities.PIRATE_MARAUDER.get(), PirateMarauderEntity.createAttributes().build());
         event.put(ModEntities.PIRATE_GUNNER.get(), PirateGunnerEntity.createAttributes().build());
         event.put(ModEntities.PIRATE_DECKHAND.get(), PirateDeckhandEntity.createAttributes().build());
     }
