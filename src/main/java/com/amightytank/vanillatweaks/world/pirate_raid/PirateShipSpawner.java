@@ -1,6 +1,7 @@
 package com.amightytank.vanillatweaks.world.pirate_raid;
 
 import com.amightytank.vanillatweaks.entity.ModEntities;
+import com.amightytank.vanillatweaks.entity.ai.util.PirateBoatPassengerHelper;
 import com.amightytank.vanillatweaks.entity.ai.util.PirateRaidAiUtil;
 import com.amightytank.vanillatweaks.entity.custom.boat.ModBoatEntity;
 import com.amightytank.vanillatweaks.util.PirateLootHelper;
@@ -316,18 +317,30 @@ public class PirateShipSpawner {
         }
     }
 
-    private static void mountCrewToBoat(Entity boat, List<Mob> crew) {
+    private static void mountCrewToBoat(Entity boatEntity, List<Mob> crew) {
+        if (!(boatEntity instanceof Boat boat)) {
+            return;
+        }
+
+        int openSeats = PirateBoatPassengerHelper.getOpenSeatCount(boat);
+
         for (Mob pirate : crew) {
+            if (openSeats <= 0) {
+                break;
+            }
+
             if (pirate == null || !pirate.isAlive()) {
                 continue;
             }
 
-            pirate.getPersistentData().putUUID(PirateRaidAiUtil.RAID_BOAT_UUID_TAG, boat.getUUID());
+            PirateBoatPassengerHelper.assignHomeBoat(pirate, boat);
 
-            if (boat instanceof ModBoatEntity modBoat) {
-                modBoat.addMobToSailboat(pirate);
-            } else {
-                pirate.startRiding(boat, true);
+            /*
+             * Delay initial boarding by 1 tick.
+             * This helps prevent "Received passengers for unknown entity".
+             */
+            if (PirateBoatPassengerHelper.queueBoard(pirate, boat, 1)) {
+                openSeats--;
             }
         }
     }

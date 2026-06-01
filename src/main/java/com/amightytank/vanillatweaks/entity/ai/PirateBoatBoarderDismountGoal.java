@@ -15,6 +15,12 @@ public class PirateBoatBoarderDismountGoal extends Goal {
     private static final String BOARDER_TAG = "PirateRaidBoarder";
 
     /*
+     * Saved on the boarder when it jumps out.
+     * The remount goal and pilot goal use this so the boat does not abandon its own crew.
+     */
+    public static final String RETURN_BOAT_UUID_TAG = "PirateReturnBoatUUID";
+
+    /*
      * Boarders only jump out when the boat gets close enough.
      */
     private static final double DISMOUNT_DISTANCE = 10.0D;
@@ -61,6 +67,15 @@ public class PirateBoatBoarderDismountGoal extends Goal {
     @Override
     public void start() {
         LivingEntity target = this.pirate.getTarget();
+
+        Entity vehicle = this.pirate.getVehicle();
+        if (vehicle instanceof Boat boat) {
+            /*
+             * Remember the exact boat this pirate jumped from.
+             * This prevents boarders from chasing the wrong pirate boat later.
+             */
+            this.pirate.getPersistentData().putUUID(RETURN_BOAT_UUID_TAG, boat.getUUID());
+        }
 
         if (target != null && target.isAlive()) {
             PirateLookHelper.lookAtEntity(this.pirate, target);

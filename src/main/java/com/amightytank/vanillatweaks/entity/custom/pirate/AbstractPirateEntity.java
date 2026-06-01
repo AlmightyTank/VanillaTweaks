@@ -34,7 +34,7 @@ public abstract class AbstractPirateEntity extends AbstractIllager {
 
         this.goalSelector.addGoal(1, new WaterAvoidingRandomStrollGoal(this, 0.8D));
         //this.goalSelector.addGoal(2, new LookAtPlayerGoal(this, Player.class, 8.0F));
-        this.goalSelector.addGoal(9, new RandomLookAroundGoal(this));
+        //this.goalSelector.addGoal(9, new RandomLookAroundGoal(this));
 
         // Pirates can still fight back, but NOT against other pirates.
         this.targetSelector.addGoal(1, new HurtByTargetGoal(this));
@@ -130,48 +130,5 @@ public abstract class AbstractPirateEntity extends AbstractIllager {
         }
 
         return IllagerArmPose.CROSSED;
-    }
-
-    public double getBoatPilotStopRange() {
-        return 8.0D;
-    }
-
-    public double getBoatPilotStartRange() {
-        return this.getBoatPilotStopRange() + 4.0D;
-    }
-
-    public boolean isCurrentBoatDriver() {
-        Entity vehicle = this.getVehicle();
-
-        return vehicle instanceof Boat
-                && vehicle.getFirstPassenger() == this;
-    }
-
-    public boolean shouldLetBoatPilotHandleTarget(LivingEntity target, double attackRange) {
-        if (!canPirateAttack(target)) {
-            return false;
-        }
-
-        if (!(this.getVehicle() instanceof Boat)) {
-            return false;
-        }
-
-        if (!this.isCurrentBoatDriver()) {
-            return false;
-        }
-
-        double pilotStopRange = this.getBoatPilotStopRange();
-
-        /*
-         * If the driver is outside the pilot stop range, let the boat move.
-         */
-        if (this.distanceToSqr(target) > pilotStopRange * pilotStopRange) {
-            return true;
-        }
-
-        /*
-         * If target is outside the boat attack arc, let the boat rotate.
-         */
-        return !this.canBoatRangedAttackTarget(target);
     }
 }

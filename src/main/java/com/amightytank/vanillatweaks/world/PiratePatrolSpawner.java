@@ -1,5 +1,6 @@
 package com.amightytank.vanillatweaks.world;
 
+import com.amightytank.vanillatweaks.entity.ai.util.PirateBoatPassengerHelper;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
@@ -34,10 +35,11 @@ public class PiratePatrolSpawner {
         }
 
         /*
-         * Tick player cooldowns every server tick.
-         * Your old version only reduced cooldown when the global patrol timer fired.
+         * Process delayed pirate boat mounts first.
+         * This prevents passenger packets from being sent before the client knows the boat exists.
          */
         for (ServerLevel level : event.getServer().getAllLevels()) {
+            PirateBoatPassengerHelper.tickQueuedMounts(level);
             tickPlayerCooldowns(level);
         }
 

@@ -11,30 +11,35 @@ import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.ai.goal.Goal;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 
 import java.util.EnumSet;
+import java.util.List;
 import java.util.UUID;
 
 public class PirateBoatPilotGoal extends Goal {
-    private static final double BOAT_CHASE_SPEED = 0.08D;
-    private static final double BOAT_HOLD_SPEED = 0.045D;
-    private static final double MAX_BOAT_SPEED = 0.32D;
+    private static final String RAID_PIRATE_TAG = "PirateTreasureRaid";
+    private static final String BOARDER_TAG = "PirateRaidBoarder";
+
+    public static final String RETURN_BOAT_UUID_TAG = "PirateReturnBoatUUID";
 
     private static final double BOARDING_STOP_RANGE = 9.0D;
     private static final double RANGED_STOP_RANGE = 20.0D;
     private static final double SAFE_LAND_HOLD_RANGE = 28.0D;
 
+    private static final double CREW_WAIT_SEARCH_RANGE = 52.0D;
+    private static final double CREW_PICKUP_MOVE_RANGE = 7.0D;
+
     private static final double TARGET_SEARCH_DISTANCE = 80.0D;
 
-    /*
-     * Natural steering:
-     * Do not instantly snap the boat to the target.
-     * These values make the boat visibly row/turn into position.
-     */
-    private static final float MAX_TURN_DEGREES_PER_TICK = 4.0F;
-    private static final float SHARP_TURN_DEGREES = 22.0F;
-    private static final float TURN_IN_PLACE_DEGREES = 70.0F;
+    private static final double WATER_CHECK_DISTANCE = 3.0D;
+    private static final double FORWARD_WATER_CHECK_DISTANCE = 2.25D;
+
+    private static final float STEER_DEAD_ZONE_DEGREES = 4.0F;
+    private static final float FORWARD_MAX_TURN_DEGREES = 145.0F;
+
+    private static final double BRAKE_SPEED_SQR = 0.0009D;
 
     private final AbstractPirateEntity pirate;
 
@@ -104,6 +109,10 @@ public class PirateBoatPilotGoal extends Goal {
 
     @Override
     public void stop() {
+        if (this.pirate.getVehicle() instanceof ModBoatEntity boat) {
+            boat.clearPirateRaidInput();
+        }
+
         this.target = null;
         this.retargetCooldown = 0;
     }
@@ -115,6 +124,7 @@ public class PirateBoatPilotGoal extends Goal {
         }
 
         if (!this.isSelectedDriver(boat)) {
+            boat.clearPirateRaidInput();
             return;
         }
 
@@ -122,13 +132,36 @@ public class PirateBoatPilotGoal extends Goal {
             this.target = this.getOrFindBoatTarget(boat);
 
             if (!AbstractPirateEntity.canPirateAttack(this.target)) {
-                slowBoat(boat);
+                this.brakeBoatLikePlayer(boat);
                 return;
             }
         }
 
+        /*
+         * Before chasing the player, check if this boat has mates still on foot.
+         * This keeps the boat from abandoning boarders after they jump out.
+         */
+        AbstractPirateEntity dismountedMate = this.findDismountedMateForBoat(boat);
+
+        if (dismountedMate != null) {
+            double mateDistanceSqr = boat.distanceToSqr(dismountedMate);
+
+            if (mateDistanceSqr > CREW_PICKUP_MOVE_RANGE * CREW_PICKUP_MOVE_RANGE) {
+                Vec3 moveDirection = PirateRaidAiUtil.horizontalDirection(
+                        boat.position(),
+                        dismountedMate.position()
+                );
+
+                this.steerBoatLikePlayer(boat, moveDirection, true);
+            } else {
+                this.brakeBoatLikePlayer(boat);
+            }
+
+            return;
+        }
+
         boolean targetSafeOnLand = PirateRaidAiUtil.isTargetSafeOnLandForBoarder(this.pirate, this.target);
-        double stopRange = getBoatStopRange(boat, targetSafeOnLand);
+        double stopRange = this.getBoatStopRange(boat, targetSafeOnLand);
 
         Vec3 boatPos = boat.position();
         Vec3 targetPos = this.target.position();
@@ -147,13 +180,15 @@ public class PirateBoatPilotGoal extends Goal {
              */
             if (distanceSqr < stopRangeSqr) {
                 moveDirection = PirateRaidAiUtil.horizontalAwayFrom(targetPos, boatPos);
+                this.steerBoatLikePlayer(boat, moveDirection, true);
             } else if (distanceSqr > (stopRange + 8.0D) * (stopRange + 8.0D)) {
                 moveDirection = PirateRaidAiUtil.horizontalDirection(boatPos, targetPos);
+                this.steerBoatLikePlayer(boat, moveDirection, true);
             } else {
-                moveDirection = getCircleDirection(boatPos, targetPos);
+                moveDirection = this.getCircleDirection(boatPos, targetPos);
+                this.steerBoatLikePlayer(boat, moveDirection, true);
             }
 
-            moveBoatSafely(boat, moveDirection, BOAT_HOLD_SPEED);
             return;
         }
 
@@ -162,10 +197,146 @@ public class PirateBoatPilotGoal extends Goal {
          */
         if (distanceSqr > stopRangeSqr) {
             moveDirection = PirateRaidAiUtil.horizontalDirection(boatPos, targetPos);
-            moveBoatSafely(boat, moveDirection, BOAT_CHASE_SPEED);
+            this.steerBoatLikePlayer(boat, moveDirection, true);
         } else {
-            slowBoat(boat);
+            this.brakeBoatLikePlayer(boat);
         }
+    }
+
+    private void steerBoatLikePlayer(ModBoatEntity boat, Vec3 direction, boolean allowForward) {
+        if (direction.lengthSqr() < 0.0001D) {
+            this.brakeBoatLikePlayer(boat);
+            return;
+        }
+
+        Vec3 wantedDirection = this.getWaterSafeDirection(boat, direction.normalize());
+
+        if (wantedDirection.lengthSqr() < 0.0001D) {
+            this.brakeBoatLikePlayer(boat);
+            return;
+        }
+
+        float turnDegrees = this.getYawDifferenceTo(boat, wantedDirection);
+        float absTurnDegrees = Math.abs(turnDegrees);
+
+        boolean left = turnDegrees < -STEER_DEAD_ZONE_DEGREES;
+        boolean right = turnDegrees > STEER_DEAD_ZONE_DEGREES;
+
+        Vec3 forward = this.getBoatForwardDirection(boat);
+
+        boolean facingCloseEnoughToRowForward = absTurnDegrees <= FORWARD_MAX_TURN_DEGREES;
+        boolean waterInFront = PirateRaidAiUtil.isWaterAhead(
+                boat.level(),
+                boat.position(),
+                forward,
+                FORWARD_WATER_CHECK_DISTANCE
+        );
+
+        boolean forwardInput = allowForward && facingCloseEnoughToRowForward && waterInFront;
+
+        boat.setPirateRaidInput(left, right, forwardInput, false);
+    }
+
+    private Vec3 getWaterSafeDirection(ModBoatEntity boat, Vec3 wantedDirection) {
+        if (PirateRaidAiUtil.isWaterAhead(boat.level(), boat.position(), wantedDirection, WATER_CHECK_DISTANCE)) {
+            return wantedDirection;
+        }
+
+        Vec3 left = PirateRaidAiUtil.leftOf(wantedDirection).normalize();
+        Vec3 right = PirateRaidAiUtil.rightOf(wantedDirection).normalize();
+
+        boolean leftWater = PirateRaidAiUtil.isWaterAhead(boat.level(), boat.position(), left, WATER_CHECK_DISTANCE);
+        boolean rightWater = PirateRaidAiUtil.isWaterAhead(boat.level(), boat.position(), right, WATER_CHECK_DISTANCE);
+
+        if (leftWater && rightWater) {
+            float leftTurn = Math.abs(this.getYawDifferenceTo(boat, left));
+            float rightTurn = Math.abs(this.getYawDifferenceTo(boat, right));
+
+            return leftTurn <= rightTurn ? left : right;
+        }
+
+        if (leftWater) {
+            return left;
+        }
+
+        if (rightWater) {
+            return right;
+        }
+
+        return Vec3.ZERO;
+    }
+
+    private void brakeBoatLikePlayer(ModBoatEntity boat) {
+        if (boat.getDeltaMovement().horizontalDistanceSqr() > BRAKE_SPEED_SQR) {
+            boat.setPirateRaidInput(false, false, false, true);
+        } else {
+            boat.clearPirateRaidInput();
+        }
+    }
+
+    private float getYawDifferenceTo(ModBoatEntity boat, Vec3 direction) {
+        if (direction.lengthSqr() < 0.0001D) {
+            return 0.0F;
+        }
+
+        float wantedYaw = (float) (Mth.atan2(direction.z, direction.x) * Mth.RAD_TO_DEG) - 90.0F;
+        return Mth.wrapDegrees(wantedYaw - boat.getYRot());
+    }
+
+    private Vec3 getBoatForwardDirection(ModBoatEntity boat) {
+        double radians = Math.toRadians(boat.getYRot() + 90.0F);
+        return new Vec3(Math.cos(radians), 0.0D, Math.sin(radians)).normalize();
+    }
+
+    private Vec3 getCircleDirection(Vec3 boatPos, Vec3 targetPos) {
+        Vec3 towardTarget = PirateRaidAiUtil.horizontalDirection(boatPos, targetPos);
+
+        if (towardTarget.lengthSqr() < 0.0001D) {
+            return Vec3.ZERO;
+        }
+
+        return PirateRaidAiUtil.leftOf(towardTarget).normalize();
+    }
+
+    private AbstractPirateEntity findDismountedMateForBoat(ModBoatEntity boat) {
+        AABB searchBox = boat.getBoundingBox().inflate(CREW_WAIT_SEARCH_RANGE);
+
+        List<AbstractPirateEntity> pirates = boat.level().getEntitiesOfClass(
+                AbstractPirateEntity.class,
+                searchBox,
+                pirateEntity -> pirateEntity.isAlive()
+                        && !pirateEntity.isPassenger()
+                        && this.isRaidBoarder(pirateEntity)
+                        && this.belongsToBoat(pirateEntity, boat)
+        );
+
+        AbstractPirateEntity farthestMate = null;
+        double farthestDistanceSqr = 0.0D;
+
+        for (AbstractPirateEntity pirateEntity : pirates) {
+            double distanceSqr = pirateEntity.distanceToSqr(boat);
+
+            if (distanceSqr > farthestDistanceSqr) {
+                farthestDistanceSqr = distanceSqr;
+                farthestMate = pirateEntity;
+            }
+        }
+
+        return farthestMate;
+    }
+
+    private boolean belongsToBoat(AbstractPirateEntity pirateEntity, ModBoatEntity boat) {
+        if (pirateEntity.getPersistentData().hasUUID(RETURN_BOAT_UUID_TAG)) {
+            UUID returnBoatUuid = pirateEntity.getPersistentData().getUUID(RETURN_BOAT_UUID_TAG);
+            return returnBoatUuid.equals(boat.getUUID());
+        }
+
+        return pirateEntity.distanceToSqr(boat) <= CREW_WAIT_SEARCH_RANGE * CREW_WAIT_SEARCH_RANGE;
+    }
+
+    private boolean isRaidBoarder(Entity entity) {
+        return entity.getTags().contains(RAID_PIRATE_TAG)
+                || entity.getTags().contains(BOARDER_TAG);
     }
 
     private boolean isSelectedDriver(ModBoatEntity boat) {
@@ -186,7 +357,7 @@ public class PirateBoatPilotGoal extends Goal {
                 continue;
             }
 
-            int priority = getDriverPriority(piratePassenger);
+            int priority = this.getDriverPriority(piratePassenger);
 
             if (priority > bestPriority) {
                 bestPriority = priority;
@@ -305,159 +476,5 @@ public class PirateBoatPilotGoal extends Goal {
         }
 
         return RANGED_STOP_RANGE;
-    }
-
-    private void moveBoatSafely(ModBoatEntity boat, Vec3 direction, double speed) {
-        if (direction.lengthSqr() < 0.0001D) {
-            slowBoat(boat);
-            return;
-        }
-
-        Vec3 wantedDirection = direction.normalize();
-
-        /*
-         * If the desired path would beach the boat, try turning along the shore.
-         */
-        if (!PirateRaidAiUtil.isWaterAhead(boat.level(), boat.position(), wantedDirection, 3.0D)) {
-            Vec3 left = PirateRaidAiUtil.leftOf(wantedDirection);
-            Vec3 right = PirateRaidAiUtil.rightOf(wantedDirection);
-
-            boolean leftWater = PirateRaidAiUtil.isWaterAhead(boat.level(), boat.position(), left, 3.0D);
-            boolean rightWater = PirateRaidAiUtil.isWaterAhead(boat.level(), boat.position(), right, 3.0D);
-
-            if (leftWater) {
-                wantedDirection = left.normalize();
-            } else if (rightWater) {
-                wantedDirection = right.normalize();
-            } else {
-                slowBoat(boat);
-                boat.setPaddleState(false, false);
-                return;
-            }
-        }
-
-        /*
-         * Turn first. The boat then moves based on its actual facing direction.
-         * This removes the unnatural sideways sliding.
-         */
-        float remainingTurn = turnBoatToward(boat, wantedDirection);
-        Vec3 forward = getBoatForwardDirection(boat);
-
-        double alignment = Mth.clamp(forward.dot(wantedDirection), -1.0D, 1.0D);
-
-        /*
-         * If the boat is not facing the target yet, it should mostly turn,
-         * not instantly shove sideways toward the target.
-         */
-        double thrustScale = Mth.clamp((alignment + 0.15D) / 1.15D, 0.0D, 1.0D);
-
-        if (Math.abs(remainingTurn) > TURN_IN_PLACE_DEGREES) {
-            thrustScale *= 0.25D;
-        }
-
-        /*
-         * If the boat's nose is pointed at land, row to turn but do not push forward.
-         */
-        if (!PirateRaidAiUtil.isWaterAhead(boat.level(), boat.position(), forward, 2.25D)) {
-            thrustScale = 0.0D;
-        }
-
-        Vec3 currentMotion = boat.getDeltaMovement();
-
-        double drag = thrustScale > 0.01D ? 0.82D : 0.90D;
-        Vec3 wantedMotion = currentMotion.scale(drag).add(forward.scale(speed * thrustScale));
-
-        if (wantedMotion.horizontalDistanceSqr() > MAX_BOAT_SPEED * MAX_BOAT_SPEED) {
-            Vec3 horizontal = new Vec3(wantedMotion.x, 0.0D, wantedMotion.z)
-                    .normalize()
-                    .scale(MAX_BOAT_SPEED);
-
-            wantedMotion = new Vec3(horizontal.x, wantedMotion.y, horizontal.z);
-        }
-
-        boat.setDeltaMovement(wantedMotion);
-        applyPaddleState(boat, remainingTurn, thrustScale > 0.01D);
-    }
-
-    private void slowBoat(ModBoatEntity boat) {
-        Vec3 motion = boat.getDeltaMovement();
-        boat.setDeltaMovement(motion.x * 0.8D, motion.y, motion.z * 0.8D);
-        boat.setPaddleState(false, false);
-    }
-
-    private Vec3 getCircleDirection(Vec3 boatPos, Vec3 targetPos) {
-        Vec3 towardTarget = PirateRaidAiUtil.horizontalDirection(boatPos, targetPos);
-
-        if (towardTarget.lengthSqr() < 0.0001D) {
-            return Vec3.ZERO;
-        }
-
-        return PirateRaidAiUtil.leftOf(towardTarget).normalize();
-    }
-
-    private float turnBoatToward(ModBoatEntity boat, Vec3 direction) {
-        if (direction.lengthSqr() < 0.0001D) {
-            return 0.0F;
-        }
-
-        float wantedYaw = (float) (Mth.atan2(direction.z, direction.x) * Mth.RAD_TO_DEG) - 90.0F;
-        float currentYaw = boat.getYRot();
-
-        float yawDifference = Mth.wrapDegrees(wantedYaw - currentYaw);
-        float clampedTurn = Mth.clamp(
-                yawDifference,
-                -MAX_TURN_DEGREES_PER_TICK,
-                MAX_TURN_DEGREES_PER_TICK
-        );
-
-        boat.setYRot(currentYaw + clampedTurn);
-
-        /*
-         * Do not set yRotO here.
-         * Let Minecraft interpolate the rotation instead of visually snapping it.
-         */
-
-        return yawDifference;
-    }
-
-    private Vec3 getBoatForwardDirection(ModBoatEntity boat) {
-        double radians = Math.toRadians(boat.getYRot() + 90.0F);
-        return new Vec3(Math.cos(radians), 0.0D, Math.sin(radians)).normalize();
-    }
-
-    private void applyPaddleState(ModBoatEntity boat, float remainingTurn, boolean movingForward) {
-        float absTurn = Math.abs(remainingTurn);
-
-        if (absTurn > SHARP_TURN_DEGREES) {
-            /*
-             * One-oar steering for sharp turns.
-             *
-             * If this looks backwards in-game, swap these two setPaddleState calls.
-             */
-            if (remainingTurn > 0.0F) {
-                boat.setPaddleState(true, false);
-            } else {
-                boat.setPaddleState(false, true);
-            }
-
-            return;
-        }
-
-        if (movingForward) {
-            boat.setPaddleState(true, true);
-            return;
-        }
-
-        if (absTurn > 3.0F) {
-            if (remainingTurn > 0.0F) {
-                boat.setPaddleState(true, false);
-            } else {
-                boat.setPaddleState(false, true);
-            }
-
-            return;
-        }
-
-        boat.setPaddleState(false, false);
     }
 }

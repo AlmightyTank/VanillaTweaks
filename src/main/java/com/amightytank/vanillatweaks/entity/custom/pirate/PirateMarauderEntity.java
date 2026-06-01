@@ -16,9 +16,11 @@ import net.minecraft.world.entity.MobSpawnType;
 import net.minecraft.world.entity.SpawnGroupData;
 import net.minecraft.world.entity.ai.attributes.AttributeSupplier;
 import net.minecraft.world.entity.ai.attributes.Attributes;
+import net.minecraft.world.entity.ai.goal.LookAtPlayerGoal;
 import net.minecraft.world.entity.monster.AbstractIllager;
 import net.minecraft.world.entity.monster.Monster;
 import net.minecraft.world.entity.monster.RangedAttackMob;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.Level;
@@ -40,11 +42,11 @@ public class PirateMarauderEntity extends AbstractPirateEntity implements Ranged
     protected void registerGoals() {
         super.registerGoals();
 
+        this.goalSelector.addGoal(2, new LookAtPlayerGoal(this, Player.class, 8.0F));
         this.goalSelector.addGoal(3, new PirateBoatPilotGoal(this));
         this.goalSelector.addGoal(4, new PirateBoatBoarderRemountGoal(this));
         this.goalSelector.addGoal(5, new PirateBoatBoarderDismountGoal(this));
-        this.goalSelector.addGoal(6, new PirateBoarderChargeGoal(this));
-        this.goalSelector.addGoal(7, new PirateMarauderThrowWhileChargingGoal(this));
+        this.goalSelector.addGoal(6, new PirateMarauderThrowWhileChargingGoal(this));
     }
 
     @Override
@@ -222,15 +224,5 @@ public class PirateMarauderEntity extends AbstractPirateEntity implements Ranged
     @Override
     public SoundEvent getCelebrateSound() {
         return SoundEvents.PILLAGER_CELEBRATE;
-    }
-
-    @Override
-    public double getBoatPilotStopRange() {
-        return 12.0D;
-    }
-
-    @Override
-    public double getBoatPilotStartRange() {
-        return 18.0D;
     }
 }

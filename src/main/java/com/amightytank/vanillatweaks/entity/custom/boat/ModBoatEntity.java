@@ -68,10 +68,11 @@ public class ModBoatEntity extends Boat implements Container {
 
     private static final double SPEED_PER_BANNER = 0.08D;
 
-    private static final int PIRATE_RAID_ROWING_TICKS = 5;
-    private static final double PIRATE_RAID_BOAT_SPEED = 0.035D;
-    private static final double PIRATE_RAID_BOAT_MAX_SPEED = 0.42D;
+    private static final int PIRATE_RAID_INPUT_TICKS = 20;
 
+    private static final double PIRATE_RAID_PLAYER_FORWARD_ACCELERATION = 0.04D;
+    private static final double PIRATE_RAID_PLAYER_BACK_ACCELERATION = 0.005D;
+    private static final double PIRATE_RAID_PLAYER_TURN_ONLY_ACCELERATION = 0.005D;
 
     private static final int ROWS_PER_CHEST = 2;
     private static final int SLOTS_PER_CHEST = ROWS_PER_CHEST * 9;
@@ -85,7 +86,9 @@ public class ModBoatEntity extends Boat implements Container {
     private boolean sailboatInputForward;
     private boolean sailboatInputBack;
 
-    private int pirateRaidRowingTicks;
+    private int pirateRaidInputTicks;
+    private boolean pirateRaidInputActive;
+    private int pirateRaidPaddleVisualTicks;
 
     private float sailboatTurnVelocity;
 
@@ -167,10 +170,6 @@ public class ModBoatEntity extends Boat implements Container {
         this.entityData.set(DATA_BANNER_STACK, copy);
     }
 
-    public boolean hasBanner() {
-        return !this.getBannerStack().isEmpty();
-    }
-
     public ItemStack getSecondBannerStack() {
         if (!this.isLargeSailboat()) {
             return ItemStack.EMPTY;
@@ -188,10 +187,6 @@ public class ModBoatEntity extends Boat implements Container {
         ItemStack copy = stack.copy();
         copy.setCount(1);
         this.entityData.set(DATA_SECOND_BANNER_STACK, copy);
-    }
-
-    public boolean hasSecondBanner() {
-        return !this.getSecondBannerStack().isEmpty();
     }
 
     public boolean isMediumSailboat() {
@@ -386,9 +381,15 @@ public class ModBoatEntity extends Boat implements Container {
     public void tick() {
         super.tick();
 
-        this.keepPirateRaidRowingAlive();
+        this.keepPirateRaidInputAlive();
 
         this.applySmoothSailboatTurning();
+
+        /*
+         * Pirate pilots use the same strength as a player holding W.
+         * This makes mob-controlled boats move properly instead of crawling.
+         */
+        this.applyPirateRaidPlayerLikeInputMotion();
 
         SailboatRowingPhysics.apply(
                 this,
@@ -397,12 +398,55 @@ public class ModBoatEntity extends Boat implements Container {
                 this.isLargeSailboat()
         );
 
-        this.applyPirateRaidRowingMotion();
-
         if (!this.level().isClientSide) {
             this.updateSailboatCollisionParts();
             this.normalizeSailboatSeatSlots();
         }
+    }
+
+    private void applyPirateRaidPlayerLikeInputMotion() {
+        if (!this.pirateRaidInputActive) {
+            return;
+        }
+
+        if (!this.hasPirateRaidPassenger()) {
+            return;
+        }
+
+        double acceleration = 0.0D;
+
+        if (this.sailboatInputForward) {
+            acceleration += PIRATE_RAID_PLAYER_FORWARD_ACCELERATION;
+        }
+
+        if (this.sailboatInputBack) {
+            acceleration -= PIRATE_RAID_PLAYER_BACK_ACCELERATION;
+        }
+
+        /*
+         * Vanilla boats get a tiny push while turning with no forward/back input.
+         * This helps pirates start swinging the boat around instead of looking stuck.
+         */
+        if ((this.sailboatInputLeft || this.sailboatInputRight)
+                && !this.sailboatInputForward
+                && !this.sailboatInputBack) {
+            acceleration += PIRATE_RAID_PLAYER_TURN_ONLY_ACCELERATION;
+        }
+
+        if (Math.abs(acceleration) <= 0.0001D) {
+            return;
+        }
+
+        float yawRadians = this.getYRot() * Mth.DEG_TO_RAD;
+
+        Vec3 motion = this.getDeltaMovement().add(
+                Mth.sin(-yawRadians) * acceleration,
+                0.0D,
+                Mth.cos(yawRadians) * acceleration
+        );
+
+        this.setDeltaMovement(motion);
+        this.hasImpulse = true;
     }
 
     @Override
@@ -421,67 +465,81 @@ public class ModBoatEntity extends Boat implements Container {
         super.setInput(false, false, forward, back);
     }
 
-    public void setPirateRaidRowing(boolean rowing) {
-        if (rowing) {
-            this.pirateRaidRowingTicks = PIRATE_RAID_ROWING_TICKS;
-        } else {
-            this.pirateRaidRowingTicks = 0;
-        }
+    public void setPirateRaidInput(boolean left, boolean right, boolean forward, boolean back) {
+        this.pirateRaidInputTicks = PIRATE_RAID_INPUT_TICKS;
+        this.pirateRaidInputActive = true;
 
-        this.sailboatInputLeft = rowing;
-        this.sailboatInputRight = rowing;
-        this.sailboatInputForward = rowing;
-        this.sailboatInputBack = false;
+        this.sailboatInputLeft = left;
+        this.sailboatInputRight = right;
+        this.sailboatInputForward = forward;
+        this.sailboatInputBack = back;
 
-        this.frontPlayerPressingForward = rowing;
+        this.frontPlayerPressingForward = forward;
 
         /*
-         * Force vanilla paddle animation.
-         * This also keeps SailboatRowingPhysics active.
+         * Do not rely on vanilla Boat input for mob pilots.
+         * We apply player-strength pirate input ourselves.
          */
-        super.setInput(rowing, rowing, rowing, false);
+        super.setInput(false, false, false, false);
+
+        /*
+         * Simple pirate oar rule:
+         * Any pirate input means both oars row.
+         */
+        boolean rowing = left || right || forward || back;
+        this.setPaddleState(rowing, rowing);
     }
 
-    private void keepPirateRaidRowingAlive() {
-        if (this.pirateRaidRowingTicks <= 0) {
-            return;
-        }
+    public void clearPirateRaidInput() {
+        this.pirateRaidInputTicks = 0;
+        this.pirateRaidInputActive = false;
 
-        this.pirateRaidRowingTicks--;
-
-        this.sailboatInputForward = true;
+        this.sailboatInputLeft = false;
+        this.sailboatInputRight = false;
+        this.sailboatInputForward = false;
         this.sailboatInputBack = false;
-        this.frontPlayerPressingForward = true;
 
-        super.setInput(true, true, true, false);
+        this.frontPlayerPressingForward = false;
+
+        super.setInput(false, false, false, false);
+        this.setPaddleState(false, false);
     }
 
-    private void applyPirateRaidRowingMotion() {
-        if (this.pirateRaidRowingTicks <= 0) {
+    private void keepPirateRaidInputAlive() {
+        if (this.pirateRaidInputTicks <= 0) {
             return;
         }
 
-        if (!this.hasPirateRaidPassenger()) {
+        this.pirateRaidInputTicks--;
+
+        if (this.pirateRaidInputTicks <= 0) {
+            this.pirateRaidInputActive = false;
+
+            this.sailboatInputLeft = false;
+            this.sailboatInputRight = false;
+            this.sailboatInputForward = false;
+            this.sailboatInputBack = false;
+
+            this.frontPlayerPressingForward = false;
+
+            super.setInput(false, false, false, false);
+            this.setPaddleState(false, false);
             return;
         }
 
-        float yaw = this.getYRot() * Mth.DEG_TO_RAD;
+        this.frontPlayerPressingForward = this.sailboatInputForward;
 
-        Vec3 motion = this.getDeltaMovement().add(
-                Mth.sin(-yaw) * PIRATE_RAID_BOAT_SPEED,
-                0.0D,
-                Mth.cos(yaw) * PIRATE_RAID_BOAT_SPEED
-        );
+        super.setInput(false, false, false, false);
 
-        double horizontalSpeed = Math.sqrt(motion.x * motion.x + motion.z * motion.z);
+        /*
+         * Keep both pirate oars rowing while the AI input is alive.
+         */
+        boolean rowing = this.sailboatInputLeft
+                || this.sailboatInputRight
+                || this.sailboatInputForward
+                || this.sailboatInputBack;
 
-        if (horizontalSpeed > PIRATE_RAID_BOAT_MAX_SPEED) {
-            double scale = PIRATE_RAID_BOAT_MAX_SPEED / horizontalSpeed;
-            motion = new Vec3(motion.x * scale, motion.y, motion.z * scale);
-        }
-
-        this.setDeltaMovement(motion);
-        this.hasImpulse = true;
+        this.setPaddleState(rowing, rowing);
     }
 
     private void applySmoothSailboatTurning() {
@@ -532,8 +590,45 @@ public class ModBoatEntity extends Boat implements Container {
         }
 
         this.setYRot(this.getYRot() + this.sailboatTurnVelocity);
+        this.applySailboatInputPaddles();
     }
 
+    private void applySailboatInputPaddles() {
+        /*
+         * Pirate visual rule:
+         * Do not show left/right steering oars.
+         * Pirates always row both oars when operating the boat.
+         */
+        if (this.pirateRaidInputActive) {
+            boolean rowing = this.sailboatInputLeft
+                    || this.sailboatInputRight
+                    || this.sailboatInputForward
+                    || this.sailboatInputBack;
+
+            this.setPaddleState(rowing, rowing);
+            return;
+        }
+
+        /*
+         * Normal player paddle visuals.
+         */
+        if (this.sailboatInputForward || this.sailboatInputBack) {
+            this.setPaddleState(true, true);
+            return;
+        }
+
+        if (this.sailboatInputLeft && !this.sailboatInputRight) {
+            this.setPaddleState(false, true);
+            return;
+        }
+
+        if (this.sailboatInputRight && !this.sailboatInputLeft) {
+            this.setPaddleState(true, false);
+            return;
+        }
+
+        this.setPaddleState(false, false);
+    }
     private float getMaxSmoothTurnSpeed() {
         if (this.isLargeSailboat()) {
             return 2.4F;
@@ -1393,9 +1488,5 @@ public class ModBoatEntity extends Boat implements Container {
         for (int i = 0; i < this.getContainerSize(); i++) {
             this.inventory.set(i, ItemStack.EMPTY);
         }
-    }
-
-    public boolean isFrontSailboatPassenger(Entity passenger) {
-        return passenger != null && this.getPassengerSeatIndex(passenger) == 0;
     }
 }

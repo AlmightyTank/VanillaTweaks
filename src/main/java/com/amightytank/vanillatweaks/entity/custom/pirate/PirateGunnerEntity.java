@@ -240,14 +240,4 @@ public class PirateGunnerEntity extends AbstractPirateEntity implements RangedAt
         SLOWNESS,
         DYNAMITE
     }
-
-    @Override
-    public double getBoatPilotStopRange() {
-        return 22.0D;
-    }
-
-    @Override
-    public double getBoatPilotStartRange() {
-        return 28.0D;
-    }
 }
