@@ -42,36 +42,14 @@ public class PirateMarauderEntity extends AbstractPirateEntity implements Ranged
     protected void registerGoals() {
         super.registerGoals();
 
-        /*
-         * Boat movement.
-         * MOVE only.
-         */
-        this.goalSelector.addGoal(2, new PirateBoatPilotGoal(this));
-
-        /*
-         * Throw while mounted.
-         * LOOK only.
-         */
-        this.goalSelector.addGoal(3, new PirateMountedThrowAttackGoal(this));
-
-        /*
-         * Dismount when close enough.
-         * This goal should have NO flags.
-         */
-        this.goalSelector.addGoal(4, new PirateBoatBoarderDismountGoal(this));
-
-        /*
-         * Return to boat if player gets too far.
-         * MOVE only.
-         */
-        this.goalSelector.addGoal(5, new PirateBoatBoarderRemountGoal(this));
-
-        /*
-         * Chase / throw / melee while on foot.
-         * MOVE only.
-         * Must refuse to run while mounted.
-         */
-        this.goalSelector.addGoal(6, new PirateMarauderThrowWhileChargingGoal(this));
+        this.goalSelector.addGoal(2, new PirateBoatPilotGoal(this)); // MOVE
+        this.goalSelector.addGoal(3, new PirateCombatLookGoal(this)); // LOOK
+        this.goalSelector.addGoal(4, new PirateRangedAttackActionGoal(this, 28.0D, 45, true)); // mounted ACTION
+        this.goalSelector.addGoal(5, new PirateBoatBoarderDismountGoal(this)); // ACTION
+        this.goalSelector.addGoal(6, new PirateBoatBoarderRemountGoal(this)); // MOVE
+        this.goalSelector.addGoal(7, new PirateBoarderChargeGoal(this)); // MOVE
+        this.goalSelector.addGoal(8, new PirateRangedAttackActionGoal(this, 28.0D, 45, false)); // foot ACTION
+        this.goalSelector.addGoal(9, new PirateMeleeAttackActionGoal(this)); // ACTION
     }
 
     @Override

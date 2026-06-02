@@ -6,26 +6,23 @@ import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.ai.goal.Goal;
 
-public class PirateCloseDefenseGoal extends Goal {
-    private static final double ATTACK_REACH_DISTANCE = 2.6D;
-    private static final double ATTACK_REACH_DISTANCE_SQR =
-            ATTACK_REACH_DISTANCE * ATTACK_REACH_DISTANCE;
+public class PirateMeleeAttackActionGoal extends Goal {
+    private static final double MELEE_REACH_DISTANCE = 2.4D;
+    private static final double MELEE_REACH_DISTANCE_SQR =
+            MELEE_REACH_DISTANCE * MELEE_REACH_DISTANCE;
 
-    private static final int ATTACK_COOLDOWN_TICKS = 20;
+    private static final int MELEE_COOLDOWN_TICKS = 20;
 
     private final Mob pirate;
 
     private int attackCooldown;
 
-    public PirateCloseDefenseGoal(Mob pirate) {
+    public PirateMeleeAttackActionGoal(Mob pirate) {
         this.pirate = pirate;
 
         /*
-         * No MOVE.
-         * No LOOK.
-         *
-         * This is only a close slap if the target is already beside the pirate.
-         * It will not turn the pirate around mounted or dismounted.
+         * No flags.
+         * This goal only performs melee attacks.
          */
     }
 
@@ -38,7 +35,7 @@ public class PirateCloseDefenseGoal extends Goal {
         LivingEntity target = this.pirate.getTarget();
 
         return AbstractPirateEntity.canPirateAttack(target)
-                && this.pirate.distanceToSqr(target) <= ATTACK_REACH_DISTANCE_SQR;
+                && this.pirate.distanceToSqr(target) <= MELEE_REACH_DISTANCE_SQR;
     }
 
     @Override
@@ -58,7 +55,7 @@ public class PirateCloseDefenseGoal extends Goal {
             return;
         }
 
-        if (this.pirate.distanceToSqr(target) > ATTACK_REACH_DISTANCE_SQR) {
+        if (this.pirate.distanceToSqr(target) > MELEE_REACH_DISTANCE_SQR) {
             return;
         }
 
@@ -68,6 +65,6 @@ public class PirateCloseDefenseGoal extends Goal {
 
         this.pirate.swing(InteractionHand.MAIN_HAND);
         this.pirate.doHurtTarget(target);
-        this.attackCooldown = ATTACK_COOLDOWN_TICKS;
+        this.attackCooldown = MELEE_COOLDOWN_TICKS;
     }
 }

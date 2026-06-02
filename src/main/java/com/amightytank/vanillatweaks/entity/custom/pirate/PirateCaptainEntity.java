@@ -142,7 +142,7 @@ public class PirateCaptainEntity extends AbstractPirateEntity {
          * No MOVE.
          * No LOOK.
          */
-        this.goalSelector.addGoal(8, new PirateCloseDefenseGoal(this));
+        this.goalSelector.addGoal(8, new PirateMeleeAttackActionGoal(this));
     }
 
     @Override

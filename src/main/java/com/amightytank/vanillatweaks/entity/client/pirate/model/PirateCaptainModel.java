@@ -98,6 +98,27 @@ public class PirateCaptainModel<T extends PirateCaptainEntity> extends EntityMod
 
 	@Override
 	public void setupAnim(T entity, float limbSwing, float limbSwingAmount, float ageInTicks, float netHeadYaw, float headPitch) {
+		resetPose();
+
+		this.head.yRot = netHeadYaw * ((float) Math.PI / 180F);
+		this.head.xRot = headPitch * ((float) Math.PI / 180F);
+
+		this.hat.yRot = this.head.yRot;
+		this.hat.xRot = this.head.xRot;
+
+		this.nose.yRot = this.head.yRot;
+		this.nose.xRot = this.head.xRot;
+
+		this.right_leg.xRot = Mth.cos(limbSwing * 0.6662F) * 1.4F * limbSwingAmount * 0.5F;
+		this.left_leg.xRot = Mth.cos(limbSwing * 0.6662F + (float) Math.PI) * 1.4F * limbSwingAmount * 0.5F;
+
+		if (entity.getArmPose() == AbstractIllager.IllagerArmPose.SPELLCASTING) {
+			animateSpellCasting(ageInTicks);
+		} else if (entity.isAggressive()) {
+			animateAttacking(ageInTicks);
+		} else {
+			animateIdle(ageInTicks);
+		}
 	}
 
 	private void resetPose() {

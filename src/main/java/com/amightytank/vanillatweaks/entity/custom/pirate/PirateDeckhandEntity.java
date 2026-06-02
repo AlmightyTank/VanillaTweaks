@@ -49,30 +49,12 @@ public class PirateDeckhandEntity extends AbstractPirateEntity {
     protected void registerGoals() {
         super.registerGoals();
 
-        /*
-         * Boat movement.
-         * MOVE only.
-         */
-        this.goalSelector.addGoal(2, new PirateBoatPilotGoal(this));
-
-        /*
-         * Dismount when close.
-         * No flags.
-         */
-        this.goalSelector.addGoal(4, new PirateBoatBoarderDismountGoal(this));
-
-        /*
-         * Return to boat when player gets away.
-         * MOVE only.
-         */
-        this.goalSelector.addGoal(5, new PirateBoatBoarderRemountGoal(this));
-
-        /*
-         * Foot chase and melee.
-         * MOVE only.
-         * Must refuse to run while mounted.
-         */
-        this.goalSelector.addGoal(6, new PirateBoarderChargeGoal(this));
+        this.goalSelector.addGoal(2, new PirateBoatPilotGoal(this)); // MOVE
+        this.goalSelector.addGoal(3, new PirateCombatLookGoal(this)); // LOOK
+        this.goalSelector.addGoal(4, new PirateBoatBoarderDismountGoal(this)); // ACTION
+        this.goalSelector.addGoal(5, new PirateBoatBoarderRemountGoal(this)); // MOVE
+        this.goalSelector.addGoal(6, new PirateBoarderChargeGoal(this)); // MOVE
+        this.goalSelector.addGoal(7, new PirateMeleeAttackActionGoal(this)); // ACTION
     }
 
     @Override

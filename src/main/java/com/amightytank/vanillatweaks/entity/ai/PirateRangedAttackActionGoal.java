@@ -1,45 +1,53 @@
 package com.amightytank.vanillatweaks.entity.ai;
 
-import com.amightytank.vanillatweaks.entity.ai.util.PirateLookHelper;
 import com.amightytank.vanillatweaks.entity.custom.pirate.AbstractPirateEntity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.ai.goal.Goal;
 import net.minecraft.world.entity.monster.RangedAttackMob;
 
-import java.util.EnumSet;
-
-public class PirateGunnerAttackGoal extends Goal {
-    private static final double ATTACK_RANGE = 32.0D;
-    private static final int ATTACK_COOLDOWN_TICKS = 40;
-
+public class PirateRangedAttackActionGoal extends Goal {
     private final Mob pirate;
+    private final double attackRange;
+    private final int attackCooldownTicks;
+    private final boolean mountedOnly;
 
     private int attackCooldown;
     private int seeTime;
 
-    public PirateGunnerAttackGoal(Mob pirate) {
+    public PirateRangedAttackActionGoal(
+            Mob pirate,
+            double attackRange,
+            int attackCooldownTicks,
+            boolean mountedOnly
+    ) {
         this.pirate = pirate;
+        this.attackRange = attackRange;
+        this.attackCooldownTicks = attackCooldownTicks;
+        this.mountedOnly = mountedOnly;
 
         /*
-         * Gunner should own LOOK so it faces the target while aiming/shooting.
-         * No MOVE flag here so boat pilot / other movement goals can still move.
+         * No flags.
+         * This goal only performs the attack action.
          */
-        this.setFlags(EnumSet.of(Goal.Flag.LOOK));
     }
 
     @Override
     public boolean canUse() {
+        if (this.mountedOnly && !this.pirate.isPassenger()) {
+            return false;
+        }
+
         LivingEntity target = this.pirate.getTarget();
+
         return AbstractPirateEntity.canPirateAttack(target)
-                && this.pirate instanceof RangedAttackMob;
+                && this.pirate instanceof RangedAttackMob
+                && this.pirate.distanceToSqr(target) <= this.attackRange * this.attackRange;
     }
 
     @Override
     public boolean canContinueToUse() {
-        LivingEntity target = this.pirate.getTarget();
-        return AbstractPirateEntity.canPirateAttack(target)
-                && this.pirate instanceof RangedAttackMob;
+        return this.canUse();
     }
 
     @Override
@@ -61,9 +69,10 @@ public class PirateGunnerAttackGoal extends Goal {
             return;
         }
 
-        PirateLookHelper.lookAtEntity(this.pirate, target);
+        if (this.attackCooldown > 0) {
+            this.attackCooldown--;
+        }
 
-        double distanceSqr = this.pirate.distanceToSqr(target);
         boolean canSeeTarget = this.pirate.getSensing().hasLineOfSight(target);
 
         if (canSeeTarget) {
@@ -72,22 +81,17 @@ public class PirateGunnerAttackGoal extends Goal {
             this.seeTime = 0;
         }
 
-        if (this.attackCooldown > 0) {
-            this.attackCooldown--;
-        }
-
-        if (distanceSqr > ATTACK_RANGE * ATTACK_RANGE) {
-            return;
-        }
-
         if (this.seeTime < 5) {
             return;
         }
 
-        if (this.attackCooldown <= 0 && this.pirate instanceof RangedAttackMob rangedAttackMob) {
-            PirateLookHelper.lookAtEntity(this.pirate, target);
+        if (this.attackCooldown > 0) {
+            return;
+        }
+
+        if (this.pirate instanceof RangedAttackMob rangedAttackMob) {
             rangedAttackMob.performRangedAttack(target, 1.0F);
-            this.attackCooldown = ATTACK_COOLDOWN_TICKS;
+            this.attackCooldown = this.attackCooldownTicks;
         }
     }
 }
