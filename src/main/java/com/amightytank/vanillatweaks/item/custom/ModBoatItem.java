@@ -31,29 +31,6 @@ public class ModBoatItem extends Item {
     private final int startingChestCount;
     private final Supplier<? extends EntityType<? extends Boat>> boatEntity;
 
-    /**
-     * Old constructor support.
-     *
-     * hasChest true now means:
-     * Spawn a normal ModBoatEntity with 1 chest already attached.
-     *
-     * If you are deleting all chest boat items, use the constructor below with bannerCount instead.
-     */
-    public ModBoatItem(boolean hasChest,
-                       Boat.Type type,
-                       Supplier<? extends EntityType<? extends Boat>> boatEntity,
-                       Properties properties) {
-        this(hasChest, type, 1, boatEntity, properties);
-    }
-
-    /**
-     * Main constructor.
-     *
-     * bannerCount:
-     * 1 = small sailboat
-     * 2 = medium sailboat
-     * 3 = large sailboat
-     */
     public ModBoatItem(boolean hasChest,
                        Boat.Type type,
                        int bannerCount,
@@ -66,11 +43,6 @@ public class ModBoatItem extends Item {
         this.boatEntity = boatEntity;
     }
 
-    /**
-     * Clean constructor for the new system.
-     *
-     * Use this for normal sailboat items.
-     */
     public ModBoatItem(Boat.Type type,
                        int bannerCount,
                        Supplier<? extends EntityType<? extends Boat>> boatEntity,
