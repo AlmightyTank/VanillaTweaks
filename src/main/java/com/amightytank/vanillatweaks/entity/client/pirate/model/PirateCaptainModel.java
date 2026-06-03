@@ -9,6 +9,7 @@ import net.minecraft.client.model.geom.PartPose;
 import net.minecraft.client.model.geom.builders.*;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.monster.AbstractIllager;
+import net.minecraft.world.entity.vehicle.Boat;
 
 public class PirateCaptainModel<T extends PirateCaptainEntity> extends EntityModel<T> {
 	private final ModelPart head;
@@ -109,8 +110,12 @@ public class PirateCaptainModel<T extends PirateCaptainEntity> extends EntityMod
 		this.nose.yRot = this.head.yRot;
 		this.nose.xRot = this.head.xRot;
 
-		this.right_leg.xRot = Mth.cos(limbSwing * 0.6662F) * 1.4F * limbSwingAmount * 0.5F;
-		this.left_leg.xRot = Mth.cos(limbSwing * 0.6662F + (float) Math.PI) * 1.4F * limbSwingAmount * 0.5F;
+		if (isRidingBoat(entity)) {
+			applyBoatSittingPose();
+		} else {
+			this.right_leg.xRot = Mth.cos(limbSwing * 0.6662F) * 1.4F * limbSwingAmount * 0.5F;
+			this.left_leg.xRot = Mth.cos(limbSwing * 0.6662F + (float) Math.PI) * 1.4F * limbSwingAmount * 0.5F;
+		}
 
 		if (entity.getArmPose() == AbstractIllager.IllagerArmPose.SPELLCASTING) {
 			animateSpellCasting(ageInTicks);
@@ -119,6 +124,20 @@ public class PirateCaptainModel<T extends PirateCaptainEntity> extends EntityMod
 		} else {
 			animateIdle(ageInTicks);
 		}
+	}
+
+	private boolean isRidingBoat(T entity) {
+		return entity.isPassenger() && entity.getVehicle() instanceof Boat;
+	}
+
+	private void applyBoatSittingPose() {
+		this.right_leg.xRot = -1.4137167F;
+		this.right_leg.yRot = 0.31415927F;
+		this.right_leg.zRot = 0.07853982F;
+
+		this.left_leg.xRot = -1.4137167F;
+		this.left_leg.yRot = -0.31415927F;
+		this.left_leg.zRot = -0.07853982F;
 	}
 
 	private void resetPose() {

@@ -1,5 +1,6 @@
 package com.amightytank.vanillatweaks.entity.client.boat;
 
+import com.amightytank.vanillatweaks.entity.custom.boat.ModBoatEntity;
 import net.minecraft.client.model.geom.ModelPart;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.LivingEntity;
@@ -8,13 +9,18 @@ import net.minecraft.world.entity.vehicle.Boat;
 import java.util.List;
 
 public final class SailboatPaddleAnimator {
-    // 1.0F = one direction
-    // -1.0F = opposite direction
     private static final float ROW_DIRECTION = -1.0F;
 
-    // Lower these if the oars swing too much.
     private static final float X_AMOUNT = 0.55F;
     private static final float Y_AMOUNT = 0.75F;
+
+    private static final float CUSTOM_ROW_SPEED = 0.65F;
+
+    /*
+     * Small offset so multiple pirates do not row perfectly identically.
+     * It makes the boat look more alive.
+     */
+    private static final float OAR_SET_PHASE_OFFSET = 0.55F;
 
     private SailboatPaddleAnimator() {
     }
@@ -24,14 +30,14 @@ public final class SailboatPaddleAnimator {
             List<PaddleSet> paddleSets,
             float partialTick
     ) {
-        int activeSets = Math.min(getLivingPassengerCount(boat), paddleSets.size());
+        int activeSets = getActiveOarSetCount(boat, paddleSets.size());
 
         for (int i = 0; i < paddleSets.size(); i++) {
             PaddleSet set = paddleSets.get(i);
 
             if (i < activeSets) {
-                animatePaddle(boat, 0, set.leftPaddle(), partialTick, set.leftBase());
-                animatePaddle(boat, 1, set.rightPaddle(), partialTick, set.rightBase());
+                animatePaddle(boat, 0, i, set.leftPaddle(), partialTick, set.leftBase());
+                animatePaddle(boat, 1, i, set.rightPaddle(), partialTick, set.rightBase());
             } else {
                 resetPaddle(set.leftPaddle(), set.leftBase());
                 resetPaddle(set.rightPaddle(), set.rightBase());
@@ -39,16 +45,25 @@ public final class SailboatPaddleAnimator {
         }
     }
 
+    private static int getActiveOarSetCount(Boat boat, int maxOarSets) {
+        if (boat instanceof ModBoatEntity modBoat) {
+            return modBoat.getSailboatVisualActiveOarSets(maxOarSets);
+        }
+
+        return Math.min(getLivingPassengerCount(boat), maxOarSets);
+    }
+
     private static int getLivingPassengerCount(Boat boat) {
         return (int) boat.getPassengers()
                 .stream()
-                .filter(entity -> entity instanceof LivingEntity)
+                .filter(entity -> entity instanceof LivingEntity livingEntity && livingEntity.isAlive())
                 .count();
     }
 
     public static void animatePaddle(
             Boat boat,
             int side,
+            int oarSetIndex,
             ModelPart paddle,
             float partialTick,
             PaddleBase base
@@ -57,12 +72,11 @@ public final class SailboatPaddleAnimator {
         paddle.y = base.y;
         paddle.z = base.z;
 
-        float f = boat.getRowingTime(side, partialTick) * ROW_DIRECTION;
+        float f = getRowingTimeForVisuals(boat, side, oarSetIndex, partialTick) * ROW_DIRECTION;
 
         float xDelta = Mth.sin(f) * X_AMOUNT;
         float yDelta = (Mth.sin(f + 1.0F) - Mth.sin(1.0F)) * Y_AMOUNT;
 
-        // Flip left paddle sweep so it mirrors the right paddle correctly.
         if (side == 0) {
             yDelta = -yDelta;
         }
@@ -70,6 +84,19 @@ public final class SailboatPaddleAnimator {
         paddle.xRot = base.xRot + xDelta;
         paddle.yRot = base.yRot + yDelta;
         paddle.zRot = base.zRot;
+    }
+
+    private static float getRowingTimeForVisuals(Boat boat, int side, int oarSetIndex, float partialTick) {
+        if (boat instanceof ModBoatEntity modBoat) {
+            if (modBoat.isSailboatVisualPaddleMoving(side)) {
+                return (((float) modBoat.tickCount + partialTick) * CUSTOM_ROW_SPEED)
+                        + (oarSetIndex * OAR_SET_PHASE_OFFSET);
+            }
+
+            return 0.0F;
+        }
+
+        return boat.getRowingTime(side, partialTick);
     }
 
     private static void resetPaddle(ModelPart paddle, PaddleBase base) {

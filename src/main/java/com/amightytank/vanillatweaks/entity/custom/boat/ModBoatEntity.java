@@ -1,6 +1,7 @@
 package com.amightytank.vanillatweaks.entity.custom.boat;
 
 import com.amightytank.vanillatweaks.entity.ModEntities;
+import com.amightytank.vanillatweaks.entity.custom.boat.util.PirateBoatDriverHelper;
 import com.amightytank.vanillatweaks.item.ModItems;
 import com.amightytank.vanillatweaks.menu.SailboatChestMenu;
 import net.minecraft.core.NonNullList;
@@ -64,6 +65,15 @@ public class ModBoatEntity extends Boat implements Container {
     private static final EntityDataAccessor<Integer> DATA_SEAT_3 =
             SynchedEntityData.defineId(ModBoatEntity.class, EntityDataSerializers.INT);
 
+    private static final EntityDataAccessor<Boolean> DATA_SAILBOAT_VISUAL_PADDLE_LEFT =
+            SynchedEntityData.defineId(ModBoatEntity.class, EntityDataSerializers.BOOLEAN);
+
+    private static final EntityDataAccessor<Boolean> DATA_SAILBOAT_VISUAL_PADDLE_RIGHT =
+            SynchedEntityData.defineId(ModBoatEntity.class, EntityDataSerializers.BOOLEAN);
+
+    private static final EntityDataAccessor<Integer> DATA_SAILBOAT_ACTIVE_OAR_SETS =
+            SynchedEntityData.defineId(ModBoatEntity.class, EntityDataSerializers.INT);
+
     private static final int EMPTY_SEAT = -1;
 
     private static final double SPEED_PER_BANNER = 0.08D;
@@ -119,6 +129,9 @@ public class ModBoatEntity extends Boat implements Container {
         this.entityData.define(DATA_SEAT_1, EMPTY_SEAT);
         this.entityData.define(DATA_SEAT_2, EMPTY_SEAT);
         this.entityData.define(DATA_SEAT_3, EMPTY_SEAT);
+        this.entityData.define(DATA_SAILBOAT_VISUAL_PADDLE_LEFT, false);
+        this.entityData.define(DATA_SAILBOAT_VISUAL_PADDLE_RIGHT, false);
+        this.entityData.define(DATA_SAILBOAT_ACTIVE_OAR_SETS, 0);
     }
 
     public Boat.Type getModVariant() {
@@ -381,6 +394,8 @@ public class ModBoatEntity extends Boat implements Container {
     public void tick() {
         super.tick();
 
+        PirateBoatDriverHelper.tickDriverPromotion(this);
+
         this.keepPirateRaidInputAlive();
 
         this.applySmoothSailboatTurning();
@@ -483,11 +498,9 @@ public class ModBoatEntity extends Boat implements Container {
         super.setInput(false, false, false, false);
 
         /*
-         * Simple pirate oar rule:
-         * Any pirate input means both oars row.
+         * Synced custom paddle visuals.
          */
-        boolean rowing = left || right || forward || back;
-        this.setPaddleState(rowing, rowing);
+        this.applyPlayerLikePaddleState(left, right, forward, back);
     }
 
     public void clearPirateRaidInput() {
@@ -502,7 +515,84 @@ public class ModBoatEntity extends Boat implements Container {
         this.frontPlayerPressingForward = false;
 
         super.setInput(false, false, false, false);
-        this.setPaddleState(false, false);
+        this.setSailboatVisualPaddles(false, false);
+    }
+
+    public boolean isSailboatVisualPaddleMoving(int side) {
+        if (side == 0) {
+            return this.entityData.get(DATA_SAILBOAT_VISUAL_PADDLE_LEFT);
+        }
+
+        return this.entityData.get(DATA_SAILBOAT_VISUAL_PADDLE_RIGHT);
+    }
+
+    public int getSailboatVisualActiveOarSets(int modelOarSetCount) {
+        int syncedCount = this.entityData.get(DATA_SAILBOAT_ACTIVE_OAR_SETS);
+
+        return Mth.clamp(
+                syncedCount,
+                0,
+                Math.min(modelOarSetCount, this.getMaxSailboatOarSets())
+        );
+    }
+
+    private int getMaxSailboatOarSets() {
+        if (this.isLargeSailboat()) {
+            return 3;
+        }
+
+        if (this.isMediumSailboat()) {
+            return 2;
+        }
+
+        return 1;
+    }
+
+    private int getLivingPassengerCountForOars() {
+        int count = 0;
+
+        for (Entity passenger : this.getPassengers()) {
+            if (passenger instanceof LivingEntity livingEntity && livingEntity.isAlive()) {
+                count++;
+            }
+        }
+
+        return count;
+    }
+
+    private void setSailboatVisualPaddles(boolean left, boolean right) {
+        if (!this.level().isClientSide) {
+            boolean moving = left || right;
+
+            int activeOarSets = 0;
+
+            if (moving) {
+                activeOarSets = Math.min(
+                        this.getLivingPassengerCountForOars(),
+                        this.getMaxSailboatOarSets()
+                );
+            }
+
+            this.entityData.set(DATA_SAILBOAT_VISUAL_PADDLE_LEFT, left);
+            this.entityData.set(DATA_SAILBOAT_VISUAL_PADDLE_RIGHT, right);
+            this.entityData.set(DATA_SAILBOAT_ACTIVE_OAR_SETS, activeOarSets);
+        }
+
+        this.setPaddleState(left, right);
+    }
+
+    private void applyPlayerLikePaddleState(boolean left, boolean right, boolean forward, boolean back) {
+        /*
+         * Player-like paddle visuals:
+         * - forward/back = both oars
+         * - left turn = right oar
+         * - right turn = left oar
+         * - forward + turn = both oars
+         */
+        boolean leftPaddle = forward || back || (right && !left);
+        boolean rightPaddle = forward || back || (left && !right);
+
+        this.setSailboatVisualPaddles(leftPaddle, rightPaddle);
     }
 
     private void keepPirateRaidInputAlive() {
@@ -523,7 +613,7 @@ public class ModBoatEntity extends Boat implements Container {
             this.frontPlayerPressingForward = false;
 
             super.setInput(false, false, false, false);
-            this.setPaddleState(false, false);
+            this.setSailboatVisualPaddles(false, false);
             return;
         }
 
@@ -532,14 +622,14 @@ public class ModBoatEntity extends Boat implements Container {
         super.setInput(false, false, false, false);
 
         /*
-         * Keep both pirate oars rowing while the AI input is alive.
+         * Keep pirate oars moving like player oars while the AI input is alive.
          */
-        boolean rowing = this.sailboatInputLeft
-                || this.sailboatInputRight
-                || this.sailboatInputForward
-                || this.sailboatInputBack;
-
-        this.setPaddleState(rowing, rowing);
+        this.applyPlayerLikePaddleState(
+                this.sailboatInputLeft,
+                this.sailboatInputRight,
+                this.sailboatInputForward,
+                this.sailboatInputBack
+        );
     }
 
     private void applySmoothSailboatTurning() {
@@ -594,41 +684,14 @@ public class ModBoatEntity extends Boat implements Container {
     }
 
     private void applySailboatInputPaddles() {
-        /*
-         * Pirate visual rule:
-         * Do not show left/right steering oars.
-         * Pirates always row both oars when operating the boat.
-         */
-        if (this.pirateRaidInputActive) {
-            boolean rowing = this.sailboatInputLeft
-                    || this.sailboatInputRight
-                    || this.sailboatInputForward
-                    || this.sailboatInputBack;
-
-            this.setPaddleState(rowing, rowing);
-            return;
-        }
-
-        /*
-         * Normal player paddle visuals.
-         */
-        if (this.sailboatInputForward || this.sailboatInputBack) {
-            this.setPaddleState(true, true);
-            return;
-        }
-
-        if (this.sailboatInputLeft && !this.sailboatInputRight) {
-            this.setPaddleState(false, true);
-            return;
-        }
-
-        if (this.sailboatInputRight && !this.sailboatInputLeft) {
-            this.setPaddleState(true, false);
-            return;
-        }
-
-        this.setPaddleState(false, false);
+        this.applyPlayerLikePaddleState(
+                this.sailboatInputLeft,
+                this.sailboatInputRight,
+                this.sailboatInputForward,
+                this.sailboatInputBack
+        );
     }
+
     private float getMaxSmoothTurnSpeed() {
         if (this.isLargeSailboat()) {
             return 2.4F;

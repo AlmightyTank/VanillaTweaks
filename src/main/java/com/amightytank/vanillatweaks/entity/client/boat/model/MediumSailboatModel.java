@@ -62,7 +62,7 @@ public class MediumSailboatModel extends ListModel<ModBoatEntity> implements Wat
         this.bannerPanel = root.getChild("banner_panel");
         this.bannerPanel.visible = false;
 
-        this.chest1 = root.getChild("chest1");
+        this.chest1 = root.getChild("chest");
         this.chest2 = root.getChild("chest2");
 
         this.waterPatch = root.getChild("water_patch");
@@ -120,13 +120,13 @@ public class MediumSailboatModel extends ListModel<ModBoatEntity> implements Wat
         PartDefinition paddle_right_back = partdefinition.addOrReplaceChild("paddle_right_back", CubeListBuilder.create().texOffs(48, 39).addBox(-1.0F, 0.0F, -5.0F, 2.0F, 2.0F, 18.0F, new CubeDeformation(0.0F))
                 .texOffs(48, 39).addBox(0.001F, -3.0F, 8.0F, 1.0F, 6.0F, 7.0F, new CubeDeformation(0.0F)), PartPose.offsetAndRotation(-11.0F, 13.0F, 12.0F, 2.1642F, -0.8727F, -2.8798F));
 
-        PartDefinition chest1 = partdefinition.addOrReplaceChild("chest1", CubeListBuilder.create(), PartPose.offsetAndRotation(-1.0F, 12.0F, 5.0F, 0.0F, 0.0F, 0.0F));
+        PartDefinition chest = partdefinition.addOrReplaceChild("chest", CubeListBuilder.create(), PartPose.offsetAndRotation(-1.0F, 12.0F, 5.0F, 0.0F, 0.0F, 0.0F));
 
-        PartDefinition chest_knob = chest1.addOrReplaceChild("chest_knob", CubeListBuilder.create().texOffs(0, 39).addBox(0.0F, 0.0F, 0.0F, 2.0F, 4.0F, 1.0F, new CubeDeformation(0.0F)), PartPose.offset(0.0F, 0.0F, 0.0F));
+        PartDefinition chest_knob = chest.addOrReplaceChild("chest_knob", CubeListBuilder.create().texOffs(0, 39).addBox(0.0F, 0.0F, 0.0F, 2.0F, 4.0F, 1.0F, new CubeDeformation(0.0F)), PartPose.offset(0.0F, 0.0F, 0.0F));
 
-        PartDefinition chest_base = chest1.addOrReplaceChild("chest_base", CubeListBuilder.create().texOffs(0, 56).addBox(0.0F, 0.0F, 0.0F, 12.0F, 8.0F, 12.0F, new CubeDeformation(0.0F)), PartPose.offset(-5.0F, 1.0F, 1.0F));
+        PartDefinition chest_base = chest.addOrReplaceChild("chest_base", CubeListBuilder.create().texOffs(0, 56).addBox(0.0F, 0.0F, 0.0F, 12.0F, 8.0F, 12.0F, new CubeDeformation(0.0F)), PartPose.offset(-5.0F, 1.0F, 1.0F));
 
-        PartDefinition chest_lid = chest1.addOrReplaceChild("chest_lid", CubeListBuilder.create().texOffs(0, 39).addBox(0.0F, 0.0F, 0.0F, 12.0F, 5.0F, 12.0F, new CubeDeformation(0.0F)), PartPose.offset(-5.0F, -3.0F, 1.0F));
+        PartDefinition chest_lid = chest.addOrReplaceChild("chest_lid", CubeListBuilder.create().texOffs(0, 39).addBox(0.0F, 0.0F, 0.0F, 12.0F, 5.0F, 12.0F, new CubeDeformation(0.0F)), PartPose.offset(-5.0F, -3.0F, 1.0F));
 
         PartDefinition chest2 = partdefinition.addOrReplaceChild("chest2", CubeListBuilder.create(), PartPose.offsetAndRotation(-1.0F, 12.0F, 21.0F, 0.0F, 0.0F, 0.0F));
 
@@ -153,8 +153,8 @@ public class MediumSailboatModel extends ListModel<ModBoatEntity> implements Wat
                 limbSwing
         );
 
-        this.chest1.visible = boat.getChestCount() >= 1;
-        this.chest2.visible = boat.getChestCount() >= 2;
+        this.chest2.visible = boat.getChestCount() >= 1;
+        this.chest1.visible = boat.getChestCount() >= 2;
     }
 
     public List<SailboatPaddleAnimator.PaddleSet> getPaddleSets() {
