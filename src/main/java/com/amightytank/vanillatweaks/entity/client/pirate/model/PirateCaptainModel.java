@@ -194,13 +194,6 @@ public class PirateCaptainModel<T extends PirateCaptainEntity> extends EntityMod
 	}
 
 	private void animateIdle(float ageInTicks) {
-		float sway = Mth.sin(ageInTicks * 0.08F) * 0.03F;
-
-		this.body.zRot = sway;
-		this.head.zRot = -sway;
-		this.hat.zRot = this.head.zRot;
-		this.nose.zRot = this.head.zRot;
-
 		this.right_arm.xRot = 0.05F;
 		this.left_arm.xRot = 0.05F;
 	}
