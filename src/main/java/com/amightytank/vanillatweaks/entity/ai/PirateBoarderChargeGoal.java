@@ -21,7 +21,8 @@ public class PirateBoarderChargeGoal extends Goal {
 
         /*
          * MOVE only.
-         * This goal only moves the pirate.
+         * This goal moves the pirate, but it also aims the eyes during its tick.
+         * Do not claim LOOK here.
          */
         this.setFlags(EnumSet.of(Goal.Flag.MOVE));
     }
@@ -54,12 +55,19 @@ public class PirateBoarderChargeGoal extends Goal {
     }
 
     @Override
+    public boolean requiresUpdateEveryTick() {
+        return true;
+    }
+
+    @Override
     public void tick() {
         LivingEntity target = this.pirate.getTarget();
 
         if (!AbstractPirateEntity.canPirateAttack(target)) {
             return;
         }
+
+        this.lookAtCombatTarget(target);
 
         if (this.repathCooldown > 0) {
             this.repathCooldown--;
@@ -70,5 +78,9 @@ public class PirateBoarderChargeGoal extends Goal {
             PirateWaterBoarderMoveHelper.moveToward(this.pirate, target.position());
             this.repathCooldown = REPATH_COOLDOWN_TICKS;
         }
+    }
+
+    private void lookAtCombatTarget(LivingEntity target) {
+        this.pirate.getLookControl().setLookAt(target, 30.0F, 30.0F);
     }
 }

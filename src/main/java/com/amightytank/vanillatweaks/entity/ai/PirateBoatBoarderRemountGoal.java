@@ -14,7 +14,7 @@ import java.util.EnumSet;
 public class PirateBoatBoarderRemountGoal extends Goal {
     private static final double MAX_FOOT_CHASE_DISTANCE = 34.0D;
     private static final double TARGET_BOAT_SEARCH_RANGE = 96.0D;
-    private static final double BOARD_DISTANCE = 4.0D;
+    private static final double BOARD_DISTANCE = 20.0D;
     private static final int REPATH_COOLDOWN_TICKS = 10;
 
     private final Mob pirate;

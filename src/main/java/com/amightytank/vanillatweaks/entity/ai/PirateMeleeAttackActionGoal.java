@@ -22,7 +22,7 @@ public class PirateMeleeAttackActionGoal extends Goal {
 
         /*
          * No flags.
-         * This goal only performs melee attacks.
+         * This goal only performs melee attacks and aims during its own tick.
          */
     }
 
@@ -44,6 +44,11 @@ public class PirateMeleeAttackActionGoal extends Goal {
     }
 
     @Override
+    public boolean requiresUpdateEveryTick() {
+        return true;
+    }
+
+    @Override
     public void tick() {
         if (this.attackCooldown > 0) {
             this.attackCooldown--;
@@ -54,6 +59,8 @@ public class PirateMeleeAttackActionGoal extends Goal {
         if (!AbstractPirateEntity.canPirateAttack(target)) {
             return;
         }
+
+        this.lookAtCombatTarget(target);
 
         if (this.pirate.distanceToSqr(target) > MELEE_REACH_DISTANCE_SQR) {
             return;
@@ -66,5 +73,9 @@ public class PirateMeleeAttackActionGoal extends Goal {
         this.pirate.swing(InteractionHand.MAIN_HAND);
         this.pirate.doHurtTarget(target);
         this.attackCooldown = MELEE_COOLDOWN_TICKS;
+    }
+
+    private void lookAtCombatTarget(LivingEntity target) {
+        this.pirate.getLookControl().setLookAt(target, 30.0F, 30.0F);
     }
 }

@@ -50,7 +50,6 @@ public class PirateDeckhandEntity extends AbstractPirateEntity {
         super.registerGoals();
 
         this.goalSelector.addGoal(2, new PirateBoatPilotGoal(this)); // MOVE
-        this.goalSelector.addGoal(3, new PirateCombatLookGoal(this)); // LOOK
         this.goalSelector.addGoal(4, new PirateBoatBoarderDismountGoal(this)); // ACTION
         this.goalSelector.addGoal(5, new PirateBoatBoarderRemountGoal(this)); // MOVE
         this.goalSelector.addGoal(6, new PirateBoarderChargeGoal(this)); // MOVE

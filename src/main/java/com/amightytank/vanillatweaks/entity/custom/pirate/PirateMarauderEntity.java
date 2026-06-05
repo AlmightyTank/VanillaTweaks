@@ -43,20 +43,27 @@ public class PirateMarauderEntity extends AbstractPirateEntity implements Ranged
         super.registerGoals();
 
         this.goalSelector.addGoal(2, new PirateBoatPilotGoal(this)); // MOVE
-        this.goalSelector.addGoal(3, new PirateCombatLookGoal(this)); // LOOK
-        this.goalSelector.addGoal(4, new PirateRangedAttackActionGoal(this, 28.0D, 45, true)); // mounted ACTION
+        this.goalSelector.addGoal(4, new PirateRangedAttackActionGoal(this, 28.0D, 45, PirateRangedAttackActionGoal.MountMode.MOUNTED_ONLY)); // mounted ACTION
         this.goalSelector.addGoal(5, new PirateBoatBoarderDismountGoal(this)); // ACTION
         this.goalSelector.addGoal(6, new PirateBoatBoarderRemountGoal(this)); // MOVE
         this.goalSelector.addGoal(7, new PirateBoarderChargeGoal(this)); // MOVE
-        this.goalSelector.addGoal(8, new PirateRangedAttackActionGoal(this, 28.0D, 45, false)); // foot ACTION
+        this.goalSelector.addGoal(8, new PirateRangedAttackActionGoal(this, 28.0D, 45,  PirateRangedAttackActionGoal.MountMode.FOOT_ONLY)); // foot ACTION
         this.goalSelector.addGoal(9, new PirateMeleeAttackActionGoal(this)); // ACTION
     }
+
+    private static final int THROW_COOLDOWN_TICKS = 45;
+
+    private int sharedThrowCooldown;
 
     @Override
     public void tick() {
         super.tick();
 
         if (!this.level().isClientSide) {
+            if (this.sharedThrowCooldown > 0) {
+                this.sharedThrowCooldown--;
+            }
+
             LivingEntity target = this.getTarget();
             this.setAggressive(this.isValidBruteTarget(target));
 
@@ -145,6 +152,11 @@ public class PirateMarauderEntity extends AbstractPirateEntity implements Ranged
             return;
         }
 
+        if (this.sharedThrowCooldown > 0) {
+            return;
+        }
+
+        this.sharedThrowCooldown = THROW_COOLDOWN_TICKS;
         this.throwWeaponAt(target);
     }
 

@@ -25,6 +25,10 @@ public class CaptainParrotSwarmGoal extends Goal {
 
     public CaptainParrotSwarmGoal(PirateCaptainEntity captain) {
         this.captain = captain;
+
+        /*
+         * This goal is a casting goal, so it owns LOOK while casting.
+         */
         this.setFlags(EnumSet.of(Goal.Flag.LOOK));
     }
 
@@ -55,7 +59,10 @@ public class CaptainParrotSwarmGoal extends Goal {
     @Override
     public boolean canContinueToUse() {
         LivingEntity target = this.captain.getTarget();
-        return this.castTime > 0 && AbstractPirateEntity.canPirateAttack(target);
+
+        return this.castTime > 0
+                && AbstractPirateEntity.canPirateAttack(target)
+                && this.captain.distanceToSqr(target) <= PARROT_SWARM_RANGE * PARROT_SWARM_RANGE;
     }
 
     @Override
@@ -78,6 +85,11 @@ public class CaptainParrotSwarmGoal extends Goal {
     }
 
     @Override
+    public boolean requiresUpdateEveryTick() {
+        return true;
+    }
+
+    @Override
     public void tick() {
         LivingEntity target = this.captain.getTarget();
 
@@ -86,12 +98,17 @@ public class CaptainParrotSwarmGoal extends Goal {
             return;
         }
 
-        this.captain.getLookControl().setLookAt(target, 30.0F, 30.0F);
+        this.lookAtCombatTarget(target);
+
         this.castTime--;
 
         if (this.castTime == SUMMON_TIME && !this.captain.level().isClientSide) {
             this.summonParrots(target);
         }
+    }
+
+    private void lookAtCombatTarget(LivingEntity target) {
+        this.captain.getLookControl().setLookAt(target, 30.0F, 30.0F);
     }
 
     private void summonParrots(LivingEntity target) {
@@ -118,12 +135,6 @@ public class CaptainParrotSwarmGoal extends Goal {
             parrot.setFromShoulder(false);
 
             level.addFreshEntity(parrot);
-
-            /*
-             * Important:
-             * Track the exact parrots this captain spawned.
-             * This is more reliable than searching by owner UUID later.
-             */
             this.captain.trackSwarmParrot(parrot);
         }
     }

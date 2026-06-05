@@ -9,6 +9,7 @@ import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.ai.goal.Goal;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.entity.vehicle.Boat;
+import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 
 import java.util.EnumSet;
@@ -16,17 +17,9 @@ import java.util.EnumSet;
 public class PirateBoatPilotGoal extends Goal {
     private static final double TARGET_SEARCH_RANGE = 96.0D;
 
-    /*
-     * If this boat has an empty seat, it tries to pick up nearby fleet pirates
-     * before chasing the player.
-     */
     private static final double CREW_PICKUP_RANGE = 72.0D;
     private static final double CREW_PICKUP_STOP_RANGE = 5.0D;
 
-    /*
-     * These are only used as fallback for vanilla boats.
-     * ModBoatEntity uses its own player-like pirate input system.
-     */
     private static final double BOAT_ACCELERATION = 0.045D;
     private static final double PICKUP_ACCELERATION = 0.035D;
 
@@ -35,34 +28,33 @@ public class PirateBoatPilotGoal extends Goal {
 
     private static final double TARGET_STOP_RANGE = 10.0D;
 
-    /*
-     * AI starts turning if the target is outside this yaw dead zone.
-     */
     private static final float TURN_DEAD_ZONE = 6.0F;
-
-    /*
-     * While inside this arc, the pirate rows forward while steering,
-     * like a player holding W + A or W + D.
-     */
     private static final float FORWARD_ARC = 135.0F;
+    private static final float FALLBACK_TURN_SPEED = 4.0F;
 
     /*
-     * Fallback vanilla boat turn assist.
-     * ModBoatEntity handles smooth turning itself.
+     * Prevent pirate boats from holding forward into land/walls.
      */
-    private static final float FALLBACK_TURN_SPEED = 4.0F;
+    private static final double OBSTACLE_CHECK_DISTANCE = 1.45D;
+    private static final double OBSTACLE_CHECK_INFLATE = 0.12D;
+    private static final int OBSTACLE_AVOID_TICKS = 18;
+    private static final double OBSTACLE_REVERSE_PUSH = 0.035D;
+    private static final double OBSTACLE_BRAKE_DRAG = 0.45D;
 
     private final AbstractPirateEntity pirate;
 
     private LivingEntity target;
     private Mob pickupPirate;
 
+    private int obstacleAvoidTicks;
+    private boolean obstacleTurnLeft;
+
     public PirateBoatPilotGoal(AbstractPirateEntity pirate) {
         this.pirate = pirate;
 
         /*
-         * Do not claim LOOK.
-         * Gunners/captains can still aim while the pilot moves the boat.
+         * MOVE only.
+         * Other combat goals can own LOOK without fighting this goal.
          */
         this.setFlags(EnumSet.of(Goal.Flag.MOVE));
     }
@@ -115,6 +107,12 @@ public class PirateBoatPilotGoal extends Goal {
 
         this.target = null;
         this.pickupPirate = null;
+        this.obstacleAvoidTicks = 0;
+    }
+
+    @Override
+    public boolean requiresUpdateEveryTick() {
+        return true;
     }
 
     @Override
@@ -127,15 +125,9 @@ public class PirateBoatPilotGoal extends Goal {
             return;
         }
 
-        /*
-         * Priority 1:
-         * Fill open seats before chasing the player.
-         */
         this.pickupPirate = findPickupPirate(boat);
 
         if (this.pickupPirate != null) {
-            this.pirate.getLookControl().setLookAt(this.pickupPirate, 30.0F, 30.0F);
-
             double distanceSqr = boat.distanceToSqr(this.pickupPirate);
 
             if (distanceSqr <= CREW_PICKUP_STOP_RANGE * CREW_PICKUP_STOP_RANGE) {
@@ -153,10 +145,6 @@ public class PirateBoatPilotGoal extends Goal {
             return;
         }
 
-        /*
-         * Priority 2:
-         * Once the boat is full, chase the player.
-         */
         this.target = findTarget();
 
         if (this.target == null) {
@@ -220,24 +208,36 @@ public class PirateBoatPilotGoal extends Goal {
         boolean forward = Math.abs(yawDifference) <= FORWARD_ARC;
 
         /*
-         * Important:
-         * ModBoatEntity has its own pirate input path.
-         * This is what turns on pirateRaidInputActive, smooth turning,
-         * player-like acceleration, and paddle visuals.
+         * If the front of the boat is blocked, do not keep holding W.
+         * Back up and turn until the hull has room again.
          */
+        if ((forward && isForwardPathBlocked(boat)) || this.obstacleAvoidTicks > 0) {
+            if (this.obstacleAvoidTicks <= 0) {
+                this.obstacleAvoidTicks = OBSTACLE_AVOID_TICKS;
+
+                if (Math.abs(yawDifference) > TURN_DEAD_ZONE) {
+                    this.obstacleTurnLeft = yawDifference < 0.0F;
+                } else {
+                    this.obstacleTurnLeft = (boat.getId() & 1) == 0;
+                }
+            }
+
+            this.obstacleAvoidTicks--;
+
+            boolean left = this.obstacleTurnLeft;
+            boolean right = !this.obstacleTurnLeft;
+
+            setBoatInput(boat, left, right, false, true);
+            pushBoatBackwardFromObstacle(boat);
+            return;
+        }
+
         setBoatInput(boat, turningLeft, turningRight, forward, false);
 
-        /*
-         * Custom sailboats should not be pushed directly here.
-         * ModBoatEntity.tick() will use the input above to move like a player boat.
-         */
         if (boat instanceof ModBoatEntity) {
             return;
         }
 
-        /*
-         * Fallback behavior for vanilla boats.
-         */
         float yawStep = Mth.clamp(yawDifference, -FALLBACK_TURN_SPEED, FALLBACK_TURN_SPEED);
         boat.setYRot(boat.getYRot() + yawStep);
 
@@ -261,6 +261,35 @@ public class PirateBoatPilotGoal extends Goal {
             newX *= scale;
             newZ *= scale;
         }
+
+        boat.setDeltaMovement(newX, motion.y, newZ);
+        boat.hasImpulse = true;
+    }
+
+    private boolean isForwardPathBlocked(Boat boat) {
+        Vec3 forwardVec = Vec3.directionFromRotation(0.0F, boat.getYRot());
+
+        AABB checkBox = boat.getBoundingBox()
+                .inflate(OBSTACLE_CHECK_INFLATE, 0.05D, OBSTACLE_CHECK_INFLATE)
+                .move(
+                        forwardVec.x * OBSTACLE_CHECK_DISTANCE,
+                        0.0D,
+                        forwardVec.z * OBSTACLE_CHECK_DISTANCE
+                );
+
+        /*
+         * Block collisions only.
+         * This avoids detecting passengers or sailboat collision-part entities.
+         */
+        return boat.level().getBlockCollisions(boat, checkBox).iterator().hasNext();
+    }
+
+    private void pushBoatBackwardFromObstacle(Boat boat) {
+        Vec3 forwardVec = Vec3.directionFromRotation(0.0F, boat.getYRot());
+        Vec3 motion = boat.getDeltaMovement();
+
+        double newX = motion.x * OBSTACLE_BRAKE_DRAG - forwardVec.x * OBSTACLE_REVERSE_PUSH;
+        double newZ = motion.z * OBSTACLE_BRAKE_DRAG - forwardVec.z * OBSTACLE_REVERSE_PUSH;
 
         boat.setDeltaMovement(newX, motion.y, newZ);
         boat.hasImpulse = true;

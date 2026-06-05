@@ -27,19 +27,20 @@ public class CaptainSummonKrakenGoal extends Goal {
 
     private static final double KRAKEN_ATTACK_RANGE = 48.0D;
 
-    /*
-     * Faster summon timing only.
-     */
-    private static final int MODEL_SHOW_DELAY_TICKS = 20; // was 60
-    private static final int SMALL_CHASE_DELAY_STEP = 2;  // was i * 3
+    private static final int MODEL_SHOW_DELAY_TICKS = 20;
+    private static final int SMALL_CHASE_DELAY_STEP = 2;
     private static final int BIG_STRIKE_DELAY = 14;
-    private static final int CAST_TIME = 24;              // was 35
+    private static final int CAST_TIME = 24;
     private static final int EXTRA_SHARED_COOLDOWN_TICKS = 20 * 5;
-    private static final int SUMMON_TIME = 12;            // was 18
-    private static final int COOLDOWN_TIME = 100;         // was 140
+    private static final int SUMMON_TIME = 12;
+    private static final int COOLDOWN_TIME = 100;
 
     public CaptainSummonKrakenGoal(PirateCaptainEntity captain) {
         this.captain = captain;
+
+        /*
+         * This goal is a casting goal, so it owns LOOK while casting.
+         */
         this.setFlags(EnumSet.of(Goal.Flag.LOOK));
     }
 
@@ -47,7 +48,7 @@ public class CaptainSummonKrakenGoal extends Goal {
     public boolean canUse() {
         LivingEntity target = this.captain.getTarget();
 
-        if (target == null || !target.isAlive()) {
+        if (!AbstractPirateEntity.canPirateAttack(target)) {
             return false;
         }
 
@@ -70,7 +71,10 @@ public class CaptainSummonKrakenGoal extends Goal {
     @Override
     public boolean canContinueToUse() {
         LivingEntity target = this.captain.getTarget();
-        return this.castTime > 0 && target != null && target.isAlive();
+
+        return this.castTime > 0
+                && AbstractPirateEntity.canPirateAttack(target)
+                && this.captain.distanceToSqr(target) <= KRAKEN_ATTACK_RANGE * KRAKEN_ATTACK_RANGE;
     }
 
     @Override
@@ -98,24 +102,30 @@ public class CaptainSummonKrakenGoal extends Goal {
     }
 
     @Override
+    public boolean requiresUpdateEveryTick() {
+        return true;
+    }
+
+    @Override
     public void tick() {
         LivingEntity target = this.captain.getTarget();
-
-        if (target == null) {
-            return;
-        }
 
         if (!AbstractPirateEntity.canPirateAttack(target)) {
             this.captain.setTarget(null);
             return;
         }
 
-        this.captain.getLookControl().setLookAt(target, 30.0F, 30.0F);
+        this.lookAtCombatTarget(target);
+
         this.castTime--;
 
         if (this.castTime == SUMMON_TIME && !this.captain.level().isClientSide) {
             this.spawnBasicKrakenAttack(target);
         }
+    }
+
+    private void lookAtCombatTarget(LivingEntity target) {
+        this.captain.getLookControl().setLookAt(target, 30.0F, 30.0F);
     }
 
     private void spawnBasicKrakenAttack(LivingEntity target) {
@@ -126,20 +136,11 @@ public class CaptainSummonKrakenGoal extends Goal {
         double captainX = this.captain.getX();
         double captainZ = this.captain.getZ();
 
-        /*
-         * This is the center of the circle.
-         * All big tentacles point toward this point.
-         */
         double centerX = target.getX();
         double centerZ = target.getZ();
 
         double dx = centerX - captainX;
         double dz = centerZ - captainZ;
-
-        /*
-         * Small chase tentacles.
-         * Keep these straight for now.
-         */
 
         for (int i = 1; i <= 6; i++) {
             double progress = (double) i / 7.0D;
@@ -192,7 +193,7 @@ public class CaptainSummonKrakenGoal extends Goal {
         tentacle.yRotO = yaw;
 
         tentacle.setOwner(this.captain);
-        tentacle.setWarmupDelay(MODEL_SHOW_DELAY_TICKS + BIG_STRIKE_DELAY);
+        tentacle.setWarmupDelay(MODEL_SHOW_DELAY_TICKS + warmupDelay);
         tentacle.setAttackType(attackType);
 
         level.addFreshEntity(tentacle);

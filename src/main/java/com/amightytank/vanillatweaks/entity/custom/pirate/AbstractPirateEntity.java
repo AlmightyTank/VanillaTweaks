@@ -33,8 +33,8 @@ public abstract class AbstractPirateEntity extends AbstractIllager {
         this.goalSelector.addGoal(0, new FloatGoal(this));
 
         this.goalSelector.addGoal(1, new WaterAvoidingRandomStrollGoal(this, 0.8D));
-        //this.goalSelector.addGoal(2, new LookAtPlayerGoal(this, Player.class, 8.0F));
-        //this.goalSelector.addGoal(9, new RandomLookAroundGoal(this));
+        this.goalSelector.addGoal(10, new LookAtPlayerGoal(this, Player.class, 16.0F));
+        this.goalSelector.addGoal(11, new RandomLookAroundGoal(this));
 
         // Pirates can still fight back, but NOT against other pirates.
         this.targetSelector.addGoal(1, new HurtByTargetGoal(this));

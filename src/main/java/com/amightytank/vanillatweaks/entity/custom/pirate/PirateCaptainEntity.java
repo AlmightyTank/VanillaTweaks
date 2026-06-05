@@ -128,13 +128,12 @@ public class PirateCaptainEntity extends AbstractPirateEntity {
          * MOVE only.
          */
         this.goalSelector.addGoal(2, new PirateBoatPilotGoal(this));
-
         /*
          * Captain pressure abilities.
          * These should be LOOK only inside their own goal files.
          */
-        this.goalSelector.addGoal(3, new CaptainSummonKrakenGoal(this));
-        this.goalSelector.addGoal(4, new CaptainParrotSwarmGoal(this));
+        this.goalSelector.addGoal(4, new CaptainSummonKrakenGoal(this));
+        this.goalSelector.addGoal(5, new CaptainParrotSwarmGoal(this));
 
         /*
          * Emergency close defense only.
