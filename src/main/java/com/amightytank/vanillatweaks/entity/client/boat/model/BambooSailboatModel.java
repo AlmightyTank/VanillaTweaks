@@ -1,19 +1,15 @@
 package com.amightytank.vanillatweaks.entity.client.boat.model;
 
 import com.amightytank.vanillatweaks.entity.client.boat.SailboatPaddleAnimator;
-import com.amightytank.vanillatweaks.entity.client.boat.SailboatPaddleModel;
 import com.amightytank.vanillatweaks.entity.custom.boat.ModBoatEntity;
 import com.google.common.collect.ImmutableList;
 import com.mojang.blaze3d.vertex.PoseStack;
 import net.minecraft.client.model.ListModel;
-import net.minecraft.client.model.WaterPatchModel;
 import net.minecraft.client.model.geom.ModelPart;
 import net.minecraft.client.model.geom.PartPose;
 import net.minecraft.client.model.geom.builders.*;
 
-import java.util.List;
-
-public class BambooSailboatModel extends ListModel<ModBoatEntity> implements BoatBannerModel, SailboatPaddleModel {
+public class BambooSailboatModel extends ListModel<ModBoatEntity> implements BoatBannerModel {
     private final ModelPart body;
 
     private final ModelPart paddleLeft;
@@ -74,11 +70,8 @@ public class BambooSailboatModel extends ListModel<ModBoatEntity> implements Boa
 
     @Override
     public void setupAnim(ModBoatEntity boat, float limbSwing, float limbSwingAmount, float ageInTicks, float netHeadYaw, float headPitch) {
-        SailboatPaddleAnimator.animateOarSetsByPassengerCount(
-                boat,
-                this.getPaddleSets(),
-                limbSwing
-        );
+        SailboatPaddleAnimator.animatePaddle(boat, 0, 0, this.paddleLeft, limbSwing, this.paddleLeftBase);
+        SailboatPaddleAnimator.animatePaddle(boat, 1, 0, this.paddleRight, limbSwing, this.paddleRightBase);
 
         this.chest.visible = boat.getChestCount() >= 1;
     }
@@ -91,17 +84,6 @@ public class BambooSailboatModel extends ListModel<ModBoatEntity> implements Boa
                 paddleLeft,
                 paddleRight,
                 bannerSail
-        );
-    }
-
-    public List<SailboatPaddleAnimator.PaddleSet> getPaddleSets() {
-        return List.of(
-                new SailboatPaddleAnimator.PaddleSet(
-                        this.paddleLeft,
-                        this.paddleRight,
-                        this.paddleLeftBase,
-                        this.paddleRightBase
-                )
         );
     }
 

@@ -2,6 +2,7 @@ package com.amightytank.vanillatweaks.entity.custom.boat;
 
 import com.amightytank.vanillatweaks.entity.ModEntities;
 import com.amightytank.vanillatweaks.entity.custom.boat.util.PirateBoatDriverHelper;
+import com.amightytank.vanillatweaks.entity.custom.pirate.PirateThrownWeaponEntity;
 import com.amightytank.vanillatweaks.item.ModItems;
 import com.amightytank.vanillatweaks.menu.SailboatChestMenu;
 import net.minecraft.core.NonNullList;
@@ -24,14 +25,17 @@ import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.entity.projectile.AbstractArrow;
 import net.minecraft.world.entity.vehicle.Boat;
 import net.minecraft.world.item.BannerItem;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.network.NetworkHooks;
+import com.amightytank.vanillatweaks.entity.custom.pirate.AbstractPirateEntity;
 
 import java.util.ArrayList;
 import java.util.Iterator;
@@ -65,16 +69,13 @@ public class ModBoatEntity extends Boat implements Container {
     private static final EntityDataAccessor<Integer> DATA_SEAT_3 =
             SynchedEntityData.defineId(ModBoatEntity.class, EntityDataSerializers.INT);
 
-    private static final EntityDataAccessor<Boolean> DATA_SAILBOAT_VISUAL_PADDLE_LEFT =
-            SynchedEntityData.defineId(ModBoatEntity.class, EntityDataSerializers.BOOLEAN);
-
-    private static final EntityDataAccessor<Boolean> DATA_SAILBOAT_VISUAL_PADDLE_RIGHT =
-            SynchedEntityData.defineId(ModBoatEntity.class, EntityDataSerializers.BOOLEAN);
-
-    private static final EntityDataAccessor<Integer> DATA_SAILBOAT_ACTIVE_OAR_SETS =
-            SynchedEntityData.defineId(ModBoatEntity.class, EntityDataSerializers.INT);
-
     private static final int EMPTY_SEAT = -1;
+
+    private static final float SAILBOAT_PADDLE_SPEED = (float) Math.PI / 8.0F;
+    private final float[] sailboatPaddlePositions = new float[2];
+
+    private static final double PIRATE_RAID_BLOCK_CHECK_DISTANCE = 1.25D;
+    private static final double PIRATE_RAID_BLOCK_CHECK_INFLATE = 0.10D;
 
     private static final double SPEED_PER_BANNER = 0.08D;
 
@@ -129,9 +130,6 @@ public class ModBoatEntity extends Boat implements Container {
         this.entityData.define(DATA_SEAT_1, EMPTY_SEAT);
         this.entityData.define(DATA_SEAT_2, EMPTY_SEAT);
         this.entityData.define(DATA_SEAT_3, EMPTY_SEAT);
-        this.entityData.define(DATA_SAILBOAT_VISUAL_PADDLE_LEFT, false);
-        this.entityData.define(DATA_SAILBOAT_VISUAL_PADDLE_RIGHT, false);
-        this.entityData.define(DATA_SAILBOAT_ACTIVE_OAR_SETS, 0);
     }
 
     public Boat.Type getModVariant() {
@@ -234,6 +232,35 @@ public class ModBoatEntity extends Boat implements Container {
 
     public double getBannerSpeedMultiplier() {
         return 1.0D + (this.getActiveBannerCount() * SPEED_PER_BANNER);
+    }
+
+    @Override
+    protected void clampRotation(Entity passenger) {
+        if (passenger instanceof AbstractPirateEntity pirate) {
+            this.clampPiratePassengerRotation(pirate);
+            return;
+        }
+
+        super.clampRotation(passenger);
+    }
+
+    private void clampPiratePassengerRotation(AbstractPirateEntity pirate) {
+        /*
+         * Flip pirates around while riding the sailboat.
+         */
+        float bodyYaw = Mth.wrapDegrees(this.getYRot() + 180.0F);
+
+        pirate.setYRot(bodyYaw);
+        pirate.yRotO = bodyYaw;
+
+        pirate.setYBodyRot(bodyYaw);
+        pirate.yBodyRotO = bodyYaw;
+
+        pirate.setYHeadRot(bodyYaw);
+        pirate.yHeadRotO = bodyYaw;
+
+        pirate.setXRot(0.0F);
+        pirate.xRotO = 0.0F;
     }
 
     private int getSailboatCollisionPartCount() {
@@ -400,10 +427,6 @@ public class ModBoatEntity extends Boat implements Container {
 
         this.applySmoothSailboatTurning();
 
-        /*
-         * Pirate pilots use the same strength as a player holding W.
-         * This makes mob-controlled boats move properly instead of crawling.
-         */
         this.applyPirateRaidPlayerLikeInputMotion();
 
         SailboatRowingPhysics.apply(
@@ -412,6 +435,13 @@ public class ModBoatEntity extends Boat implements Container {
                 this.isMediumSailboat(),
                 this.isLargeSailboat()
         );
+
+        /*
+         * Final sailboat paddle state for this tick.
+         * This feeds ModBoatEntity#getRowingTime().
+         */
+        this.applySailboatInputPaddles();
+        this.tickSailboatPaddlePositions();
 
         if (!this.level().isClientSide) {
             this.updateSailboatCollisionParts();
@@ -425,6 +455,16 @@ public class ModBoatEntity extends Boat implements Container {
         }
 
         if (!this.hasPirateRaidPassenger()) {
+            return;
+        }
+
+        if (this.sailboatInputForward && this.isPirateRaidForwardPathBlocked()) {
+            this.frontPlayerPressingForward = false;
+
+            Vec3 motion = this.getDeltaMovement();
+            this.setDeltaMovement(motion.x * 0.55D, motion.y, motion.z * 0.55D);
+            this.hasImpulse = true;
+
             return;
         }
 
@@ -464,6 +504,20 @@ public class ModBoatEntity extends Boat implements Container {
         this.hasImpulse = true;
     }
 
+    private boolean isPirateRaidForwardPathBlocked() {
+        Vec3 forwardVec = Vec3.directionFromRotation(0.0F, this.getYRot());
+
+        AABB checkBox = this.getBoundingBox()
+                .inflate(PIRATE_RAID_BLOCK_CHECK_INFLATE, 0.05D, PIRATE_RAID_BLOCK_CHECK_INFLATE)
+                .move(
+                        forwardVec.x * PIRATE_RAID_BLOCK_CHECK_DISTANCE,
+                        0.0D,
+                        forwardVec.z * PIRATE_RAID_BLOCK_CHECK_DISTANCE
+                );
+
+        return this.level().getBlockCollisions(this, checkBox).iterator().hasNext();
+    }
+
     @Override
     public void setInput(boolean left, boolean right, boolean forward, boolean back) {
         this.sailboatInputLeft = left;
@@ -475,9 +529,35 @@ public class ModBoatEntity extends Boat implements Container {
 
         /*
          * Keep vanilla forward/back movement.
-         * Disable vanilla left/right turning because we handle turning smoothly ourselves.
+         * Disable vanilla left/right turning because sailboats use smooth custom turning.
          */
         super.setInput(false, false, forward, back);
+
+        this.applySailboatPaddleState(left, right, forward, back);
+    }
+
+    private void applySailboatPaddleState(boolean left, boolean right, boolean forward, boolean back) {
+        if (back) {
+            this.setPaddleState(false, false);
+            return;
+        }
+
+        if (left && !right) {
+            this.setPaddleState(false, true);
+            return;
+        }
+
+        if (right && !left) {
+            this.setPaddleState(true, false);
+            return;
+        }
+
+        if (forward) {
+            this.setPaddleState(true, true);
+            return;
+        }
+
+        this.setPaddleState(false, false);
     }
 
     public void setPirateRaidInput(boolean left, boolean right, boolean forward, boolean back) {
@@ -492,15 +572,12 @@ public class ModBoatEntity extends Boat implements Container {
         this.frontPlayerPressingForward = forward;
 
         /*
-         * Do not rely on vanilla Boat input for mob pilots.
-         * We apply player-strength pirate input ourselves.
+         * Pirate pilots do not use vanilla Boat movement input.
+         * Their movement is applied manually.
          */
         super.setInput(false, false, false, false);
 
-        /*
-         * Synced custom paddle visuals.
-         */
-        this.applyPlayerLikePaddleState(left, right, forward, back);
+        this.applySailboatPaddleState(left, right, forward, back);
     }
 
     public void clearPirateRaidInput() {
@@ -515,84 +592,7 @@ public class ModBoatEntity extends Boat implements Container {
         this.frontPlayerPressingForward = false;
 
         super.setInput(false, false, false, false);
-        this.setSailboatVisualPaddles(false, false);
-    }
-
-    public boolean isSailboatVisualPaddleMoving(int side) {
-        if (side == 0) {
-            return this.entityData.get(DATA_SAILBOAT_VISUAL_PADDLE_LEFT);
-        }
-
-        return this.entityData.get(DATA_SAILBOAT_VISUAL_PADDLE_RIGHT);
-    }
-
-    public int getSailboatVisualActiveOarSets(int modelOarSetCount) {
-        int syncedCount = this.entityData.get(DATA_SAILBOAT_ACTIVE_OAR_SETS);
-
-        return Mth.clamp(
-                syncedCount,
-                0,
-                Math.min(modelOarSetCount, this.getMaxSailboatOarSets())
-        );
-    }
-
-    private int getMaxSailboatOarSets() {
-        if (this.isLargeSailboat()) {
-            return 3;
-        }
-
-        if (this.isMediumSailboat()) {
-            return 2;
-        }
-
-        return 1;
-    }
-
-    private int getLivingPassengerCountForOars() {
-        int count = 0;
-
-        for (Entity passenger : this.getPassengers()) {
-            if (passenger instanceof LivingEntity livingEntity && livingEntity.isAlive()) {
-                count++;
-            }
-        }
-
-        return count;
-    }
-
-    private void setSailboatVisualPaddles(boolean left, boolean right) {
-        if (!this.level().isClientSide) {
-            boolean moving = left || right;
-
-            int activeOarSets = 0;
-
-            if (moving) {
-                activeOarSets = Math.min(
-                        this.getLivingPassengerCountForOars(),
-                        this.getMaxSailboatOarSets()
-                );
-            }
-
-            this.entityData.set(DATA_SAILBOAT_VISUAL_PADDLE_LEFT, left);
-            this.entityData.set(DATA_SAILBOAT_VISUAL_PADDLE_RIGHT, right);
-            this.entityData.set(DATA_SAILBOAT_ACTIVE_OAR_SETS, activeOarSets);
-        }
-
-        this.setPaddleState(left, right);
-    }
-
-    private void applyPlayerLikePaddleState(boolean left, boolean right, boolean forward, boolean back) {
-        /*
-         * Player-like paddle visuals:
-         * - forward/back = both oars
-         * - left turn = right oar
-         * - right turn = left oar
-         * - forward + turn = both oars
-         */
-        boolean leftPaddle = forward || back || (right && !left);
-        boolean rightPaddle = forward || back || (left && !right);
-
-        this.setSailboatVisualPaddles(leftPaddle, rightPaddle);
+        this.setPaddleState(false, false);
     }
 
     private void keepPirateRaidInputAlive() {
@@ -613,18 +613,21 @@ public class ModBoatEntity extends Boat implements Container {
             this.frontPlayerPressingForward = false;
 
             super.setInput(false, false, false, false);
-            this.setSailboatVisualPaddles(false, false);
+            this.setPaddleState(false, false);
             return;
         }
 
         this.frontPlayerPressingForward = this.sailboatInputForward;
 
+        /*
+         * Keep vanilla movement input disabled for pirate AI.
+         */
         super.setInput(false, false, false, false);
 
         /*
-         * Keep pirate oars moving like player oars while the AI input is alive.
+         * But keep vanilla paddle animation state alive.
          */
-        this.applyPlayerLikePaddleState(
+        this.applySailboatPaddleState(
                 this.sailboatInputLeft,
                 this.sailboatInputRight,
                 this.sailboatInputForward,
@@ -680,16 +683,38 @@ public class ModBoatEntity extends Boat implements Container {
         }
 
         this.setYRot(this.getYRot() + this.sailboatTurnVelocity);
-        this.applySailboatInputPaddles();
     }
 
     private void applySailboatInputPaddles() {
-        this.applyPlayerLikePaddleState(
+        this.applySailboatPaddleState(
                 this.sailboatInputLeft,
                 this.sailboatInputRight,
                 this.sailboatInputForward,
                 this.sailboatInputBack
         );
+    }
+
+    @Override
+    public float getRowingTime(int side, float partialTick) {
+        if (!this.getPaddleState(side)) {
+            return 0.0F;
+        }
+
+        return Mth.clampedLerp(
+                this.sailboatPaddlePositions[side] - SAILBOAT_PADDLE_SPEED,
+                this.sailboatPaddlePositions[side],
+                partialTick
+        );
+    }
+
+    private void tickSailboatPaddlePositions() {
+        for (int side = 0; side <= 1; side++) {
+            if (this.getPaddleState(side)) {
+                this.sailboatPaddlePositions[side] += SAILBOAT_PADDLE_SPEED;
+            } else {
+                this.sailboatPaddlePositions[side] = 0.0F;
+            }
+        }
     }
 
     private float getMaxSmoothTurnSpeed() {
@@ -864,6 +889,45 @@ public class ModBoatEntity extends Boat implements Container {
     }
 
     @Override
+    public boolean hurt(DamageSource damageSource, float amount) {
+        if (isPirateProjectileDamage(damageSource)) {
+            Entity directEntity = damageSource.getDirectEntity();
+
+            // Remove pirate arrows / thrown weapons so they do not stick in the boat.
+            if (!this.level().isClientSide && directEntity != null) {
+                directEntity.discard();
+            }
+
+            return false;
+        }
+
+        return super.hurt(damageSource, amount);
+    }
+
+    private static boolean isPirateProjectileDamage(DamageSource damageSource) {
+        Entity directEntity = damageSource.getDirectEntity();
+        Entity ownerEntity = damageSource.getEntity();
+
+        if (directEntity instanceof PirateThrownWeaponEntity) {
+            return true;
+        }
+
+        if (directEntity instanceof AbstractArrow arrow) {
+            Entity arrowOwner = arrow.getOwner();
+
+            if (AbstractPirateEntity.isPirateAlly(arrowOwner)) {
+                return true;
+            }
+
+            if (AbstractPirateEntity.isPirateAlly(ownerEntity)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    @Override
     protected void positionRider(Entity passenger, Entity.MoveFunction callback) {
         if (!this.hasPassenger(passenger)) {
             return;
@@ -882,7 +946,10 @@ public class ModBoatEntity extends Boat implements Container {
         double rotatedX = seatOffset.x * Math.cos(yawRadians) - seatOffset.z * Math.sin(yawRadians);
         double rotatedZ = seatOffset.x * Math.sin(yawRadians) + seatOffset.z * Math.cos(yawRadians);
 
-        double riderY = this.getY() + this.getPassengersRidingOffset() + seatOffset.y;
+        double riderY = this.getY()
+                + this.getPassengersRidingOffset()
+                + seatOffset.y
+                + this.getPirateSeatYOffset(passenger, passengerIndex);
 
         callback.accept(
                 passenger,
@@ -894,6 +961,30 @@ public class ModBoatEntity extends Boat implements Container {
 
         passenger.setYRot(passenger.getYRot() + yawDelta);
         passenger.setYHeadRot(passenger.getYHeadRot() + yawDelta);
+    }
+
+    private double getPirateSeatYOffset(Entity passenger, int seatIndex) {
+        if (!(passenger instanceof AbstractPirateEntity)) {
+            return 0.0D;
+        }
+
+        /*
+         * Pirate models sit too high in the front driver seat.
+         * Only lower seat 0 so the other seats stay unchanged.
+         */
+        if (seatIndex == 0) {
+            if (this.isLargeSailboat()) {
+                return -0.18D;
+            }
+
+            if (this.isMediumSailboat()) {
+                return -0.16D;
+            }
+
+            return -0.14D;
+        }
+
+        return 0.0D;
     }
 
     private Vec3 getSailboatSeatOffset(int index) {

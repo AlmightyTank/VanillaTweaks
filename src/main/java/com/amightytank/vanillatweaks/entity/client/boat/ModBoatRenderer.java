@@ -134,14 +134,6 @@ public class ModBoatRenderer extends EntityRenderer<ModBoatEntity> {
 
         model.setupAnim(boat, partialTick, 0.0F, -0.1F, 0.0F, 0.0F);
 
-        if (model instanceof SailboatPaddleModel paddleModel) {
-            SailboatPaddleAnimator.animateOarSetsByPassengerCount(
-                    boat,
-                    paddleModel.getPaddleSets(),
-                    partialTick
-            );
-        }
-
         VertexConsumer vertexConsumer = bufferSource.getBuffer(model.renderType(texture));
         model.renderToBuffer(
                 poseStack,

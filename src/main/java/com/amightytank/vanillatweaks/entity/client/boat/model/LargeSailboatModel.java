@@ -1,7 +1,6 @@
 package com.amightytank.vanillatweaks.entity.client.boat.model;
 
 import com.amightytank.vanillatweaks.entity.client.boat.SailboatPaddleAnimator;
-import com.amightytank.vanillatweaks.entity.client.boat.SailboatPaddleModel;
 import com.amightytank.vanillatweaks.entity.custom.boat.ModBoatEntity;
 import com.google.common.collect.ImmutableList;
 import com.mojang.blaze3d.vertex.PoseStack;
@@ -15,9 +14,7 @@ import net.minecraft.client.model.geom.builders.LayerDefinition;
 import net.minecraft.client.model.geom.builders.MeshDefinition;
 import net.minecraft.client.model.geom.builders.PartDefinition;
 
-import java.util.List;
-
-public class LargeSailboatModel extends ListModel<ModBoatEntity> implements WaterPatchModel, BoatBannerModel, SailboatPaddleModel {
+public class LargeSailboatModel extends ListModel<ModBoatEntity> implements WaterPatchModel, BoatBannerModel {
 	private final ModelPart waterPatch;
 
 	private final ModelPart left;
@@ -199,38 +196,18 @@ public class LargeSailboatModel extends ListModel<ModBoatEntity> implements Wate
 
 	@Override
 	public void setupAnim(ModBoatEntity boat, float limbSwing, float limbSwingAmount, float ageInTicks, float netHeadYaw, float headPitch) {
-		SailboatPaddleAnimator.animateOarSetsByPassengerCount(
-				boat,
-				this.getPaddleSets(),
-				limbSwing
-		);
+		SailboatPaddleAnimator.animatePaddle(boat, 0, 0, this.paddleLeft, limbSwing, this.paddleLeftBase);
+		SailboatPaddleAnimator.animatePaddle(boat, 1, 0, this.paddleRight, limbSwing, this.paddleRightBase);
+
+		SailboatPaddleAnimator.animatePaddle(boat, 0, 1, this.paddleLeftMiddle, limbSwing, this.paddleLeftMiddleBase);
+		SailboatPaddleAnimator.animatePaddle(boat, 1, 1, this.paddleRightMiddle, limbSwing, this.paddleRightMiddleBase);
+
+		SailboatPaddleAnimator.animatePaddle(boat, 0, 2, this.paddleLeftBack, limbSwing, this.paddleLeftBackBase);
+		SailboatPaddleAnimator.animatePaddle(boat, 1, 2, this.paddleRightBack, limbSwing, this.paddleRightBackBase);
 
 		this.chest1.visible = boat.getChestCount() >= 1;
 		this.chest2.visible = boat.getChestCount() >= 2;
 		this.chest3.visible = boat.getChestCount() >= 3;
-	}
-
-	public List<SailboatPaddleAnimator.PaddleSet> getPaddleSets() {
-		return List.of(
-				new SailboatPaddleAnimator.PaddleSet(
-						this.paddleLeft,
-						this.paddleRight,
-						this.paddleLeftBase,
-						this.paddleRightBase
-				),
-				new SailboatPaddleAnimator.PaddleSet(
-						this.paddleLeftMiddle,
-						this.paddleRightMiddle,
-						this.paddleLeftMiddleBase,
-						this.paddleRightMiddleBase
-				),
-				new SailboatPaddleAnimator.PaddleSet(
-						this.paddleLeftBack,
-						this.paddleRightBack,
-						this.paddleLeftBackBase,
-						this.paddleRightBackBase
-				)
-		);
 	}
 
 	@Override

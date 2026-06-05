@@ -1,19 +1,15 @@
 package com.amightytank.vanillatweaks.entity.client.boat.model;
 
 import com.amightytank.vanillatweaks.entity.client.boat.SailboatPaddleAnimator;
-import com.amightytank.vanillatweaks.entity.client.boat.SailboatPaddleModel;
 import com.amightytank.vanillatweaks.entity.custom.boat.ModBoatEntity;
 import com.google.common.collect.ImmutableList;
 import com.mojang.blaze3d.vertex.PoseStack;
 import net.minecraft.client.model.ListModel;
-import net.minecraft.client.model.WaterPatchModel;
 import net.minecraft.client.model.geom.ModelPart;
 import net.minecraft.client.model.geom.PartPose;
 import net.minecraft.client.model.geom.builders.*;
 
-import java.util.List;
-
-public class BambooMediumSailboatModel extends ListModel<ModBoatEntity> implements BoatBannerModel, SailboatPaddleModel {
+public class BambooMediumSailboatModel extends ListModel<ModBoatEntity> implements BoatBannerModel {
     private final ModelPart body;
 
     private final ModelPart paddleLeft;
@@ -99,31 +95,14 @@ public class BambooMediumSailboatModel extends ListModel<ModBoatEntity> implemen
 
     @Override
     public void setupAnim(ModBoatEntity boat, float limbSwing, float limbSwingAmount, float ageInTicks, float netHeadYaw, float headPitch) {
-        SailboatPaddleAnimator.animateOarSetsByPassengerCount(
-                boat,
-                this.getPaddleSets(),
-                limbSwing
-        );
+        SailboatPaddleAnimator.animatePaddle(boat, 0, 0, this.paddleLeft, limbSwing, this.paddleLeftBase);
+        SailboatPaddleAnimator.animatePaddle(boat, 1, 0, this.paddleRight, limbSwing, this.paddleRightBase);
+
+        SailboatPaddleAnimator.animatePaddle(boat, 0, 1, this.paddleLeftBack, limbSwing, this.paddleLeftBackBase);
+        SailboatPaddleAnimator.animatePaddle(boat, 1, 1, this.paddleRightBack, limbSwing, this.paddleRightBackBase);
 
         this.chest1.visible = boat.getChestCount() >= 1;
         this.chest2.visible = boat.getChestCount() >= 2;
-    }
-
-    public List<SailboatPaddleAnimator.PaddleSet> getPaddleSets() {
-        return List.of(
-                new SailboatPaddleAnimator.PaddleSet(
-                        this.paddleLeft,
-                        this.paddleRight,
-                        this.paddleLeftBase,
-                        this.paddleRightBase
-                ),
-                new SailboatPaddleAnimator.PaddleSet(
-                        this.paddleLeftBack,
-                        this.paddleRightBack,
-                        this.paddleLeftBackBase,
-                        this.paddleRightBackBase
-                )
-        );
     }
 
     @Override

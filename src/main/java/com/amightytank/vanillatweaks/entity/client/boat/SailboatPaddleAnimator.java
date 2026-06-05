@@ -1,12 +1,9 @@
 package com.amightytank.vanillatweaks.entity.client.boat;
 
-import com.amightytank.vanillatweaks.entity.custom.boat.ModBoatEntity;
 import net.minecraft.client.model.geom.ModelPart;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.vehicle.Boat;
-
-import java.util.List;
 
 public final class SailboatPaddleAnimator {
     private static final float ROW_DIRECTION = -1.0F;
@@ -14,50 +11,7 @@ public final class SailboatPaddleAnimator {
     private static final float X_AMOUNT = 0.55F;
     private static final float Y_AMOUNT = 0.75F;
 
-    private static final float CUSTOM_ROW_SPEED = 0.65F;
-
-    /*
-     * Small offset so multiple pirates do not row perfectly identically.
-     * It makes the boat look more alive.
-     */
-    private static final float OAR_SET_PHASE_OFFSET = 0.55F;
-
     private SailboatPaddleAnimator() {
-    }
-
-    public static void animateOarSetsByPassengerCount(
-            Boat boat,
-            List<PaddleSet> paddleSets,
-            float partialTick
-    ) {
-        int activeSets = getActiveOarSetCount(boat, paddleSets.size());
-
-        for (int i = 0; i < paddleSets.size(); i++) {
-            PaddleSet set = paddleSets.get(i);
-
-            if (i < activeSets) {
-                animatePaddle(boat, 0, i, set.leftPaddle(), partialTick, set.leftBase());
-                animatePaddle(boat, 1, i, set.rightPaddle(), partialTick, set.rightBase());
-            } else {
-                resetPaddle(set.leftPaddle(), set.leftBase());
-                resetPaddle(set.rightPaddle(), set.rightBase());
-            }
-        }
-    }
-
-    private static int getActiveOarSetCount(Boat boat, int maxOarSets) {
-        if (boat instanceof ModBoatEntity modBoat) {
-            return modBoat.getSailboatVisualActiveOarSets(maxOarSets);
-        }
-
-        return Math.min(getLivingPassengerCount(boat), maxOarSets);
-    }
-
-    private static int getLivingPassengerCount(Boat boat) {
-        return (int) boat.getPassengers()
-                .stream()
-                .filter(entity -> entity instanceof LivingEntity livingEntity && livingEntity.isAlive())
-                .count();
     }
 
     public static void animatePaddle(
@@ -68,11 +22,25 @@ public final class SailboatPaddleAnimator {
             float partialTick,
             PaddleBase base
     ) {
-        paddle.x = base.x;
-        paddle.y = base.y;
-        paddle.z = base.z;
+        resetPaddle(paddle, base);
 
-        float f = getRowingTimeForVisuals(boat, side, oarSetIndex, partialTick) * ROW_DIRECTION;
+        /*
+         * One living passenger activates one oar set.
+         * Medium/large models call this for more sets, so no list helper is needed.
+         */
+        if (oarSetIndex >= getLivingPassengerCount(boat)) {
+            return;
+        }
+
+        /*
+         * side 0 = left-side oars
+         * side 1 = right-side oars
+         */
+        if (!boat.getPaddleState(side)) {
+            return;
+        }
+
+        float f = boat.getRowingTime(side, partialTick) * ROW_DIRECTION;
 
         float xDelta = Mth.sin(f) * X_AMOUNT;
         float yDelta = (Mth.sin(f + 1.0F) - Mth.sin(1.0F)) * Y_AMOUNT;
@@ -86,17 +54,11 @@ public final class SailboatPaddleAnimator {
         paddle.zRot = base.zRot;
     }
 
-    private static float getRowingTimeForVisuals(Boat boat, int side, int oarSetIndex, float partialTick) {
-        if (boat instanceof ModBoatEntity modBoat) {
-            if (modBoat.isSailboatVisualPaddleMoving(side)) {
-                return (((float) modBoat.tickCount + partialTick) * CUSTOM_ROW_SPEED)
-                        + (oarSetIndex * OAR_SET_PHASE_OFFSET);
-            }
-
-            return 0.0F;
-        }
-
-        return boat.getRowingTime(side, partialTick);
+    private static int getLivingPassengerCount(Boat boat) {
+        return (int) boat.getPassengers()
+                .stream()
+                .filter(entity -> entity instanceof LivingEntity livingEntity && livingEntity.isAlive())
+                .count();
     }
 
     private static void resetPaddle(ModelPart paddle, PaddleBase base) {
@@ -127,13 +89,5 @@ public final class SailboatPaddleAnimator {
             this.yRot = paddle.yRot;
             this.zRot = paddle.zRot;
         }
-    }
-
-    public record PaddleSet(
-            ModelPart leftPaddle,
-            ModelPart rightPaddle,
-            PaddleBase leftBase,
-            PaddleBase rightBase
-    ) {
     }
 }

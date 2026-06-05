@@ -1,7 +1,6 @@
 package com.amightytank.vanillatweaks.entity.client.boat.model;
 
 import com.amightytank.vanillatweaks.entity.client.boat.SailboatPaddleAnimator;
-import com.amightytank.vanillatweaks.entity.client.boat.SailboatPaddleModel;
 import com.amightytank.vanillatweaks.entity.custom.boat.ModBoatEntity;
 import com.google.common.collect.ImmutableList;
 import com.mojang.blaze3d.vertex.PoseStack;
@@ -15,9 +14,7 @@ import net.minecraft.client.model.geom.builders.LayerDefinition;
 import net.minecraft.client.model.geom.builders.MeshDefinition;
 import net.minecraft.client.model.geom.builders.PartDefinition;
 
-import java.util.List;
-
-public class SmallSailboatModel extends ListModel<ModBoatEntity> implements WaterPatchModel, BoatBannerModel, SailboatPaddleModel {
+public class SmallSailboatModel extends ListModel<ModBoatEntity> implements WaterPatchModel, BoatBannerModel {
     private final ModelPart front;
     private final ModelPart left;
     private final ModelPart right;
@@ -98,11 +95,8 @@ public class SmallSailboatModel extends ListModel<ModBoatEntity> implements Wate
 
     @Override
     public void setupAnim(ModBoatEntity boat, float limbSwing, float limbSwingAmount, float ageInTicks, float netHeadYaw, float headPitch) {
-        SailboatPaddleAnimator.animateOarSetsByPassengerCount(
-                boat,
-                this.getPaddleSets(),
-                limbSwing
-        );
+        SailboatPaddleAnimator.animatePaddle(boat, 0, 0, this.paddleLeft, limbSwing, this.paddleLeftBase);
+        SailboatPaddleAnimator.animatePaddle(boat, 1, 0, this.paddleRight, limbSwing, this.paddleRightBase);
 
         this.chest.visible = boat.getChestCount() >= 1;
     }
@@ -119,17 +113,6 @@ public class SmallSailboatModel extends ListModel<ModBoatEntity> implements Wate
                 paddleLeft,
                 paddleRight,
                 bannerSail
-        );
-    }
-
-    public List<SailboatPaddleAnimator.PaddleSet> getPaddleSets() {
-        return List.of(
-                new SailboatPaddleAnimator.PaddleSet(
-                        this.paddleLeft,
-                        this.paddleRight,
-                        this.paddleLeftBase,
-                        this.paddleRightBase
-                )
         );
     }
 
